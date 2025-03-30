@@ -20,6 +20,13 @@ type Subtopic = {
   topic_id: number;
   subtopic_name: string;
 };
+type QuestionPaper = {
+  paper_id: number;
+  paper_year: number;
+  paper_code: string | null;
+  subject: string;
+  section: string | null;
+};
 
 type Question = {
   question_id: number;
@@ -78,6 +85,10 @@ export default function QuestionsPage() {
   
   // JSON Uploader state
   const [isJsonUploaderOpen, setIsJsonUploaderOpen] = useState(false);
+
+  const [selectedPaperId, setSelectedPaperId] = useState<number | null>(null);
+  const [papers, setPapers] = useState<QuestionPaper[]>([]);
+  const [currentPaper, setCurrentPaper] = useState<QuestionPaper | null>(null);
 
   // Fetch initial data
   useEffect(() => {
@@ -164,8 +175,93 @@ export default function QuestionsPage() {
 
   // Fetch questions based on filters
   useEffect(() => {
+    const fetchQuestions = async () => {
+      setLoading(true);
+      try {
+        let url = '/api/admin/questions?';
+        
+        if (selectedPaperId) {
+          url += `paperId=${selectedPaperId}`;
+        } else if (selectedTopic) {
+          url += `topicId=${selectedTopic}`;
+          
+          if (selectedSubtopic) {
+            url += `&subtopicId=${selectedSubtopic}`;
+          }
+        }
+        
+        // Add pagination
+        url += `&limit=${limit}&offset=${(page - 1) * limit}`;
+        
+        const response = await fetch(url);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Filter by question type if selected
+          const filteredData = selectedType 
+            ? data.filter((q: Question) => q.question_type === selectedType)
+            : data;
+            
+          setQuestions(filteredData);
+          setTotalQuestions(filteredData.length);
+        } else {
+          setError('Failed to load questions');
+        }
+      } catch (err) {
+        setError('Failed to load questions');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchQuestions();
-  }, [selectedTopic, selectedSubtopic, selectedType, page, limit]);
+  }, [selectedTopic, selectedSubtopic, selectedPaperId, selectedType, page, limit]);
+
+  // Check if there's a paper ID in the URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paperId = urlParams.get('paperId');
+    
+    if (paperId) {
+      const id = Number(paperId);
+      setSelectedPaperId(id);
+      
+      // Fetch the paper details
+      const fetchPaper = async () => {
+        try {
+          const response = await fetch(`/api/admin/question-papers?id=${id}`);
+          
+          if (response.ok) {
+            const paper = await response.json();
+            setCurrentPaper(paper);
+          }
+        } catch (err) {
+          console.error('Error fetching paper details:', err);
+        }
+      };
+      
+      fetchPaper();
+    }
+  }, []);
+
+  // Add this code to fetch the papers for the dropdown
+  useEffect(() => {
+    const fetchPapers = async () => {
+      try {
+        const response = await fetch('/api/admin/question-papers');
+        
+        if (response.ok) {
+          const data = await response.json();
+          setPapers(data);
+        }
+      } catch (err) {
+        console.error('Error fetching papers:', err);
+      }
+    };
+    
+    fetchPapers();
+  }, []);
 
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedSubject(e.target.value);
@@ -291,7 +387,12 @@ export default function QuestionsPage() {
       setError(`Failed to ${formMode} question`);
     }
   };
-
+// Add this handler function
+const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const value = e.target.value;
+  setSelectedPaperId(value ? Number(value) : null);
+  setPage(1);
+};
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -521,6 +622,33 @@ export default function QuestionsPage() {
               ))}
             </select>
           </div>
+          {currentPaper && (
+            <div className="col-span-full bg-indigo-50 p-3 rounded-md mb-2">
+              <h3 className="font-medium text-indigo-800">
+                Viewing questions for: {currentPaper.subject} ({currentPaper.paper_year})
+                {currentPaper.paper_code && ` - ${currentPaper.paper_code}`}
+                {currentPaper.section && ` Section ${currentPaper.section}`}
+              </h3>
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Question Paper:
+            </label>
+            <select
+              value={selectedPaperId?.toString() || ''}
+              onChange={handlePaperChange}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              <option value="">All Papers</option>
+              {papers.map((paper) => (
+                <option key={paper.paper_id} value={paper.paper_id}>
+                  {paper.subject} ({paper.paper_year})
+                  {paper.paper_code && ` - ${paper.paper_code}`}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -729,6 +857,26 @@ export default function QuestionsPage() {
                     className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                     required
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="paper_id">
+                    Question Paper
+                  </label>
+                  <select
+                    id="paper_id"
+                    name="paper_id"
+                    value={currentQuestion.paper_id?.toString() || ''}
+                    onChange={handleInputChange}
+                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                  >
+                    <option value="">None</option>
+                    {papers.map((paper) => (
+                      <option key={paper.paper_id} value={paper.paper_id}>
+                        {paper.subject} ({paper.paper_year})
+                        {paper.paper_code && ` - ${paper.paper_code}`}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
