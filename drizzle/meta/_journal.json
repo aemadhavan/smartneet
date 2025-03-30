@@ -15,6 +15,13 @@
       "when": 1743296129883,
       "tag": "0001_fancy_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1743304617312,
+      "tag": "0002_handy_skin",
+      "breakpoints": true
     }
   ]
 }
