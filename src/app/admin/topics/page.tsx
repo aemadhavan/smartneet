@@ -36,6 +36,7 @@ export default function TopicsPage() {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         // Fetch subjects
         const subjectsResponse = await fetch('/api/admin/subjects');
@@ -45,28 +46,43 @@ export default function TopicsPage() {
         const subjectsData = await subjectsResponse.json();
         setSubjects(subjectsData);
         
-        // If there are subjects, fetch topics (either all or for the first subject)
-        if (subjectsData.length > 0) {
-          await fetchTopics(selectedSubject || subjectsData[0].subject_id);
+        // If there are subjects, set selectedSubject to the first one if not already set
+        if (subjectsData.length > 0 && !selectedSubject) {
+          setSelectedSubject(subjectsData[0].subject_id.toString());
+          await fetchTopics(subjectsData[0].subject_id.toString());
+        } else if (selectedSubject) {
+          await fetchTopics(selectedSubject);
         } else {
           setTopics([]);
           setLoading(false);
         }
       } catch (err) {
+        console.error('Error in fetchData:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
         setLoading(false);
       }
     };
     
     fetchData();
+  }, []);
+
+  // Effect to handle selectedSubject changes
+  useEffect(() => {
+    if (selectedSubject) {
+      fetchTopics(selectedSubject);
+    }
   }, [selectedSubject]);
 
   const fetchTopics = async (subjectId: string) => {
     try {
+      setLoading(true);
+      setError(null);
+      
       const url = subjectId 
         ? `/api/admin/topics?subjectId=${subjectId}` 
         : '/api/admin/topics';
       
+      console.log('Fetching topics from:', url);
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -74,14 +90,16 @@ export default function TopicsPage() {
       }
       
       const data = await response.json();
+      console.log('Topics fetched:', data);
       setTopics(data);
       
       // Set available parent topics (exclude non-active ones)
       setParentTopics(data.filter((topic: Topic) => topic.is_active));
       
-      setLoading(false);
     } catch (err) {
+      console.error('Error in fetchTopics:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
       setLoading(false);
     }
   };
@@ -91,13 +109,27 @@ export default function TopicsPage() {
   };
 
   const handleCreateClick = () => {
-    setCurrentTopic({ subject_id: selectedSubject });
+    // Make sure we have a subject selected
+    if (!selectedSubject && subjects.length > 0) {
+      setSelectedSubject(subjects[0].subject_id.toString());
+    }
+    
+    // Initialize the form with the selected subject
+    setCurrentTopic({
+      subject_id: selectedSubject || subjects[0]?.subject_id.toString() || '',
+      topic_name: '',
+      description: '',
+      parent_topic_id: null,
+      is_active: true
+    });
+    
     setFormMode('create');
     setIsFormOpen(true);
+    console.log('Create topic form opened with subject:', selectedSubject);
   };
 
   const handleEditClick = (topic: Topic) => {
-    setCurrentTopic(topic);
+    setCurrentTopic({...topic});
     setFormMode('edit');
     setIsFormOpen(true);
   };
@@ -108,6 +140,7 @@ export default function TopicsPage() {
     }
 
     try {
+      setError(null);
       const response = await fetch(`/api/admin/topics?id=${id}`, {
         method: 'DELETE',
       });
@@ -119,6 +152,7 @@ export default function TopicsPage() {
       // Refresh the list
       fetchTopics(selectedSubject);
     } catch (err) {
+      console.error('Error in handleDeleteClick:', err);
       setError(err instanceof Error ? err.message : 'An error occurred while deleting');
     }
   };
@@ -126,8 +160,18 @@ export default function TopicsPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!currentTopic.subject_id || !currentTopic.topic_name) {
+      setError('Subject and topic name are required');
+      return;
+    }
+    
     try {
+      setLoading(true);
+      setError(null);
+      
       const method = formMode === 'create' ? 'POST' : 'PUT';
+      console.log(`Submitting form with method ${method}:`, currentTopic);
+      
       const response = await fetch('/api/admin/topics', {
         method,
         headers: {
@@ -137,14 +181,18 @@ export default function TopicsPage() {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${formMode} topic`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to ${formMode} topic`);
       }
 
       // Close form and refresh the list
       setIsFormOpen(false);
       fetchTopics(selectedSubject);
     } catch (err) {
+      console.error('Error in handleFormSubmit:', err);
       setError(err instanceof Error ? err.message : `An error occurred while ${formMode === 'create' ? 'creating' : 'updating'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -182,7 +230,6 @@ export default function TopicsPage() {
         <button 
           onClick={handleCreateClick}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          disabled={!selectedSubject && subjects.length > 0}
         >
           Add New Topic
         </button>
@@ -195,7 +242,7 @@ export default function TopicsPage() {
             Filter by Subject:
           </label>
           <select
-            value={selectedSubject || subjects[0]?.subject_id.toString() || ''}
+            value={selectedSubject || ''}
             onChange={handleSubjectChange}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
           >
