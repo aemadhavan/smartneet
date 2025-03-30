@@ -64,7 +64,7 @@ export const questions = pgTable('questions', {
   question_number: integer('question_number').notNull(),
   topic_id: integer('topic_id').references(() => topics.topic_id),
   subtopic_id: integer('subtopic_id').references(() => subtopics.subtopic_id),
-  question_type: varchar('question_type', { length: 50 }).notNull(),
+  question_type: varchar('question_type', { length: 50 }).notNull(), //
   question_text: text('question_text').notNull(),
   explanation: text('explanation'),
   difficulty_level: varchar('difficulty_level', { length: 20 }).default('medium'),

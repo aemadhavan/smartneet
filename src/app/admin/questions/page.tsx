@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import JsonUploader from '@/app/admin/components/JsonUploader';
 
 type Subject = {
   subject_id: number;
@@ -74,6 +75,9 @@ export default function QuestionsPage() {
   const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({});
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewQuestion, setViewQuestion] = useState<Question | null>(null);
+  
+  // JSON Uploader state
+  const [isJsonUploaderOpen, setIsJsonUploaderOpen] = useState(false);
 
   // Fetch initial data
   useEffect(() => {
@@ -160,45 +164,6 @@ export default function QuestionsPage() {
 
   // Fetch questions based on filters
   useEffect(() => {
-    const fetchQuestions = async () => {
-      setLoading(true);
-      try {
-        let url = '/api/admin/questions?';
-        
-        if (selectedTopic) {
-          url += `topicId=${selectedTopic}&`;
-        }
-        
-        if (selectedSubtopic) {
-          url += `subtopicId=${selectedSubtopic}&`;
-        }
-        
-        // Add pagination
-        url += `limit=${limit}&offset=${(page - 1) * limit}`;
-        
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const data = await response.json();
-          
-          // Filter by question type if selected
-          const filteredData = selectedType 
-            ? data.filter((q: Question) => q.question_type === selectedType)
-            : data;
-            
-          setQuestions(filteredData);
-          // This is simplified - in a real app you would get total count from server
-          setTotalQuestions(filteredData.length);
-        } else {
-          setError('Failed to load questions');
-        }
-      } catch (err) {
-        setError('Failed to load questions');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchQuestions();
   }, [selectedTopic, selectedSubtopic, selectedType, page, limit]);
 
@@ -345,6 +310,49 @@ export default function QuestionsPage() {
     }
   };
 
+  const handleJsonUploaderClose = () => {
+    setIsJsonUploaderOpen(false);
+    
+    // Refresh the questions list after upload
+    fetchQuestions();
+  };
+
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      let url = '/api/admin/questions?';
+      
+      if (selectedTopic) {
+        url += `topicId=${selectedTopic}&`;
+      }
+      
+      if (selectedSubtopic) {
+        url += `subtopicId=${selectedSubtopic}&`;
+      }
+      
+      url += `limit=${limit}&offset=${(page - 1) * limit}`;
+      
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        const filteredData = selectedType 
+          ? data.filter((q: Question) => q.question_type === selectedType)
+          : data;
+          
+        setQuestions(filteredData);
+        setTotalQuestions(filteredData.length);
+      } else {
+        setError('Failed to load questions');
+      }
+    } catch (err) {
+      setError('Failed to refresh questions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getTopicName = (topicId: number | null) => {
     if (!topicId) return 'None';
     const topic = topics.find(t => t.topic_id === topicId);
@@ -421,13 +429,21 @@ export default function QuestionsPage() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Questions Management</h1>
-        <button 
-          onClick={handleCreateClick}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          disabled={!selectedTopic}
-        >
-          Add New Question
-        </button>
+        <div className="flex space-x-4">
+          <button 
+            onClick={() => setIsJsonUploaderOpen(true)}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          >
+            Add Questions from JSON
+          </button>
+          <button 
+            onClick={handleCreateClick}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            disabled={!selectedTopic}
+          >
+            Add New Question
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -588,6 +604,11 @@ export default function QuestionsPage() {
           {renderPagination()}
         </>
       )}
+      
+      {/* JSON Uploader Modal */}
+      {isJsonUploaderOpen && (
+        <JsonUploader onClose={handleJsonUploaderClose} />
+      )}
 
       {/* Question Form Modal */}
       {isFormOpen && (
@@ -737,7 +758,7 @@ export default function QuestionsPage() {
                   onChange={handleInputChange}
                   className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                   rows={3}
-                />
+                ></textarea>
               </div>
               
               <div className="flex items-center">
