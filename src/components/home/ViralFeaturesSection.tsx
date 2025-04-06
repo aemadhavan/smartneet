@@ -1,6 +1,4 @@
 import { motion } from "framer-motion";
-import Link from "next/link";
-import { stats } from "../data/stats";
 
 const fadeIn = {
     hidden: { opacity: 0, y: 20 },
@@ -36,16 +34,6 @@ const fadeIn = {
     }
   };
   
-  const numberCounter = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: {
-        duration: 1
-      }
-    }
-  };
-
   export const ViralFeaturesSection = () => {
     return (
         <section className="py-20 bg-gradient-to-b from-gray-50 to-white overflow-hidden relative">

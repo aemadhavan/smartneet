@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import Link from "next/link";
-import { stats } from "../data/stats";
+
 
 const fadeIn = {
     hidden: { opacity: 0, y: 20 },
@@ -23,28 +22,7 @@ const fadeIn = {
       }
     }
   };
-  const heroImageAnimate = {
-    hidden: { scale: 0.8, opacity: 0 },
-    visible: { 
-      scale: 1, 
-      opacity: 1, 
-      transition: { 
-        type: "spring",
-        stiffness: 50,
-        delay: 0.2 
-      } 
-    }
-  };
   
-  const numberCounter = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: {
-        duration: 1
-      }
-    }
-  };
 
   export const CTASection = () => {
     return (
