@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2">
-            <h3 className="text-2xl font-bold text-white mb-4">Smart<span className="text-emerald-400">NEET</span></h3>
+            <h3 className="text-2xl font-bold text-white mb-4">Smarter<span className="text-emerald-400">NEET</span></h3>
             <p className="text-gray-400 mb-4 max-w-md">Your ultimate companion for NEET exam preparation. Access 10 years of previous questions, AI-powered analytics, and personalized learning paths.</p>
             <div className="flex space-x-4">
                 <a href="#" className="text-gray-400 hover:text-white transition-colors">
