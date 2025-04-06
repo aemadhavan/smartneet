@@ -64,7 +64,7 @@ export default function TopicsPage() {
     };
     
     fetchData();
-  }, []);
+  }, [selectedSubject]);
 
   // Effect to handle selectedSubject changes
   useEffect(() => {

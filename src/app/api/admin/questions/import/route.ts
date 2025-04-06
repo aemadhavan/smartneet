@@ -11,7 +11,82 @@ import {
   statement_based_questions,
   statements
 } from '@/db/schema';
+// Base question interface
+interface BaseQuestionData {
+  paper_id: number;
+  question_number: number;
+  topic_id?: number;
+  subtopic_id?: number;
+  question_type: string;
+  question_text: string;
+  explanation?: string;
+  difficulty_level?: string;
+  marks?: number;
+  is_image_based?: boolean;
+  image_url?: string;
+  is_active?: boolean;
+}
 
+// Multiple choice option interface
+interface MultipleChoiceOption {
+  option_number: number;
+  option_text: string;
+  is_correct: boolean;
+}
+
+// Assertion reason interface
+interface AssertionReasonData {
+  assertion_text: string;
+  reason_text: string;
+  correct_option: number;
+  options?: MultipleChoiceOption[];
+}
+
+// Match columns item interface
+interface MatchColumnsItem {
+  left_item_label: string;
+  left_item_text: string;
+  right_item_label: string;
+  right_item_text: string;
+}
+
+// Match columns option interface
+interface MatchColumnsOption {
+  option_number: number;
+  option_text: string;
+  is_correct: boolean;
+}
+
+// Match columns data interface
+interface MatchColumnsData {
+  left_column_header?: string;
+  right_column_header?: string;
+  items?: MatchColumnsItem[];
+  options?: MatchColumnsOption[];
+}
+
+// Statement interface
+interface Statement {
+  statement_number: number;
+  statement_text: string;
+  is_correct: boolean;
+}
+
+// Statement based data interface
+interface StatementBasedData {
+  intro_text?: string;
+  correct_option: number;
+  statements?: Statement[];
+  options?: MultipleChoiceOption[];
+}
+
+// Complete question data interface
+interface QuestionData extends BaseQuestionData {
+  options?: MultipleChoiceOption[];
+  assertion_reason?: AssertionReasonData;
+  match_columns?: MatchColumnsData;
+  statement_based?: StatementBasedData;
+}
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -25,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     const text = await jsonFile.text();
-    let questionsData;
+    let questionsData: QuestionData[] ;
     
     try {
       questionsData = JSON.parse(text);
@@ -36,6 +111,7 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (error) {
+      console.error('Error parsing JSON:', error);
       return NextResponse.json(
         { error: 'Failed to parse JSON' },
         { status: 400 }
@@ -75,7 +151,7 @@ export async function POST(request: NextRequest) {
             case 'multiple_choice':
               if (questionData.options) {
                 await Promise.all(
-                  questionData.options.map((option: any) =>
+                  questionData.options.map((option: MultipleChoiceOption) =>
                     tx.insert(multiple_choice_options).values({
                       question_id: questionId,
                       option_number: option.option_number,
@@ -89,21 +165,22 @@ export async function POST(request: NextRequest) {
 
             case 'assertion_reason':
               if (questionData.assertion_reason) {
+                const ar = questionData.assertion_reason; 
                 await tx.insert(assertion_reason_questions).values({
                   question_id: questionId,
-                  assertion_text: questionData.assertion_reason.assertion_text,
-                  reason_text: questionData.assertion_reason.reason_text,
-                  correct_option: questionData.assertion_reason.correct_option
+                  assertion_text: ar.assertion_text,
+                  reason_text: ar.reason_text,
+                  correct_option: ar.correct_option
                 });
 
                 if (questionData.assertion_reason.options) {
                   await Promise.all(
-                    questionData.assertion_reason.options.map((option: any) =>
+                    questionData.assertion_reason.options.map((option: MultipleChoiceOption) =>
                       tx.insert(multiple_choice_options).values({
                         question_id: questionId,
                         option_number: option.option_number,
                         option_text: option.option_text,
-                        is_correct: option.option_number === questionData.assertion_reason.correct_option
+                        is_correct: option.option_number === questionData.assertion_reason!.correct_option
                       })
                     )
                   );
@@ -127,7 +204,7 @@ export async function POST(request: NextRequest) {
                 // Insert match items
                 if (questionData.match_columns.items) {
                   await Promise.all(
-                    questionData.match_columns.items.map((item: any) =>
+                    questionData.match_columns.items.map((item: MatchColumnsItem) =>
                       tx.insert(match_columns_items).values({
                         match_id: matchId,
                         left_item_label: item.left_item_label,
@@ -142,7 +219,7 @@ export async function POST(request: NextRequest) {
                 // Insert match options
                 if (questionData.match_columns.options) {
                   await Promise.all(
-                    questionData.match_columns.options.map((option: any) =>
+                    questionData.match_columns.options.map((option: MatchColumnsOption) =>
                       tx.insert(match_columns_options).values({
                         match_id: matchId,
                         option_number: option.option_number,
@@ -166,7 +243,7 @@ export async function POST(request: NextRequest) {
                 // Insert statements
                 if (questionData.statement_based.statements) {
                   await Promise.all(
-                    questionData.statement_based.statements.map((statement: any) =>
+                    questionData.statement_based.statements.map((statement: Statement) =>
                       tx.insert(statements).values({
                         question_id: questionId,
                         statement_number: statement.statement_number,
@@ -180,12 +257,12 @@ export async function POST(request: NextRequest) {
                 // Insert options
                 if (questionData.statement_based.options) {
                   await Promise.all(
-                    questionData.statement_based.options.map((option: any) =>
+                    questionData.statement_based.options.map((option: MultipleChoiceOption) =>
                       tx.insert(multiple_choice_options).values({
                         question_id: questionId,
                         option_number: option.option_number,
                         option_text: option.option_text,
-                        is_correct: option.option_number === questionData.statement_based.correct_option
+                        is_correct: option.option_number === questionData.statement_based!.correct_option
                       })
                     )
                   );

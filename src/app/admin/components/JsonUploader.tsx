@@ -63,6 +63,7 @@ const JsonUploader: React.FC<JsonUploaderProps> = ({ onClose, onUploadSuccess })
         });
       }
     } catch (error) {
+      console.error('Error importing questions:', error);
       setUploadStatus({
         success: false,
         message: 'An error occurred while importing questions'

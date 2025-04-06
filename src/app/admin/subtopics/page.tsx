@@ -59,7 +59,7 @@ export default function SubtopicsPage() {
     };
     
     fetchSubjects();
-  }, []);
+  }, [selectedSubject]);
 
   // Fetch topics when subject changes
   useEffect(() => {
@@ -91,7 +91,7 @@ export default function SubtopicsPage() {
     };
     
     fetchTopicsBySubject();
-  }, [selectedSubject]);
+  }, [selectedSubject, selectedTopic]);
 
   // Fetch subtopics when topic changes
   useEffect(() => {

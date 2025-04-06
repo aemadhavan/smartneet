@@ -137,11 +137,11 @@ export async function getQuestionById(id: number) {
   return db.select().from(questions).where(eq(questions.question_id, id)).limit(1);
 }
 
-export async function createQuestion(data: any) {
+export async function createQuestion(data: QuestionCreate) {
   return db.insert(questions).values(data).returning();
 }
 
-export async function updateQuestion(id: number, data: any) {
+export async function updateQuestion(id: number, data: QuestionUpdate) {
   return db.update(questions).set(data).where(eq(questions.question_id, id)).returning();
 }
 
@@ -205,4 +205,35 @@ export async function updateQuestionPaperCount(paperId: number) {
     .set({ total_questions: count })
     .where(eq(question_papers.paper_id, paperId))
     .returning();
+}
+
+interface QuestionCreate {
+  paper_id?: number;
+  question_number: number;
+  topic_id?: number;
+  subtopic_id?: number;
+  question_type: string;
+  question_text: string;
+  explanation?: string;
+  difficulty_level?: string;
+  marks?: number;
+  is_image_based?: boolean;
+  image_url?: string;
+  is_active?: boolean;
+}
+
+interface QuestionUpdate {
+  paper_id?: number;
+  question_number?: number;
+  topic_id?: number;
+  subtopic_id?: number;
+  question_type?: string;
+  question_text?: string;
+  explanation?: string;
+  difficulty_level?: string;
+  marks?: number;
+  is_image_based?: boolean;
+  image_url?: string;
+  is_active?: boolean;
+  updated_at?: Date;
 }

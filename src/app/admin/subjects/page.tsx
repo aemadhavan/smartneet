@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+//import { useRouter } from 'next/navigation';
 
 type Subject = {
   subject_id: number;
@@ -12,7 +12,7 @@ type Subject = {
 };
 
 export default function SubjectsPage() {
-  const router = useRouter();
+  //const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

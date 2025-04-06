@@ -12,6 +12,7 @@
     "@clerk/nextjs": "^6.12.12",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.41.0",
+    "framer-motion": "^12.6.3",
     "next": "15.2.4",
     "pg": "^8.14.1",
     "react": "^19.0.0",

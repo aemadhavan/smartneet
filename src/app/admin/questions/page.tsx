@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import JsonUploader from '@/app/admin/components/JsonUploader';
+import Image from 'next/image';
 
 type Subject = {
   subject_id: number;
@@ -105,12 +106,13 @@ export default function QuestionsPage() {
           }
         }
       } catch (err) {
+        console.error('Error fetching subjects:', err);
         setError('Failed to load initial data');
       }
     };
     
     fetchInitialData();
-  }, []);
+  }, [selectedSubject]);
 
   // Fetch topics when subject changes
   useEffect(() => {
@@ -135,12 +137,13 @@ export default function QuestionsPage() {
           }
         }
       } catch (err) {
+        console.error('Error fetching topics:', err);
         setError('Failed to load topics');
       }
     };
     
     fetchTopics();
-  }, [selectedSubject]);
+  }, [selectedSubject,selectedTopic]);
 
   // Fetch subtopics when topic changes
   useEffect(() => {
@@ -166,12 +169,13 @@ export default function QuestionsPage() {
           }
         }
       } catch (err) {
+        console.error('Error fetching subtopics:', err);
         setError('Failed to load subtopics');
       }
     };
     
     fetchSubtopics();
-  }, [selectedTopic]);
+  }, [selectedTopic, selectedSubtopic, selectedPaperId, selectedType, page, limit]);
 
   // Fetch questions based on filters
   useEffect(() => {
@@ -209,6 +213,7 @@ export default function QuestionsPage() {
           setError('Failed to load questions');
         }
       } catch (err) {
+        console.error('Error fetching questions:', err);
         setError('Failed to load questions');
       } finally {
         setLoading(false);
@@ -311,6 +316,7 @@ export default function QuestionsPage() {
         setError('Failed to load question details');
       }
     } catch (err) {
+      console.error('Error fetching question details:', err); 
       setError('Failed to load question details');
     }
   };
@@ -327,6 +333,7 @@ export default function QuestionsPage() {
         setError('Failed to load question details');
       }
     } catch (err) {
+      console.error('Error fetching question details:', err); 
       setError('Failed to load question details');
     }
   };
@@ -348,6 +355,7 @@ export default function QuestionsPage() {
         setError('Failed to delete question');
       }
     } catch (err) {
+      console.error('Error deleting question:', err);
       setError('Failed to delete question');
     }
   };
@@ -384,6 +392,7 @@ export default function QuestionsPage() {
         setError(`Failed to ${formMode} question`);
       }
     } catch (err) {
+      console.error(`Error ${formMode} question:`, err);
       setError(`Failed to ${formMode} question`);
     }
   };
@@ -448,6 +457,7 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setError('Failed to load questions');
       }
     } catch (err) {
+      console.error(err);
       setError('Failed to refresh questions');
     } finally {
       setLoading(false);
@@ -1000,7 +1010,15 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
               {viewQuestion.is_image_based && viewQuestion.image_url && (
                 <div>
                   <strong>Image:</strong> <br />
-                  <img src={viewQuestion.image_url} alt="Question Image" className="max-w-full h-auto mt-1 border rounded" />
+                  <Image 
+                      src={viewQuestion.image_url} 
+                      alt="Question Image" 
+                      width={0}
+                      height={0}
+                      sizes="100vw"
+                      style={{ width: '100%', height: 'auto' }}
+                      className="mt-1 border rounded" 
+                    />
                 </div>
               )}
               <div className="mt-2">
