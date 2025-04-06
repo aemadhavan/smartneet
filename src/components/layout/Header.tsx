@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const Header = () => {
   return (
@@ -31,12 +32,23 @@ const Header = () => {
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-4">
-            <Link href="#" className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-all">
-              Log in
-            </Link>
-            <Link href="#" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-md hover:shadow-lg transition-all">
-              Sign up
-            </Link>
+              <SignedOut>
+                <Link 
+                  href="/sign-in" 
+                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                >
+                  Log In
+                </Link>
+                <Link 
+                  href="/sign-up" 
+                  className="rounded-md px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  Sign Up
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <UserButton />
+              </SignedIn>
           </div>
           
           {/* Mobile menu button */}
