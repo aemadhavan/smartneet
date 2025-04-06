@@ -10,7 +10,7 @@ const Header = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-indigo-600">Smart<span className="text-emerald-500">NEET</span></span>
+              <span className="text-2xl font-bold text-indigo-600">Smarter<span className="text-emerald-500">NEET</span></span>
             </Link>
             <div className="hidden md:ml-10 md:flex md:space-x-8">
               <Link href="/" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
