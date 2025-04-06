@@ -29,7 +29,7 @@ const fadeIn = {
       rank: "AIR 342",
       year: "2023",
       image: "/student1.jpg",
-      quote: "SmartNEET helped me identify my weak areas in Biology. After 3 months of focused practice, I improved my score by 15%."
+      quote: "SmarterNEET helped me identify my weak areas in Biology. After 3 months of focused practice, I improved my score by 15%."
     },
     {
       name: "Rahul Patel",
@@ -60,7 +60,7 @@ const fadeIn = {
                   >
                     <span className="px-3 py-1 text-sm font-medium bg-indigo-100 text-indigo-800 rounded-full inline-block mb-4">SUCCESS STORIES</span>
                     <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Meet Our Top Achievers</h2>
-                    <p className="text-xl text-gray-600 max-w-2xl mx-auto">Hear directly from students who cracked NEET with SmartNEET&apos;s help.</p>
+                    <p className="text-xl text-gray-600 max-w-2xl mx-auto">Hear directly from students who cracked NEET with SmarterNEET&apos;s help.</p>
                   </motion.div>
                   
                   <motion.div 

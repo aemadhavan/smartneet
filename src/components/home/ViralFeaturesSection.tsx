@@ -52,7 +52,7 @@ const fadeIn = {
             variants={fadeIn}
           >
             <span className="px-3 py-1 text-sm font-medium bg-emerald-100 text-emerald-800 rounded-full inline-block mb-4">VIRAL FEATURES</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">What Makes SmartNEET Different</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">What Makes SmarterNEET Different</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">Innovative features that transform how you prepare for NEET.</p>
           </motion.div>
           
@@ -142,7 +142,7 @@ const fadeIn = {
                   <div className="bg-indigo-600 p-4 text-white">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center">
-                        <span className="font-bold text-lg mr-2">SmartNEET</span>
+                        <span className="font-bold text-lg mr-2">SmarterNEET</span>
                         <span className="text-xs px-2 py-0.5 bg-indigo-800 rounded-full">BETA</span>
                       </div>
                       <div className="flex space-x-2">

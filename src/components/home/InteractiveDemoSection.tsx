@@ -52,7 +52,7 @@ const fadeIn = {
                         viewport={{ once: true, margin: "-100px" }}
                         variants={fadeIn}
                       >
-                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Experience SmartNEET in Action</h2>
+                        <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Experience SmarterNEET in Action</h2>
                         <p className="text-xl text-gray-600 max-w-2xl mx-auto">Try our interactive demo to see how our platform makes NEET preparation effective and engaging.</p>
                       </motion.div>
                       
@@ -144,7 +144,7 @@ const fadeIn = {
                                   <div className="w-3 h-3 rounded-full bg-red-400"></div>
                                   <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                                   <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                                  <div className="ml-2 text-xs text-gray-500">dashboard.smartneet.com</div>
+                                  <div className="ml-2 text-xs text-gray-500">dashboard.smarterneet.com</div>
                                 </div>
                                 
                                 <div className="bg-white rounded-lg p-4">

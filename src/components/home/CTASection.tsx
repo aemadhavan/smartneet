@@ -76,7 +76,7 @@ const fadeIn = {
             variants={fadeIn}
           >
             <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to Transform Your NEET Preparation?</h2>
-            <p className="text-xl text-indigo-100 mb-10">Join thousands of successful students who achieved their dream medical college seats with SmartNEET.</p>
+            <p className="text-xl text-indigo-100 mb-10">Join thousands of successful students who achieved their dream medical college seats with SmarterNEET.</p>
             
             <motion.div 
               className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6"
@@ -112,7 +112,7 @@ const fadeIn = {
                 </div>
                 <div className="ml-4">
                   <div className="font-medium">60,000+ Students</div>
-                  <div className="text-sm text-indigo-200">Trust SmartNEET</div>
+                  <div className="text-sm text-indigo-200">Trust SmarterNEET</div>
                 </div>
               </div>
               
