@@ -145,7 +145,7 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Head>
-        <title>SmartNEET - Advanced NEET Exam Preparation Platform</title>
+        <title>SmarterNEET - Advanced NEET Exam Preparation Platform</title>
         <meta name="description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics" />
         <link rel="icon" href="/favicon.ico" />
       </Head>

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: 'SmartNEET - Advanced NEET Exam Preparation Platform',
+  title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
   description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics',
 };
 
