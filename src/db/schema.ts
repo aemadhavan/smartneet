@@ -1,3 +1,4 @@
+//File: src/db/schema.ts
 import { 
   serial, 
   integer, 

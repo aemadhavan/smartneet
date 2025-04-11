@@ -11,17 +11,22 @@ import {
   statement_based_questions,
   statements
 } from '@/db/schema';
+import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
+
 // Base question interface
 interface BaseQuestionData {
   paper_id: number;
+  subject_id: number; // This is required in your schema
   question_number: number;
-  topic_id?: number;
+  topic_id: number; // This is required in your schema
   subtopic_id?: number;
   question_type: string;
+  source_type?: string; // This is required in your schema
   question_text: string;
   explanation?: string;
   difficulty_level?: string;
   marks?: number;
+  negative_marks?: number;
   is_image_based?: boolean;
   image_url?: string;
   is_active?: boolean;
@@ -68,6 +73,7 @@ interface MatchColumnsData {
 // Statement interface
 interface Statement {
   statement_number: number;
+  statement_label?: string;
   statement_text: string;
   is_correct: boolean;
 }
@@ -87,6 +93,96 @@ interface QuestionData extends BaseQuestionData {
   match_columns?: MatchColumnsData;
   statement_based?: StatementBasedData;
 }
+
+// Helper functions to validate and convert enum values
+function validateQuestionType(type: string): typeof questionTypeEnum.enumValues[number] {
+  // Map common type names to the enum values
+  const typeMapping: Record<string, typeof questionTypeEnum.enumValues[number]> = {
+    'multiple_choice': 'MultipleChoice',
+    'multiplechoice': 'MultipleChoice',
+    'assertion_reason': 'AssertionReason',
+    'assertionreason': 'AssertionReason',
+    'match_columns': 'Matching',
+    'matching': 'Matching',
+    'statement_based': 'MultipleCorrectStatements',
+    'multiplecorrectstatements': 'MultipleCorrectStatements',
+    'diagram_based': 'DiagramBased',
+    'diagrambased': 'DiagramBased',
+    'sequence_ordering': 'SequenceOrdering',
+    'sequenceordering': 'SequenceOrdering'
+  };
+
+  // Try direct match with enum values first
+  if (questionTypeEnum.enumValues.includes(type as typeof questionTypeEnum.enumValues[number])) {
+    return type as typeof questionTypeEnum.enumValues[number];
+  }
+
+  // Try the normalized mapping
+  const normalizedType = type.toLowerCase().replace(/\s+/g, '');
+  if (typeMapping[normalizedType]) {
+    return typeMapping[normalizedType];
+  }
+
+  // If we reach here, the type is invalid
+  throw new Error(`Invalid question type: ${type}. Valid types are: ${questionTypeEnum.enumValues.join(', ')}`);
+}
+
+function validateSourceType(type: string = 'PreviousYear'): typeof questionSourceTypeEnum.enumValues[number] {
+  // Map common source type names to the enum values
+  const sourceMapping: Record<string, typeof questionSourceTypeEnum.enumValues[number]> = {
+    'previous_year': 'PreviousYear', 
+    'previousyear': 'PreviousYear',
+    'ai_generated': 'AI_Generated',
+    'aigenerated': 'AI_Generated',
+    'ai': 'AI_Generated',
+    'other': 'Other'
+  };
+
+  // Try direct match with enum values first
+  if (questionSourceTypeEnum.enumValues.includes(type as typeof questionSourceTypeEnum.enumValues[number])) {
+    return type as typeof questionSourceTypeEnum.enumValues[number];
+  }
+
+  // Try the normalized mapping
+  const normalizedType = type.toLowerCase().replace(/\s+/g, '');
+  if (sourceMapping[normalizedType]) {
+    return sourceMapping[normalizedType];
+  }
+
+  // Default to PreviousYear if not specified or invalid
+  return 'PreviousYear';
+}
+
+function validateDifficultyLevel(level: string = 'medium'): typeof difficultyLevelEnum.enumValues[number] {
+  // Map common difficulty level names to the enum values
+  const levelMapping: Record<string, typeof difficultyLevelEnum.enumValues[number]> = {
+    'easy': 'easy',
+    'medium': 'medium',
+    'hard': 'hard',
+    '1': 'easy',
+    '2': 'medium', 
+    '3': 'hard',
+    'low': 'easy',
+    'moderate': 'medium',
+    'high': 'hard',
+    'difficult': 'hard'
+  };
+
+  // Try direct match with enum values first
+  if (difficultyLevelEnum.enumValues.includes(level as typeof difficultyLevelEnum.enumValues[number])) {
+    return level as typeof difficultyLevelEnum.enumValues[number];
+  }
+
+  // Try the normalized mapping
+  const normalizedLevel = level.toLowerCase().replace(/\s+/g, '');
+  if (levelMapping[normalizedLevel]) {
+    return levelMapping[normalizedLevel];
+  }
+
+  // Default to medium if not specified or invalid
+  return 'medium';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -100,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     const text = await jsonFile.text();
-    let questionsData: QuestionData[] ;
+    let questionsData: QuestionData[];
     
     try {
       questionsData = JSON.parse(text);
@@ -120,35 +216,51 @@ export async function POST(request: NextRequest) {
 
     let insertedCount = 0;
     const totalCount = questionsData.length;
+    const errors: Array<{ question_number: number, error: string }> = [];
 
     for (const questionData of questionsData) {
       try {
+        // Validate and prepare required fields
+        if (!questionData.subject_id) {
+          throw new Error("subject_id is required");
+        }
+        
+        if (!questionData.topic_id) {
+          throw new Error("topic_id is required");
+        }
+
         // Start a transaction
         await db.transaction(async (tx) => {
+          // Map question type to enum value
+          const questionType = validateQuestionType(questionData.question_type);
+          
           // Insert the base question
           const [insertedQuestion] = await tx
             .insert(questions)
             .values({
               paper_id: questionData.paper_id,
+              subject_id: questionData.subject_id,
               question_number: questionData.question_number,
               topic_id: questionData.topic_id,
               subtopic_id: questionData.subtopic_id,
-              question_type: questionData.question_type.toLowerCase(),
+              question_type: questionType,
+              source_type: validateSourceType(questionData.source_type),
               question_text: questionData.question_text,
               explanation: questionData.explanation,
-              difficulty_level: questionData.difficulty_level,
+              difficulty_level: questionData.difficulty_level ? validateDifficultyLevel(questionData.difficulty_level) : undefined,
               marks: questionData.marks,
+              negative_marks: questionData.negative_marks,
               is_image_based: questionData.is_image_based,
               image_url: questionData.image_url,
-              is_active: questionData.is_active
+              is_active: questionData.is_active ?? true
             })
             .returning({ question_id: questions.question_id });
 
           const questionId = insertedQuestion.question_id;
 
           // Insert question type-specific data
-          switch (questionData.question_type.toLowerCase()) {
-            case 'multiple_choice':
+          switch (questionType) {
+            case 'MultipleChoice':
               if (questionData.options) {
                 await Promise.all(
                   questionData.options.map((option: MultipleChoiceOption) =>
@@ -163,7 +275,7 @@ export async function POST(request: NextRequest) {
               }
               break;
 
-            case 'assertion_reason':
+            case 'AssertionReason':
               if (questionData.assertion_reason) {
                 const ar = questionData.assertion_reason; 
                 await tx.insert(assertion_reason_questions).values({
@@ -173,14 +285,14 @@ export async function POST(request: NextRequest) {
                   correct_option: ar.correct_option
                 });
 
-                if (questionData.assertion_reason.options) {
+                if (ar.options) {
                   await Promise.all(
-                    questionData.assertion_reason.options.map((option: MultipleChoiceOption) =>
+                    ar.options.map((option: MultipleChoiceOption) =>
                       tx.insert(multiple_choice_options).values({
                         question_id: questionId,
                         option_number: option.option_number,
                         option_text: option.option_text,
-                        is_correct: option.option_number === questionData.assertion_reason!.correct_option
+                        is_correct: option.option_number === ar.correct_option
                       })
                     )
                   );
@@ -188,7 +300,7 @@ export async function POST(request: NextRequest) {
               }
               break;
 
-            case 'match_columns':
+            case 'Matching':
               if (questionData.match_columns) {
                 const [matchColumnsInsert] = await tx
                   .insert(match_columns_questions)
@@ -232,21 +344,27 @@ export async function POST(request: NextRequest) {
               }
               break;
 
-            case 'statement_based':
+            case 'MultipleCorrectStatements':
               if (questionData.statement_based) {
-                await tx.insert(statement_based_questions).values({
-                  question_id: questionId,
-                  intro_text: questionData.statement_based.intro_text,
-                  correct_option: questionData.statement_based.correct_option
-                });
+                const [statementBasedInsert] = await tx
+                  .insert(statement_based_questions)
+                  .values({
+                    question_id: questionId,
+                    intro_text: questionData.statement_based.intro_text,
+                    correct_option: questionData.statement_based.correct_option
+                  })
+                  .returning({ statement_id: statement_based_questions.statement_id });
+
+                const statementId = statementBasedInsert.statement_id;
 
                 // Insert statements
                 if (questionData.statement_based.statements) {
                   await Promise.all(
                     questionData.statement_based.statements.map((statement: Statement) =>
                       tx.insert(statements).values({
-                        question_id: questionId,
+                        statement_based_id: statementId,
                         statement_number: statement.statement_number,
+                        statement_label: statement.statement_label,
                         statement_text: statement.statement_text,
                         is_correct: statement.is_correct || false
                       })
@@ -269,12 +387,35 @@ export async function POST(request: NextRequest) {
                 }
               }
               break;
+              
+            // Add other question types as needed
+            case 'DiagramBased':
+            case 'SequenceOrdering':
+              // These types might have their own special handling
+              if (questionData.options) {
+                await Promise.all(
+                  questionData.options.map((option: MultipleChoiceOption) =>
+                    tx.insert(multiple_choice_options).values({
+                      question_id: questionId,
+                      option_number: option.option_number,
+                      option_text: option.option_text,
+                      is_correct: option.is_correct || false
+                    })
+                  )
+                );
+              }
+              break;
           }
         });
 
         insertedCount++;
       } catch (error) {
         console.error('Error inserting question:', error);
+        // Store error for reporting
+        errors.push({
+          question_number: questionData.question_number,
+          error: error instanceof Error ? error.message : String(error)
+        });
         // Continue with next question even if one fails
       }
     }
@@ -282,12 +423,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       total: totalCount,
-      inserted: insertedCount
+      inserted: insertedCount,
+      failed: totalCount - insertedCount,
+      errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {
     console.error('Error processing request:', error);
     return NextResponse.json(
-      { error: 'Failed to process questions' },
+      { error: 'Failed to process questions', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

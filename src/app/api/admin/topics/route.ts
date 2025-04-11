@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
     
     if (subjectId) {
-      const topics = await getTopicsBySubject(subjectId);
+      const topics = await getTopicsBySubject(Number(subjectId));
       return NextResponse.json(topics);
     }
     
