@@ -3,6 +3,10 @@
 import React from 'react';
 //import Link from 'next/link';
 
+/**
+ * This is the footer component for the application.
+ * It displays the logo, description, social media links, quick links, resources, company information, and copyright information.
+ */
 const Footer = () => {
   return (
     <footer className="bg-gray-900 text-white py-12">

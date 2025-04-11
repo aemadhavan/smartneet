@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 
-
+/**
+ * Fade-in animation variants for Framer Motion.
+ */
 const fadeIn = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -13,6 +15,9 @@ const fadeIn = {
       }
     }
   };
+  /**
+   * Stagger container animation variants for Framer Motion.
+   */
   const staggerContainer = {
     hidden: { opacity: 0 },
     visible: {
@@ -23,7 +28,11 @@ const fadeIn = {
     }
   };
   
-
+  /**
+   * Call to Action Section Component.
+   * This section encourages users to take action, offering a free trial and exploring plans.
+   * It includes animated background elements, student testimonials, and rating information.
+   */
   export const CTASection = () => {
     return (
         <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden">

@@ -1,3 +1,7 @@
+/*
+  This file contains the global styles for the application.
+  It imports the Tailwind CSS styles and defines the color palette and font families.
+*/
 @import "tailwindcss";
 
 :root {

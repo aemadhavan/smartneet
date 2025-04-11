@@ -4,6 +4,10 @@ import React from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
+/**
+ * This is the header component for the application.
+ * It displays the logo, navigation links, and authentication buttons.
+ */
 const Header = () => {
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">

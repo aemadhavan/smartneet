@@ -12,7 +12,10 @@ import { CTASection } from '@/components/home/CTASection';
 
 // Animation variants
 
-
+/**
+ * This is the home page of the application.
+ * It displays the hero section, features section, question preview section, interactive demo section, and CTA section.
+ */
 const HomePage = () => {
   
   return (
