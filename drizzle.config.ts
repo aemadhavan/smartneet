@@ -16,4 +16,5 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.XATA_DATABASE_URL,
   },  
+  strict: true,
 });

@@ -6,29 +6,37 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:reset": "node src/db/reset-and-recreate.js",
+    "db:fresh": "node src/db/fresh-start.js",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "node --loader ts-node/esm src/db/migrate-direct.ts",
+    "db:create-schema": "node src/db/create-schema.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.13.0",
-    "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.41.0",
     "framer-motion": "^12.6.3",
     "next": "15.2.4",
-    "pg": "^8.14.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.17.30",
     "@types/pg": "^8.11.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.5.0",
     "drizzle-kit": "^0.30.6",
+    "drizzle-orm": "^0.41.0",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
+    "pg": "^8.14.1",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "typescript": "^5"
   }
