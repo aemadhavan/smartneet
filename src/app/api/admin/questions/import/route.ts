@@ -92,6 +92,10 @@ interface QuestionData extends BaseQuestionData {
   assertion_reason?: AssertionReasonData;
   match_columns?: MatchColumnsData;
   statement_based?: StatementBasedData;
+  statement_based_questions?: StatementBasedData;
+  statements?: Statement[];
+  // This will also be useful for consistent handling
+  assertion_reason_questions?: AssertionReasonData;
 }
 
 // Helper functions to validate and convert enum values
@@ -284,10 +288,12 @@ export async function POST(request: NextRequest) {
                   reason_text: ar.reason_text,
                   correct_option: ar.correct_option
                 });
-
-                if (ar.options) {
+            
+                // Check for options in both places
+                const options = ar.options || questionData.options;
+                if (options) {
                   await Promise.all(
-                    ar.options.map((option: MultipleChoiceOption) =>
+                    options.map((option: MultipleChoiceOption) =>
                       tx.insert(multiple_choice_options).values({
                         question_id: questionId,
                         option_number: option.option_number,
@@ -301,22 +307,75 @@ export async function POST(request: NextRequest) {
               break;
 
             case 'Matching':
-              if (questionData.match_columns) {
+                // First we need to create the match_columns_questions entry
+                // But we need to extract the column headers from the question text
+                
+                // Create default column headers if not explicitly provided
+                const leftHeader = questionData.match_columns?.left_column_header || 'List I';
+                const rightHeader = questionData.match_columns?.right_column_header || 'List II';
+                
+                // Insert the match columns question record
                 const [matchColumnsInsert] = await tx
                   .insert(match_columns_questions)
                   .values({
                     question_id: questionId,
-                    left_column_header: questionData.match_columns.left_column_header,
-                    right_column_header: questionData.match_columns.right_column_header
+                    left_column_header: leftHeader,
+                    right_column_header: rightHeader
                   })
                   .returning({ match_id: match_columns_questions.match_id });
-
+              
                 const matchId = matchColumnsInsert.match_id;
-
+              
+                // Parse match items from question text if not explicitly provided
+                // This is a simplified example - you'll need more robust parsing based on your format
+                let matchItems = [];
+                if (questionData.match_columns?.items) {
+                  matchItems = questionData.match_columns.items;
+                } else {
+                  // Try to extract items from question text
+                  // This would need actual parsing logic based on your question format
+                  // For example, detecting "List I: A. Rhizopus, B. Ustilago..." pattern
+                  
+                  // Example parsing logic (simplified):
+                  try {
+                    // Simple regex to find List I items - this is just an example
+                    const listIRegex = /List I:([^.]*?)List II/s;
+                    const listIIRegex = /List II:([^.]*?)$/s;
+                    
+                    const listIMatch = questionData.question_text.match(listIRegex);
+                    const listIIMatch = questionData.question_text.match(listIIRegex);
+                    
+                    if (listIMatch && listIIMatch) {
+                      // Parse items like "A. Rhizopus, B. Ustilago..."
+                      const listIItems = listIMatch[1].split(',').map(i => i.trim());
+                      const listIIItems = listIIMatch[1].split(',').map(i => i.trim());
+                      
+                      // Match them up - this logic would need to be customized
+                      // This is just a simplified example
+                      for (let i = 0; i < Math.min(listIItems.length, listIIItems.length); i++) {
+                        const leftItem = listIItems[i].match(/(\w+)\.([^,]+)/);
+                        const rightItem = listIIItems[i].match(/(\w+)\.([^,]+)/);
+                        
+                        if (leftItem && rightItem) {
+                          matchItems.push({
+                            left_item_label: leftItem[1],
+                            left_item_text: leftItem[2].trim(),
+                            right_item_label: rightItem[1],
+                            right_item_text: rightItem[2].trim()
+                          });
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error("Failed to parse match items from question text:", error);
+                    // Continue with empty items - log this for review
+                  }
+                }
+              
                 // Insert match items
-                if (questionData.match_columns.items) {
+                if (matchItems.length > 0) {
                   await Promise.all(
-                    questionData.match_columns.items.map((item: MatchColumnsItem) =>
+                    matchItems.map((item) =>
                       tx.insert(match_columns_items).values({
                         match_id: matchId,
                         left_item_label: item.left_item_label,
@@ -327,11 +386,11 @@ export async function POST(request: NextRequest) {
                     )
                   );
                 }
-
-                // Insert match options
-                if (questionData.match_columns.options) {
+              
+                // Insert options - use questionData.options directly 
+                if (questionData.options) {
                   await Promise.all(
-                    questionData.match_columns.options.map((option: MatchColumnsOption) =>
+                    questionData.options.map((option) =>
                       tx.insert(match_columns_options).values({
                         match_id: matchId,
                         option_number: option.option_number,
@@ -341,26 +400,31 @@ export async function POST(request: NextRequest) {
                     )
                   );
                 }
-              }
-              break;
+                break;
 
             case 'MultipleCorrectStatements':
-              if (questionData.statement_based) {
+              // Look for statement_based_questions OR statement_based
+              const statementBasedData = questionData.statement_based_questions || questionData.statement_based;
+              
+              if (statementBasedData) {
                 const [statementBasedInsert] = await tx
                   .insert(statement_based_questions)
                   .values({
                     question_id: questionId,
-                    intro_text: questionData.statement_based.intro_text,
-                    correct_option: questionData.statement_based.correct_option
+                    intro_text: statementBasedData.intro_text,
+                    correct_option: statementBasedData.correct_option
                   })
                   .returning({ statement_id: statement_based_questions.statement_id });
-
+            
                 const statementId = statementBasedInsert.statement_id;
-
+            
+                // Check for statements in both places
+                const statementsList = statementBasedData.statements || questionData.statements;
+                
                 // Insert statements
-                if (questionData.statement_based.statements) {
+                if (statementsList && statementsList.length > 0) {
                   await Promise.all(
-                    questionData.statement_based.statements.map((statement: Statement) =>
+                    statementsList.map((statement: Statement) =>
                       tx.insert(statements).values({
                         statement_based_id: statementId,
                         statement_number: statement.statement_number,
@@ -371,16 +435,19 @@ export async function POST(request: NextRequest) {
                     )
                   );
                 }
-
+            
+                // Check for options in both places
+                const options = statementBasedData.options || questionData.options;
+                
                 // Insert options
-                if (questionData.statement_based.options) {
+                if (options) {
                   await Promise.all(
-                    questionData.statement_based.options.map((option: MultipleChoiceOption) =>
+                    options.map((option: MultipleChoiceOption) =>
                       tx.insert(multiple_choice_options).values({
                         question_id: questionId,
                         option_number: option.option_number,
                         option_text: option.option_text,
-                        is_correct: option.option_number === questionData.statement_based!.correct_option
+                        is_correct: option.option_number === statementBasedData.correct_option
                       })
                     )
                   );

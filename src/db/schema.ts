@@ -169,6 +169,20 @@ export const statements = pgTable('statements', {
   statement_text: text('statement_text').notNull(),
   is_correct: boolean('is_correct').default(false)
 });
+export const sequence_ordering_questions = pgTable('sequence_ordering_questions', {
+  sequence_id: serial('sequence_id').primaryKey(),
+  question_id: integer('question_id').references(() => questions.question_id, { onDelete: 'cascade' }).unique(),
+  intro_text: text('intro_text'),
+  correct_sequence: text('correct_sequence').notNull() // Store as JSON string
+});
+
+export const sequence_items = pgTable('sequence_items', {
+  item_id: serial('item_id').primaryKey(),
+  sequence_id: integer('sequence_id').references(() => sequence_ordering_questions.sequence_id, { onDelete: 'cascade' }),
+  item_number: integer('item_number').notNull(),
+  item_label: varchar('item_label', { length: 10 }),
+  item_text: text('item_text').notNull()
+});
 
 export const tags = pgTable('tags', {
   tag_id: serial('tag_id').primaryKey(),
