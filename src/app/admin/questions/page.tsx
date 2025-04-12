@@ -12,8 +12,11 @@ type Subject = {
 
 type Topic = {
   topic_id: number;
-  subject_id: string;
+  subject_id: number; // Changed from string to number
   topic_name: string;
+  parent_topic_id: number | null;
+  description: string | null;
+  is_active: boolean;
 };
 
 type Subtopic = {
@@ -48,12 +51,12 @@ type Question = {
 };
 
 const questionTypes = [
-  'Multiple Choice',
-  'Assertion Reason',
-  'Match Columns',
-  'Statement Based',
-  'Subjective',
-  'True/False'
+  'MultipleChoice',
+  'Matching',
+  'MultipleCorrectStatements',
+  'AssertionReason',
+  'DiagramBased',
+  'SequenceOrdering'
 ];
 
 const difficultyLevels = ['easy', 'medium', 'hard', 'very-hard'];
@@ -120,7 +123,7 @@ export default function QuestionsPage() {
       if (!selectedSubject) return;
       
       try {
-        const response = await fetch(`/api/admin/topics?subjectId=${selectedSubject}`);
+        const response = await fetch(`/api/admin/topics?subjectId=${Number(selectedSubject)}`);
         
         if (response.ok) {
           const data = await response.json();
@@ -143,7 +146,7 @@ export default function QuestionsPage() {
     };
     
     fetchTopics();
-  }, [selectedSubject,selectedTopic]);
+  }, [selectedSubject]);
 
   // Fetch subtopics when topic changes
   useEffect(() => {
@@ -268,8 +271,22 @@ export default function QuestionsPage() {
     fetchPapers();
   }, []);
 
+  useEffect(() => {
+    if (questions.length > 0) {
+      console.log("Questions with topic info:", 
+        questions.map(q => ({
+          id: q.question_id,
+          topic_id: q.topic_id,
+          topic_name: getTopicName(q.topic_id)
+        }))
+      );
+    }
+  }, [questions]);
+
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedSubject(e.target.value);
+    setSelectedTopic(null); // Reset topic when subject changes
+    setSelectedSubtopic(null); // Reset subtopic when subject changes
     setPage(1); // Reset pagination when filter changes
   };
 
@@ -310,6 +327,13 @@ export default function QuestionsPage() {
       if (response.ok) {
         const question = await response.json();
         setCurrentQuestion(question);
+        if (question.topic_id) {
+          const subtopicsResponse = await fetch(`/api/admin/subtopics?topicId=${question.topic_id}`);
+          if (subtopicsResponse.ok) {
+            const subtopicsData = await subtopicsResponse.json();
+            setSubtopics(subtopicsData);
+          }
+        }
         setFormMode('edit');
         setIsFormOpen(true);
       } else {
@@ -466,6 +490,7 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 
   const getTopicName = (topicId: number | null) => {
     if (!topicId) return 'None';
+    if (!topics || topics.length === 0) return 'Loading...';
     const topic = topics.find(t => t.topic_id === topicId);
     return topic ? topic.topic_name : 'Unknown';
   };
