@@ -1,7 +1,7 @@
 // src/app/db/admin-service.ts
 import { db } from './index'; // Assuming this is how your db connection is exported
 import { subjects, topics, subtopics, questions, question_papers, exam_years } from '@/db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, desc } from 'drizzle-orm';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
 // Subjects
@@ -242,11 +242,43 @@ export async function deleteQuestion(id: number) {
 
 // Question Papers
 export async function getAllQuestionPapers() {
-  return db.select().from(question_papers).orderBy(question_papers.exam_year_id);
+  // Join with exam_years and subjects to get the data needed for the frontend
+  return db.select({
+    paper_id: question_papers.paper_id,
+    paper_year: exam_years.exam_year,
+    paper_code: question_papers.paper_code,
+    subject: subjects.subject_name,
+    section: sql<string | null>`null`, // Placeholder for section field
+    total_questions: question_papers.total_questions,
+    max_marks: question_papers.max_marks,
+    time_duration_minutes: question_papers.time_duration_minutes,
+    source: question_papers.source_description,
+    upload_date: question_papers.upload_date,
+  })
+  .from(question_papers)
+  .leftJoin(exam_years, eq(question_papers.exam_year_id, exam_years.year_id))
+  .leftJoin(subjects, eq(question_papers.subject_id, subjects.subject_id))
+  .where(eq(question_papers.is_active, true))
+  .orderBy(desc(question_papers.created_at));
 }
 
 export async function getQuestionPaperById(id: number) {
-  return db.select().from(question_papers).where(eq(question_papers.paper_id, id)).limit(1);
+  return db.select({
+    paper_id: question_papers.paper_id,
+    paper_year: exam_years.exam_year,
+    paper_code: question_papers.paper_code,
+    subject: subjects.subject_name,
+    section: sql<string | null>`null`, // Placeholder for section field
+    total_questions: question_papers.total_questions,
+    max_marks: question_papers.max_marks,
+    time_duration_minutes: question_papers.time_duration_minutes,
+    source: question_papers.source_description,
+    upload_date: question_papers.upload_date,
+  })
+  .from(question_papers)
+  .leftJoin(exam_years, eq(question_papers.exam_year_id, exam_years.year_id))
+  .leftJoin(subjects, eq(question_papers.subject_id, subjects.subject_id))
+  .where(eq(question_papers.paper_id, id));
 }
 
 export async function createQuestionPaper(data: {

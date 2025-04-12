@@ -174,8 +174,8 @@ export default function QuestionPapersPage() {
   // Filter papers based on filters
   const filteredPapers = papers.filter(paper => {
     return (
-      (yearFilter === '' || paper.paper_year.toString() === yearFilter) &&
-      (subjectFilter === '' || paper.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
+      (yearFilter === '' || (paper.paper_year && paper.paper_year.toString() === yearFilter)) &&
+      (subjectFilter === '' || (paper.subject && paper.subject.toLowerCase().includes(subjectFilter.toLowerCase())))
     );
   });
 
@@ -195,10 +195,16 @@ export default function QuestionPapersPage() {
       </div>
 
       {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
-          <p>{error}</p>
-        </div>
-      )}
+          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4" role="alert">
+            <p>{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-700 hover:text-red-900 text-sm mt-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow mb-6">
@@ -226,13 +232,18 @@ export default function QuestionPapersPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Subject:
             </label>
-            <input
-              type="text"
+            <select
               value={subjectFilter}
               onChange={(e) => setSubjectFilter(e.target.value)}
-              placeholder="Filter by subject..."
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            />
+            >
+              <option value="">All Subjects</option>
+              {[...new Set(papers.filter(p => p.subject).map(paper => paper.subject))].map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -328,16 +339,21 @@ export default function QuestionPapersPage() {
                   <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="subject">
                     Subject*
                   </label>
-                  <input
-                    type="text"
-                    id="subject"
-                    name="subject"
-                    value={currentPaper.subject || ''}
-                    onChange={handleInputChange}
-                    className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                    required
-                    list="subjectList"
-                  />
+                  <select
+                      id="subject"
+                      name="subject"
+                      value={currentPaper.subject || ''}
+                      onChange={handleInputChange}
+                      className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                      required
+                    >
+                      <option value="">Select a subject</option>
+                      {subjects.map((subject) => (
+                        <option key={subject.subject_id} value={subject.subject_name}>
+                          {subject.subject_name}
+                        </option>
+                      ))}
+                    </select>
                   <datalist id="subjectList">
                     {subjects.map((subject) => (
                       <option key={subject.subject_id} value={subject.subject_name} />
