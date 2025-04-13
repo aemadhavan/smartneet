@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Head from 'next/head';
-//import Link from 'next/link';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, useUser } from '@clerk/nextjs';
 
@@ -115,7 +115,6 @@ const HomePageContent = () => {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(75,0,130,0.8)]"
-            onClick={() => setOverlayState(prev => ({ ...prev, isVisible: false }))}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -123,7 +122,6 @@ const HomePageContent = () => {
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="relative bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center border-2 border-gradient-to-r from-blue-600 to-green-500"
-              onClick={(e) => e.stopPropagation()}
             >
               {/* Overlay Message */}
               <motion.div
@@ -145,8 +143,20 @@ const HomePageContent = () => {
                 {overlayState.message}
               </p>
               
-              {/* Button removed */}
-              {/* User can click outside the overlay to dismiss it */}
+              {/* Conditional button - only show for signup prompt */}
+              {overlayState.isSignupPrompt && (
+                <Link
+                  href="/sign-up"
+                  onClick={() => {
+                    sessionStorage.setItem('signup_initiated', 'true');
+                  }}
+                  className="inline-block bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-transform transform hover:scale-105"
+                >
+                  Sign up now!
+                </Link>
+              )}
+              
+              {/* No button needed for thank you message */}
             </motion.div>
           </motion.div>
         )}
