@@ -1,10 +1,11 @@
+//File: src/app/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
+//import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSearchParams } from 'next/navigation';
+import { useAuth, useUser } from '@clerk/nextjs';
 
 import { HeroSection } from '@/components/home/HeroSection';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
@@ -13,31 +14,89 @@ import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection
 import { CTASection } from '@/components/home/CTASection';
 
 /**
- * Main content of the homepage that uses searchParams
+ * Main content of the homepage that uses Clerk authentication
  */
 const HomePageContent = () => {
-  const [isOverlayVisible, setIsOverlayVisible] = useState(false);
-  const [showThankYou, setShowThankYou] = useState(false);
-  const searchParams = useSearchParams();
+  const [overlayState, setOverlayState] = useState({
+    isVisible: false,
+    title: '',
+    message: '',
+    buttonText: '',
+    buttonLink: '',
+    buttonAction: () => {},
+    isSignupPrompt: false
+  });
+  
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
 
-  // Show overlay after 2 seconds if not returning from successful signup
+  // Determine which overlay to show based on user status
   useEffect(() => {
-    const signupSuccess = searchParams.get('signupSuccess');
+    if (!isLoaded) return;
+
+    // Set a short delay to ensure everything is loaded properly
+    const timer = setTimeout(() => {
+      const justSignedUp = sessionStorage.getItem('just_signed_up') === 'true';
+      
+      if (isSignedIn) {
+        // User is signed in
+        if (justSignedUp) {
+          // New user who just signed up
+          console.log('Detected successful signup! Showing thank you message...');
+          
+          // Clear the flag so it doesn't show again
+          sessionStorage.removeItem('just_signed_up');
+          
+          // Store that we've welcomed this user
+          if (user) {
+            localStorage.setItem(`welcomed-${user.id}`, 'true');
+          }
+          
+          // Show thank you overlay for new user
+          setOverlayState({
+            isVisible: true,
+            title: "Thank you for joining the SmarterNEET community!",
+            message: "We're thrilled to have you on board! Get ready for an exciting journey as we prepare to launch our advanced features designed to help you ace your NEET exam.",
+            buttonText: "",
+            buttonLink: "",
+            buttonAction: () => setOverlayState(prev => ({ ...prev, isVisible: false })),
+            isSignupPrompt: false
+          });
+        } else {
+          // Existing user who signed in
+          console.log('Existing user signed in. Showing welcome back message...');
+          
+          // Show welcome back overlay for existing user
+          setOverlayState({
+            isVisible: true,
+            title: "Welcome back to SmarterNEET!",
+            message: "Thank you for being part of the SmarterNEET community! We're continuously working to enhance your preparation experience. Stay tuned for exciting new features coming soon!",
+            buttonText: "",
+            buttonLink: "",
+            buttonAction: () => setOverlayState(prev => ({ ...prev, isVisible: false })),
+            isSignupPrompt: false
+          });
+        }
+      } else {
+        // User is not signed in - show signup prompt
+        setOverlayState({
+          isVisible: true,
+          title: "Exciting things are coming - join the waitlist and stay ahead.",
+          message: "Be among the first to access our advanced NEET preparation platform with AI-powered practice tests and personalized analytics.",
+          buttonText: "Sign up now!",
+          buttonLink: "/sign-up",
+          buttonAction: () => {
+            sessionStorage.setItem('signup_initiated', 'true');
+          },
+          isSignupPrompt: true
+        });
+      }
+    }, 1000); // Short delay to ensure everything is loaded
     
-    if (signupSuccess === 'true') {
-      setShowThankYou(true);
-      // Hide thank you message after 5 seconds
-      const thankYouTimer = setTimeout(() => {
-        setShowThankYou(false);
-      }, 5000);
-      return () => clearTimeout(thankYouTimer);
-    } else {
-      const timer = setTimeout(() => {
-        setIsOverlayVisible(true);
-      }, 2000);
-      return () => clearTimeout(timer); // Cleanup on unmount
-    }
-  }, [searchParams]);
+    return () => clearTimeout(timer);
+  }, [isLoaded, isSignedIn, user]);
+
+  // The timer useEffect for auto-hiding overlay has been removed
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-poppins relative overflow-x-hidden">
@@ -47,15 +106,16 @@ const HomePageContent = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      {/* Overlay for Sign-Up Prompt - Now non-closable */}
+      {/* Unified Overlay that always shows with content based on user status */}
       <AnimatePresence>
-        {isOverlayVisible && (
+        {overlayState.isVisible && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(75,0,130,0.8)]"
+            onClick={() => setOverlayState(prev => ({ ...prev, isVisible: false }))}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -63,140 +123,30 @@ const HomePageContent = () => {
               exit={{ scale: 0.8, opacity: 0 }}
               transition={{ duration: 0.3 }}
               className="relative bg-white p-8 rounded-lg shadow-lg max-w-md w-full text-center border-2 border-gradient-to-r from-blue-600 to-green-500"
+              onClick={(e) => e.stopPropagation()}
             >
-              {/* No Close Button - Overlay is not closable */}
-              
               {/* Overlay Message */}
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">
-                Exciting things are coming - join the waitlist and stay ahead.
-              </h2>
-              <Link
-                href="/sign-up"
-                className="inline-block bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-transform transform hover:scale-105"
-              >
-                Sign up now!
-              </Link>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Flashy Thank You Message after successful signup */}
-      <AnimatePresence>
-        {showThankYou && (
-          <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div 
-              className="relative w-full h-full flex flex-col items-center justify-center bg-gradient-to-r from-purple-600 via-blue-500 to-green-400"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
               <motion.div
-                className="flex flex-col items-center justify-center text-white p-8 rounded-xl backdrop-blur-lg bg-white bg-opacity-20 shadow-2xl"
-                initial={{ scale: 0.8, y: 50, opacity: 0 }}
-                animate={{ 
-                  scale: 1, 
-                  y: 0, 
-                  opacity: 1,
-                  transition: { 
-                    type: "spring", 
-                    damping: 12,
-                    delay: 0.2 
-                  } 
-                }}
-                exit={{ scale: 0.8, opacity: 0 }}
+                initial={!overlayState.isSignupPrompt ? { scale: 0 } : {}}
+                animate={!overlayState.isSignupPrompt ? { 
+                  scale: [0, 1.2, 1],
+                  transition: { duration: 0.5 }
+                } : {}}
+                className="text-5xl mb-4 mx-auto"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ 
-                    scale: [0, 1.2, 1],
-                    rotate: [0, 10, -10, 0],
-                    transition: { 
-                      times: [0, 0.6, 0.8, 1],
-                      duration: 0.8
-                    }
-                  }}
-                  className="text-6xl mb-4"
-                >
-                  🎉
-                </motion.div>
-                
-                <motion.h1 
-                  className="text-4xl font-bold mb-2 text-center"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ 
-                    opacity: 1, 
-                    y: 0,
-                    transition: { delay: 0.4 } 
-                  }}
-                >
-                  Thank You for Signing Up!
-                </motion.h1>
-                
-                <motion.p 
-                  className="text-xl mb-6 text-center max-w-md"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ 
-                    opacity: 1, 
-                    y: 0,
-                    transition: { delay: 0.6 } 
-                  }}
-                >
-                  Welcome to the SmarterNEET community! We&apos;re excited to help you ace your NEET exam.
-                </motion.p>
-                
-                <motion.div 
-                  className="flex space-x-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ 
-                    opacity: 1,
-                    transition: { delay: 0.8 } 
-                  }}
-                >
-                  <motion.button
-                    className="px-6 py-3 bg-white text-purple-600 font-bold rounded-lg shadow-lg"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setShowThankYou(false)}
-                  >
-                    Continue to Dashboard
-                  </motion.button>
-                </motion.div>
+                {!overlayState.isSignupPrompt && "🎉"}
               </motion.div>
               
-              {/* Animated background elements - using static array instead of dynamic creation to avoid client-side only code */}
-              {Array(10).fill(0).map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute rounded-full bg-white bg-opacity-20"
-                  initial={{ 
-                    x: `${10 + (i * 10)}%`, 
-                    y: `${5 + (i * 8)}%`,
-                    opacity: 0.1 + (i * 0.03),
-                    scale: 0.5 + (i * 0.05)
-                  }}
-                  animate={{ 
-                    y: [null, `-${20 + (i * 5)}%`],
-                    opacity: [null, 0],
-                    transition: { 
-                      duration: 3 + (i * 0.5),
-                      repeat: Infinity,
-                      repeatType: "loop",
-                      delay: i * 0.2,
-                      ease: "easeInOut"
-                    }
-                  }}
-                  style={{
-                    width: `${20 + (i * 5)}px`,
-                    height: `${20 + (i * 5)}px`,
-                  }}
-                />
-              ))}
+              <h2 className="text-2xl font-bold text-gray-800 mb-3">
+                {overlayState.title}
+              </h2>
+              
+              <p className="text-gray-600 mb-6">
+                {overlayState.message}
+              </p>
+              
+              {/* Button removed */}
+              {/* User can click outside the overlay to dismiss it */}
             </motion.div>
           </motion.div>
         )}
@@ -221,8 +171,8 @@ const HomePageContent = () => {
 
 /**
  * This is the home page of the application.
- * It displays the hero section, features section, question preview section, interactive demo section, and CTA section.
- * Now includes a non-closable overlay to prompt users to sign up and a flashy thank you message after successful signup.
+ * It displays the hero section, features sections, and other content.
+ * Now includes overlay for all users with different messages based on status.
  */
 const HomePage = () => {
   return (
