@@ -1,40 +1,74 @@
 // src/db/custom-migrate.ts
-
-import { Pool } from 'pg';
+import { Client } from 'pg';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
 // Load .env.local instead of .env
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-async function main() {
-  console.log('Starting custom migration...');
-  
-  // Use XATA_DATABASE_URL specifically for Xata
-  const dbUrl = process.env.XATA_DATABASE_URL;
-  
-  if (!dbUrl) {
-    throw new Error('XATA_DATABASE_URL environment variable is not defined in .env.local');
-  }
-  
-  console.log('Found Xata database URL');
-  
-  // Configure TLS/SSL properly for Xata
-  const pool = new Pool({
-    connectionString: dbUrl,
+async function migrate() {
+  // Connect directly to PostgreSQL
+  const client = new Client({
+    connectionString: process.env.XATA_DATABASE_URL,
     ssl: {
-      rejectUnauthorized: true, // For secure connections
+      rejectUnauthorized: true, // For secure connections to Xata
     }
   });
-
-  // Rest of your script...
-  // ...
   
-  // First check if the sequence tables already exist
-  const client = await pool.connect();
   try {
-    console.log('Connected to Xata database successfully');
-    console.log('Checking for existing tables...');
+    await client.connect();
+    console.log('Connected to database successfully');
+    
+    // Check if enums exist and create them if they don't
+    const checkAndCreateEnums = async () => {
+      // Check if difficulty_level enum exists
+      const difficultyLevelExists = await client.query(
+        "SELECT 1 FROM pg_type WHERE typname = 'difficulty_level'"
+      );
+      
+      if (difficultyLevelExists.rowCount === 0) {
+        console.log('Creating difficulty_level enum...');
+        await client.query(
+          "CREATE TYPE difficulty_level AS ENUM ('easy', 'medium', 'hard')"
+        );
+      } else {
+        console.log('difficulty_level enum already exists, skipping creation');
+      }
+      
+      // Check if question_type enum exists
+      const questionTypeExists = await client.query(
+        "SELECT 1 FROM pg_type WHERE typname = 'question_type'"
+      );
+      
+      if (questionTypeExists.rowCount === 0) {
+        console.log('Creating question_type enum...');
+        await client.query(
+          "CREATE TYPE question_type AS ENUM ('MultipleChoice', 'Matching', 'MultipleCorrectStatements', 'AssertionReason', 'DiagramBased', 'SequenceOrdering')"
+        );
+      } else {
+        console.log('question_type enum already exists, skipping creation');
+      }
+      
+      // Check if question_source_type enum exists
+      const sourceTypeExists = await client.query(
+        "SELECT 1 FROM pg_type WHERE typname = 'question_source_type'"
+      );
+      
+      if (sourceTypeExists.rowCount === 0) {
+        console.log('Creating question_source_type enum...');
+        await client.query(
+          "CREATE TYPE question_source_type AS ENUM ('PreviousYear', 'AI_Generated', 'Other')"
+        );
+      } else {
+        console.log('question_source_type enum already exists, skipping creation');
+      }
+    };
+    
+    await checkAndCreateEnums();
+    console.log('Enum check and creation completed.');
+    
+    // Check for sequence tables
+    console.log('Checking for existing sequence tables...');
     
     const { rows } = await client.query(`
       SELECT table_name 
@@ -46,57 +80,56 @@ async function main() {
     const existingTables = rows.map(row => row.table_name);
     console.log(`Found existing tables: ${existingTables.join(', ') || 'none'}`);
     
-    // If tables already exist, we'll skip creating them
-    if (existingTables.length === 2) {
-      console.log('Both sequence tables already exist. Skipping table creation.');
-      return;
+    // Check if questions table exists before creating sequence tables
+    const questionsTableExists = await client.query(`
+      SELECT 1 FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'questions'
+    `);
+    
+    if (questionsTableExists.rowCount === 0) {
+      console.log('Questions table does not exist yet. Skipping sequence tables creation.');
+    } else {
+      // If tables already exist, we'll skip creating them
+      if (existingTables.includes('sequence_ordering_questions')) {
+        console.log('sequence_ordering_questions table already exists. Skipping creation.');
+      } else {
+        console.log('Creating sequence_ordering_questions table...');
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS sequence_ordering_questions (
+            sequence_id SERIAL PRIMARY KEY,
+            question_id INTEGER REFERENCES questions(question_id) ON DELETE CASCADE UNIQUE,
+            intro_text TEXT,
+            correct_sequence TEXT NOT NULL
+          )
+        `);
+      }
+      
+      if (existingTables.includes('sequence_items')) {
+        console.log('sequence_items table already exists. Skipping creation.');
+      } else {
+        console.log('Creating sequence_items table...');
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS sequence_items (
+            item_id SERIAL PRIMARY KEY,
+            sequence_id INTEGER REFERENCES sequence_ordering_questions(sequence_id) ON DELETE CASCADE,
+            item_number INTEGER NOT NULL,
+            item_label VARCHAR(10),
+            item_text TEXT NOT NULL
+          )
+        `);
+      }
     }
     
-    // Generate migration SQL for the sequence tables only
-    console.log('Preparing to create sequence tables...');
-    
-    // We'll skip enum creation completely since they already exist
-    console.log('Existing enums will be used, no enum creation needed.');
-    
-    // Create the tables directly if they don't exist
-    if (!existingTables.includes('sequence_ordering_questions')) {
-      console.log('Creating sequence_ordering_questions table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS sequence_ordering_questions (
-          sequence_id SERIAL PRIMARY KEY,
-          question_id INTEGER REFERENCES questions(question_id) ON DELETE CASCADE UNIQUE,
-          intro_text TEXT,
-          correct_sequence TEXT NOT NULL
-        )
-      `);
-    }
-    
-    if (!existingTables.includes('sequence_items')) {
-      console.log('Creating sequence_items table...');
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS sequence_items (
-          item_id SERIAL PRIMARY KEY,
-          sequence_id INTEGER REFERENCES sequence_ordering_questions(sequence_id) ON DELETE CASCADE,
-          item_number INTEGER NOT NULL,
-          item_label VARCHAR(10),
-          item_text TEXT NOT NULL
-        )
-      `);
-    }
-    
-    console.log('Sequence tables created successfully.');
+    console.log('Migration completed successfully!');
   } catch (error) {
-    console.error('Error creating sequence tables:', error);
+    console.error('Migration failed:', error);
     throw error;
   } finally {
-    client.release();
+    await client.end();
   }
-  
-  console.log('Migration completed successfully!');
-  await pool.end();
 }
 
-main().catch(error => {
+migrate().catch(error => {
   console.error('Migration failed:', error);
   process.exit(1);
 });

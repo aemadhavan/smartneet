@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1743295423324,
-      "tag": "0000_gray_lionheart",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1743296129883,
-      "tag": "0001_fancy_kabuki",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1743304617312,
-      "tag": "0002_handy_skin",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1744404771110,
-      "tag": "0003_certain_moondragon",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1744464834599,
-      "tag": "0004_redundant_doctor_doom",
+      "when": 1744512848714,
+      "tag": "0000_giant_lake",
       "breakpoints": true
     }
   ]

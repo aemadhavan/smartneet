@@ -14,7 +14,10 @@
     "db:studio": "drizzle-kit studio",
     "db:migrate": "node --loader ts-node/esm src/db/migrate-direct.ts",
     "db:create-schema": "node src/db/create-schema.js",
-    "db:add-sequence-tables": "tsx src/db/custom-migrate.ts"
+    "db:add-sequence-tables": "tsx src/db/custom-migrate.ts",
+    "db:migrate:all": "tsx src/db/migrate.ts",
+    "db:verify": "tsx src/db/verify-schema.ts",
+    "db:migrate:future": "tsx src/db/future-migrations.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.13.0",

@@ -15,6 +15,7 @@ export default defineConfig({
   dialect: 'postgresql',  
   dbCredentials: {
     url: process.env.XATA_DATABASE_URL,
+    ssl: true, 
   },  
   strict: true,
 });
