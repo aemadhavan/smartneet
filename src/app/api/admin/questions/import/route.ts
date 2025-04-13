@@ -45,7 +45,7 @@ interface QuestionDetails {
   reason_text?: string;
   left_column_header?: string;
   right_column_header?: string;
-  items?: MatchColumnsItem[];
+  items?: MatchColumnsItem[] | SequenceItem[]; // Can be either type depending on question_type
   intro_text?: string;
   correct_option?: number | string;
   correct_sequence?: string | number[];
@@ -295,6 +295,14 @@ function processQuestionData(questionData: QuestionData): QuestionData {
           intro_text: sequenceData.intro_text,
           correct_sequence: sequenceData.correct_sequence
         };
+        
+        // Move items to details if needed - these should be SequenceItem[] for this question type
+        if (sequenceData.items && !processedQuestion.details?.items) {
+          processedQuestion.details = {
+            ...processedQuestion.details,
+            items: sequenceData.items as SequenceItem[]
+          };
+        }
       }
       break;
   }
@@ -401,16 +409,23 @@ export async function POST(request: NextRequest) {
           
               // Insert sequence items if present
               if (sequenceData.items && Array.isArray(sequenceData.items)) {
-                await Promise.all(
-                  sequenceData.items.map((item: any) =>
-                    tx.insert(sequence_items).values({
-                      sequence_id: sequenceId,
-                      item_number: item.item_number,
-                      item_label: item.item_label,
-                      item_text: item.item_text
-                    })
-                  )
-                );
+                // Check if items are SequenceItem[] by looking for item_number property
+                const isSequenceItems = sequenceData.items.length > 0 && 'item_number' in sequenceData.items[0];
+                
+                if (isSequenceItems) {
+                  await Promise.all(
+                    (sequenceData.items as SequenceItem[]).map(item =>
+                      tx.insert(sequence_items).values({
+                        sequence_id: sequenceId,
+                        item_number: item.item_number,
+                        item_label: item.item_label,
+                        item_text: item.item_text
+                      })
+                    )
+                  );
+                } else {
+                  console.warn('Expected SequenceItem[] but got different item type in sequenceData.items');
+                }
               }
             }
           }

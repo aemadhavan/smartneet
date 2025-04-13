@@ -92,7 +92,7 @@ async function applyMigrations() {
       // Extract all CREATE TABLE statements to check for existing tables
       const createTableRegex = /CREATE TABLE IF NOT EXISTS ([^\s(]+)/g;
       let match;
-      let tablesToCreate = [];
+      const tablesToCreate = [];
       
       while ((match = createTableRegex.exec(sqlContent)) !== null) {
         const tableName = match[1].replace(/"/g, '').trim();
