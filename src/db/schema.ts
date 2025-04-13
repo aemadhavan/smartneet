@@ -241,6 +241,7 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   assertionReasonQuestion: one(assertion_reason_questions, { fields: [questions.question_id], references: [assertion_reason_questions.question_id] }),
   matchColumnsQuestion: one(match_columns_questions, { fields: [questions.question_id], references: [match_columns_questions.question_id] }),
   statementBasedQuestion: one(statement_based_questions, { fields: [questions.question_id], references: [statement_based_questions.question_id] }),
+  sequenceOrderingQuestion: one(sequence_ordering_questions, { fields: [questions.question_id], references: [sequence_ordering_questions.question_id] }),
   questionTags: many(question_tags)
 }));
 
@@ -282,4 +283,14 @@ export const tagsRelations = relations(tags, ({ many }) => ({
 export const questionTagsRelations = relations(question_tags, ({ one }) => ({
   question: one(questions, { fields: [question_tags.question_id], references: [questions.question_id] }),
   tag: one(tags, { fields: [question_tags.tag_id], references: [tags.tag_id] })
+}));
+
+// Add these new relation definitions at the end of your file
+export const sequenceOrderingQuestionsRelations = relations(sequence_ordering_questions, ({ one, many }) => ({
+  question: one(questions, { fields: [sequence_ordering_questions.question_id], references: [questions.question_id] }),
+  sequenceItems: many(sequence_items)
+}));
+
+export const sequenceItemsRelations = relations(sequence_items, ({ one }) => ({
+  sequenceQuestion: one(sequence_ordering_questions, { fields: [sequence_items.sequence_id], references: [sequence_ordering_questions.sequence_id] })
 }));

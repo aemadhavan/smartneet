@@ -9,7 +9,9 @@ import {
   match_columns_items,
   match_columns_options,
   statement_based_questions,
-  statements
+  statements,
+  sequence_ordering_questions,
+  sequence_items
 } from '@/db/schema';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
@@ -85,17 +87,30 @@ interface StatementBasedData {
   statements?: Statement[];
   options?: MultipleChoiceOption[];
 }
+interface SequenceItem {
+  item_number: number;
+  item_label?: string;
+  item_text: string;
+}
 
+// Sequence ordering data interface
+interface SequenceOrderingData {
+  intro_text?: string;
+  correct_sequence: number[] | string;
+  items?: SequenceItem[];
+}
 // Complete question data interface
 interface QuestionData extends BaseQuestionData {
   options?: MultipleChoiceOption[];
   assertion_reason?: AssertionReasonData;
+  assertion_reason_questions?: AssertionReasonData;
   match_columns?: MatchColumnsData;
   statement_based?: StatementBasedData;
   statement_based_questions?: StatementBasedData;
-  statements?: Statement[];
-  // This will also be useful for consistent handling
-  assertion_reason_questions?: AssertionReasonData;
+  statements?: Statement[];  
+  sequence_ordering?: SequenceOrderingData;
+  sequence_ordering_questions?: SequenceOrderingData;
+  sequence_items?: SequenceItem[];
 }
 
 // Helper functions to validate and convert enum values
@@ -454,10 +469,62 @@ export async function POST(request: NextRequest) {
                 }
               }
               break;
+              case 'SequenceOrdering':
+                // Look for sequence_ordering_questions in both possible locations
+                const sequenceData = questionData.sequence_ordering_questions || questionData.sequence_ordering;
+                
+                if (sequenceData) {
+                  // Convert correct_sequence array to string if needed
+                  const correctSequenceStr = typeof sequenceData.correct_sequence === 'object' 
+                    ? JSON.stringify(sequenceData.correct_sequence)
+                    : sequenceData.correct_sequence;
+                  
+                  const [sequenceInsert] = await tx
+                    .insert(sequence_ordering_questions)
+                    .values({
+                      question_id: questionId,
+                      intro_text: sequenceData.intro_text,
+                      correct_sequence: correctSequenceStr
+                    })
+                    .returning({ sequence_id: sequence_ordering_questions.sequence_id });
               
+                  const sequenceId = sequenceInsert.sequence_id;
+              
+                  // Check for sequence items in both places
+                  const sequenceItems = sequenceData.items || questionData.sequence_items;
+                  
+                  // Insert sequence items
+                  if (sequenceItems && sequenceItems.length > 0) {
+                    await Promise.all(
+                      sequenceItems.map((item) =>
+                        tx.insert(sequence_items).values({
+                          sequence_id: sequenceId,
+                          item_number: item.item_number,
+                          item_label: item.item_label,
+                          item_text: item.item_text
+                        })
+                      )
+                    );
+                  }
+                }
+                
+                // Insert options
+                if (questionData.options) {
+                  await Promise.all(
+                    questionData.options.map((option: MultipleChoiceOption) =>
+                      tx.insert(multiple_choice_options).values({
+                        question_id: questionId,
+                        option_number: option.option_number,
+                        option_text: option.option_text,
+                        is_correct: option.is_correct || false
+                      })
+                    )
+                  );
+                }
+                break;  
             // Add other question types as needed
             case 'DiagramBased':
-            case 'SequenceOrdering':
+            
               // These types might have their own special handling
               if (questionData.options) {
                 await Promise.all(

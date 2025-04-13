@@ -1,7 +1,7 @@
 // src/app/admin/questions/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import JsonUploader from '@/app/admin/components/JsonUploader';
 import Image from 'next/image';
 
@@ -94,6 +94,20 @@ export default function QuestionsPage() {
   const [papers, setPapers] = useState<QuestionPaper[]>([]);
   const [currentPaper, setCurrentPaper] = useState<QuestionPaper | null>(null);
 
+  // Define getTopicName and getSubtopicName with useCallback here, before they're used
+  const getTopicName = useCallback((topicId: number | null) => {
+    if (!topicId) return 'None';
+    if (!topics || topics.length === 0) return 'Loading...';
+    const topic = topics.find(t => t.topic_id === topicId);
+    return topic ? topic.topic_name : 'Unknown';
+  }, [topics]);
+
+  const getSubtopicName = useCallback((subtopicId: number | null) => {
+    if (!subtopicId) return 'None';
+    const subtopic = subtopics.find(s => s.subtopic_id === subtopicId);
+    return subtopic ? subtopic.subtopic_name : 'Unknown';
+  }, [subtopics]);
+
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -146,8 +160,18 @@ export default function QuestionsPage() {
     };
     
     fetchTopics();
-  }, [selectedSubject]);
-
+  }, [selectedSubject, selectedTopic]);
+  useEffect(() => {
+    if (questions.length > 0) {
+      console.log("Questions with topic info:", 
+        questions.map(q => ({
+          id: q.question_id,
+          topic_id: q.topic_id,
+          topic_name: getTopicName(q.topic_id)
+        }))
+      );
+    }
+  }, [questions, getTopicName]);
   // Fetch subtopics when topic changes
   useEffect(() => {
     const fetchSubtopics = async () => {
@@ -271,17 +295,7 @@ export default function QuestionsPage() {
     fetchPapers();
   }, []);
 
-  useEffect(() => {
-    if (questions.length > 0) {
-      console.log("Questions with topic info:", 
-        questions.map(q => ({
-          id: q.question_id,
-          topic_id: q.topic_id,
-          topic_name: getTopicName(q.topic_id)
-        }))
-      );
-    }
-  }, [questions]);
+
 
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedSubject(e.target.value);
@@ -455,6 +469,10 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setLoading(true);
     try {
       let url = '/api/admin/questions?';
+
+      if (selectedPaperId) {
+        url += `paperId=${selectedPaperId}&`;
+      }
       
       if (selectedTopic) {
         url += `topicId=${selectedTopic}&`;
@@ -488,18 +506,7 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     }
   };
 
-  const getTopicName = (topicId: number | null) => {
-    if (!topicId) return 'None';
-    if (!topics || topics.length === 0) return 'Loading...';
-    const topic = topics.find(t => t.topic_id === topicId);
-    return topic ? topic.topic_name : 'Unknown';
-  };
-
-  const getSubtopicName = (subtopicId: number | null) => {
-    if (!subtopicId) return 'None';
-    const subtopic = subtopics.find(s => s.subtopic_id === subtopicId);
-    return subtopic ? subtopic.subtopic_name : 'Unknown';
-  };
+  
 
   const renderPagination = () => {
     const totalPages = Math.ceil(totalQuestions / limit);
