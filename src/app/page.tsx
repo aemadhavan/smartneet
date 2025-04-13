@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,11 +13,9 @@ import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection
 import { CTASection } from '@/components/home/CTASection';
 
 /**
- * This is the home page of the application.
- * It displays the hero section, features section, question preview section, interactive demo section, and CTA section.
- * Now includes a non-closable overlay to prompt users to sign up and a flashy thank you message after successful signup.
+ * Main content of the homepage that uses searchParams
  */
-const HomePage = () => {
+const HomePageContent = () => {
   const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const [showThankYou, setShowThankYou] = useState(false);
   const searchParams = useSearchParams();
@@ -149,7 +147,7 @@ const HomePage = () => {
                     transition: { delay: 0.6 } 
                   }}
                 >
-                  Welcome to the SmarterNEET community! We're excited to help you ace your NEET exam.
+                  Welcome to the SmarterNEET community! We&apos;re excited to help you ace your NEET exam.
                 </motion.p>
                 
                 <motion.div 
@@ -171,31 +169,31 @@ const HomePage = () => {
                 </motion.div>
               </motion.div>
               
-              {/* Animated background elements */}
-              {[...Array(10)].map((_, i) => (
+              {/* Animated background elements - using static array instead of dynamic creation to avoid client-side only code */}
+              {Array(10).fill(0).map((_, i) => (
                 <motion.div
                   key={i}
                   className="absolute rounded-full bg-white bg-opacity-20"
                   initial={{ 
-                    x: Math.random() * window.innerWidth, 
-                    y: Math.random() * window.innerHeight,
-                    opacity: 0.1 + Math.random() * 0.3,
-                    scale: 0.5 + Math.random()
+                    x: `${10 + (i * 10)}%`, 
+                    y: `${5 + (i * 8)}%`,
+                    opacity: 0.1 + (i * 0.03),
+                    scale: 0.5 + (i * 0.05)
                   }}
                   animate={{ 
-                    y: [null, -200 - Math.random() * 200],
+                    y: [null, `-${20 + (i * 5)}%`],
                     opacity: [null, 0],
                     transition: { 
-                      duration: 3 + Math.random() * 5,
+                      duration: 3 + (i * 0.5),
                       repeat: Infinity,
                       repeatType: "loop",
-                      delay: Math.random() * 2,
+                      delay: i * 0.2,
                       ease: "easeInOut"
                     }
                   }}
                   style={{
-                    width: `${20 + Math.random() * 50}px`,
-                    height: `${20 + Math.random() * 50}px`,
+                    width: `${20 + (i * 5)}px`,
+                    height: `${20 + (i * 5)}px`,
                   }}
                 />
               ))}
@@ -218,6 +216,23 @@ const HomePage = () => {
       {/* CTA Section */}
       <CTASection />
     </div>
+  );
+};
+
+/**
+ * This is the home page of the application.
+ * It displays the hero section, features section, question preview section, interactive demo section, and CTA section.
+ * Now includes a non-closable overlay to prompt users to sign up and a flashy thank you message after successful signup.
+ */
+const HomePage = () => {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-2xl text-gray-600">Loading...</div>
+      </div>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 };
 
