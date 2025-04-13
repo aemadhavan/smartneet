@@ -138,10 +138,33 @@ export async function getQuestionById(id: number) {
   return db.select().from(questions).where(eq(questions.question_id, id)).limit(1);
 }
 
+// Define a type for question details
+interface QuestionDetails {
+  options?: Array<{ option_number: string | number; option_text: string; is_correct: boolean }>;
+  statements?: Array<{ statement_label: string; statement_text: string; is_correct: boolean }>;
+  assertion_text?: string;
+  reason_text?: string;
+  left_column_header?: string;
+  right_column_header?: string;
+  items?: Array<{
+    left_item_label?: string;
+    left_item_text?: string;
+    right_item_label?: string;
+    right_item_text?: string;
+    item_number?: number;
+    item_label?: string;
+    item_text?: string;
+  }>;
+  intro_text?: string;
+  correct_option?: number | string;
+  correct_sequence?: string | number[];
+}
+
 export async function createQuestion(data: Partial<QuestionCreate> & { 
   question_text: string;
   question_type: string; 
   source_type?: string;
+  details?: QuestionDetails;
 }) {
   // Default values and validation
   if (!data.subject_id) {
@@ -161,6 +184,8 @@ export async function createQuestion(data: Partial<QuestionCreate> & {
     // Validate and cast enum types
     question_type: validateQuestionType(data.question_type),
     source_type: validateSourceType(data.source_type || 'PreviousYear'),
+    // Add details field (required by schema)
+    details: data.details || {},
     // Optional fields
     paper_id: data.paper_id,
     subtopic_id: data.subtopic_id,
@@ -193,6 +218,7 @@ export async function updateQuestion(id: number, data: Partial<QuestionUpdate>) 
   if (data.is_image_based !== undefined) updateData.is_image_based = data.is_image_based;
   if (data.image_url !== undefined) updateData.image_url = data.image_url;
   if (data.is_active !== undefined) updateData.is_active = data.is_active;
+  if (data.details !== undefined) updateData.details = data.details;
   
   // Handle and validate enum fields
   if (data.question_type !== undefined) {
@@ -409,6 +435,7 @@ interface QuestionCreate {
   source_type: typeof questionSourceTypeEnum.enumValues[number]; // Use enum type directly
   question_text: string;
   explanation?: string;
+  details: QuestionDetails; // Add the details field as required
   difficulty_level?: typeof difficultyLevelEnum.enumValues[number];
   marks?: number;
   negative_marks?: number;
@@ -427,6 +454,7 @@ interface QuestionUpdate {
   source_type?: typeof questionSourceTypeEnum.enumValues[number];
   question_text?: string;
   explanation?: string;
+  details?: QuestionDetails; // Add details field to update interface
   difficulty_level?: typeof difficultyLevelEnum.enumValues[number];
   marks?: number;
   negative_marks?: number;
