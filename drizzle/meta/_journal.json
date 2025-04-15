@@ -8,6 +8,20 @@
       "when": 1744512848714,
       "tag": "0000_giant_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1744634219046,
+      "tag": "0001_deep_harrier",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1744635144135,
+      "tag": "0002_futuristic_ogun",
+      "breakpoints": true
     }
   ]
 }

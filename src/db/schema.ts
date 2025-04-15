@@ -35,6 +35,23 @@ export const difficultyLevelEnum = pgEnum('difficulty_level', [
   'hard'
 ]);
 
+// New enum for session types
+export const sessionTypeEnum = pgEnum('session_type', [
+  'Practice',
+  'Test',
+  'Review',
+  'Custom'
+]);
+
+// New enum for mastery levels
+export const masteryLevelEnum = pgEnum('mastery_level', [
+  'notStarted',
+  'beginner',
+  'intermediate',
+  'advanced',
+  'mastered'
+]);
+
 // --- Core Tables ---
 
 export const subjects = pgTable('subjects', {
@@ -125,24 +142,80 @@ export const question_tags = pgTable('question_tags', {
   };
 });
 
-// --- Sequence Tables ---
-export const sequence_ordering_questions = pgTable('sequence_ordering_questions', {
-  sequence_id: serial('sequence_id').primaryKey(),
-  question_id: integer('question_id').notNull().references(() => questions.question_id, { onDelete: 'cascade' }),
-  intro_text: text('intro_text'),
-  correct_sequence: text('correct_sequence').notNull()
+// --- User Management Tables --- 
+
+export const practice_sessions = pgTable('practice_sessions', {
+  session_id: serial('session_id').primaryKey(),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  session_type: sessionTypeEnum('session_type').notNull(),
+  subject_id: integer('subject_id').references(() => subjects.subject_id),
+  topic_id: integer('topic_id').references(() => topics.topic_id),
+  subtopic_id: integer('subtopic_id').references(() => subtopics.subtopic_id),
+  start_time: timestamp('start_time').notNull().defaultNow(),
+  end_time: timestamp('end_time'),
+  duration_minutes: integer('duration_minutes'),
+  total_questions: integer('total_questions'),
+  questions_attempted: integer('questions_attempted'),
+  questions_correct: integer('questions_correct'),
+  score: integer('score'),
+  max_score: integer('max_score'),
+  is_completed: boolean('is_completed').default(false),
+  notes: text('notes'),
+  settings: jsonb('settings'), // Store session configurations
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+});
+
+export const session_questions = pgTable('session_questions', {
+  session_question_id: serial('session_question_id').primaryKey(),
+  session_id: integer('session_id').notNull().references(() => practice_sessions.session_id, { onDelete: 'cascade' }),
+  question_id: integer('question_id').notNull().references(() => questions.question_id),
+  question_order: integer('question_order').notNull(),
+  time_spent_seconds: integer('time_spent_seconds'),
+  is_bookmarked: boolean('is_bookmarked').default(false),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
 }, (table) => {
   return {
-    uniqueQuestionIdx: uniqueIndex('unique_sequence_question_idx').on(table.question_id)
+    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx').on(table.session_id, table.question_id)
   };
 });
 
-export const sequence_items = pgTable('sequence_items', {
-  item_id: serial('item_id').primaryKey(),
-  sequence_id: integer('sequence_id').notNull().references(() => sequence_ordering_questions.sequence_id, { onDelete: 'cascade' }),
-  item_number: integer('item_number').notNull(),
-  item_label: varchar('item_label', { length: 10 }),
-  item_text: text('item_text').notNull()
+export const question_attempts = pgTable('question_attempts', {
+  attempt_id: serial('attempt_id').primaryKey(),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  question_id: integer('question_id').notNull().references(() => questions.question_id),
+  session_id: integer('session_id').references(() => practice_sessions.session_id),
+  session_question_id: integer('session_question_id').references(() => session_questions.session_question_id),
+  attempt_number: integer('attempt_number').notNull().default(1),
+  user_answer: jsonb('user_answer').notNull(), // Store answer in flexible format
+  is_correct: boolean('is_correct').notNull(),
+  time_taken_seconds: integer('time_taken_seconds'),
+  marks_awarded: integer('marks_awarded'),
+  review_flag: boolean('review_flag').default(false),
+  user_notes: text('user_notes'),
+  attempt_timestamp: timestamp('attempt_timestamp').notNull().defaultNow(),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+});
+
+export const topic_mastery = pgTable('topic_mastery', {
+  mastery_id: serial('mastery_id').primaryKey(),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  topic_id: integer('topic_id').notNull().references(() => topics.topic_id),
+  mastery_level: masteryLevelEnum('mastery_level').notNull().default('notStarted'),
+  questions_attempted: integer('questions_attempted').notNull().default(0),
+  questions_correct: integer('questions_correct').notNull().default(0),
+  accuracy_percentage: integer('accuracy_percentage'),
+  last_practiced: timestamp('last_practiced'),
+  streak_count: integer('streak_count').default(0),
+  progress_data: jsonb('progress_data'), // Store detailed progress metrics
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+}, (table) => {
+  return {
+    uniqueUserTopic: uniqueIndex('unique_user_topic_idx').on(table.user_id, table.topic_id)
+  };
 });
 
 // --- Define Relations ---
@@ -150,7 +223,8 @@ export const sequence_items = pgTable('sequence_items', {
 export const subjectsRelations = relations(subjects, ({ many }) => ({
   topics: many(topics),
   questionPapers: many(question_papers),
-  questions: many(questions)
+  questions: many(questions),
+  practiceSessions: many(practice_sessions)
 }));
 
 export const topicsRelations = relations(topics, ({ one, many }) => ({
@@ -158,12 +232,15 @@ export const topicsRelations = relations(topics, ({ one, many }) => ({
   parentTopic: one(topics, { fields: [topics.parent_topic_id], references: [topics.topic_id], relationName: 'parentTopic' }),
   childTopics: many(topics, { relationName: 'parentTopic' }),
   subtopics: many(subtopics),
-  questions: many(questions)
+  questions: many(questions),
+  practiceSessions: many(practice_sessions),
+  topicMastery: many(topic_mastery)
 }));
 
 export const subtopicsRelations = relations(subtopics, ({ one, many }) => ({
   topic: one(topics, { fields: [subtopics.topic_id], references: [topics.topic_id] }),
-  questions: many(questions)
+  questions: many(questions),
+  practiceSessions: many(practice_sessions)
 }));
 
 export const examYearsRelations = relations(exam_years, ({ many }) => ({
@@ -182,7 +259,8 @@ export const questionsRelations = relations(questions, ({ one, many }) => ({
   topic: one(topics, { fields: [questions.topic_id], references: [topics.topic_id] }),
   subtopic: one(subtopics, { fields: [questions.subtopic_id], references: [subtopics.subtopic_id] }),
   questionTags: many(question_tags),
-  sequenceQuestion: one(sequence_ordering_questions, { fields: [questions.question_id], references: [sequence_ordering_questions.question_id] })
+  sessionQuestions: many(session_questions),
+  questionAttempts: many(question_attempts)
 }));
 
 export const tagsRelations = relations(tags, ({ many }) => ({
@@ -194,12 +272,28 @@ export const questionTagsRelations = relations(question_tags, ({ one }) => ({
   tag: one(tags, { fields: [question_tags.tag_id], references: [tags.tag_id] })
 }));
 
-// Add relations for sequence tables
-export const sequenceOrderingQuestionsRelations = relations(sequence_ordering_questions, ({ one, many }) => ({
-  question: one(questions, { fields: [sequence_ordering_questions.question_id], references: [questions.question_id] }),
-  sequenceItems: many(sequence_items)
+// --- User Management Relations ---
+
+export const practiceSessionsRelations = relations(practice_sessions, ({ one, many }) => ({
+  subject: one(subjects, { fields: [practice_sessions.subject_id], references: [subjects.subject_id] }),
+  topic: one(topics, { fields: [practice_sessions.topic_id], references: [topics.topic_id] }),
+  subtopic: one(subtopics, { fields: [practice_sessions.subtopic_id], references: [subtopics.subtopic_id] }),
+  sessionQuestions: many(session_questions),
+  questionAttempts: many(question_attempts)
 }));
 
-export const sequenceItemsRelations = relations(sequence_items, ({ one }) => ({
-  sequenceQuestion: one(sequence_ordering_questions, { fields: [sequence_items.sequence_id], references: [sequence_ordering_questions.sequence_id] })
+export const sessionQuestionsRelations = relations(session_questions, ({ one, many }) => ({
+  session: one(practice_sessions, { fields: [session_questions.session_id], references: [practice_sessions.session_id] }),
+  question: one(questions, { fields: [session_questions.question_id], references: [questions.question_id] }),
+  questionAttempts: many(question_attempts)
+}));
+
+export const questionAttemptsRelations = relations(question_attempts, ({ one }) => ({
+  question: one(questions, { fields: [question_attempts.question_id], references: [questions.question_id] }),
+  session: one(practice_sessions, { fields: [question_attempts.session_id], references: [practice_sessions.session_id] }),
+  sessionQuestion: one(session_questions, { fields: [question_attempts.session_question_id], references: [session_questions.session_question_id] })
+}));
+
+export const topicMasteryRelations = relations(topic_mastery, ({ one }) => ({
+  topic: one(topics, { fields: [topic_mastery.topic_id], references: [topics.topic_id] })
 }));
