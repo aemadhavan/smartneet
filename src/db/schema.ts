@@ -21,7 +21,8 @@ export const questionTypeEnum = pgEnum('question_type', [
   'AssertionReason',
   'DiagramBased',
   'SequenceOrdering',
-]);
+]
+);
 
 export const questionSourceTypeEnum = pgEnum('question_source_type', [
   'PreviousYear',
@@ -123,6 +124,8 @@ export const questions = pgTable('questions', {
   difficulty_level: difficultyLevelEnum('difficulty_level').default('medium'),
   marks: integer('marks').default(4),
   negative_marks: integer('negative_marks').default(1),
+  is_image_based: boolean('is_image_based').default(false),
+  image_url: varchar('image_url', { length: 255 }),
   is_active: boolean('is_active').default(true),
   created_at: timestamp('created_at').defaultNow(),
   updated_at: timestamp('updated_at').defaultNow()

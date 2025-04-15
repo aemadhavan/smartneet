@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
+import * as schema from './schema';  // Import all schema tables and relations
 
 // Make sure the environment variable exists
 if (!process.env.XATA_DATABASE_URL) {
@@ -23,8 +24,8 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-// Export the drizzle instance with the pool
-export const db = drizzle(pool);
+// Export the drizzle instance with the pool AND schema
+export const db = drizzle(pool, { schema });  // Pass schema here
 
 // Optional: Test query to verify connection
 async function testConnection() {
@@ -43,3 +44,6 @@ async function testConnection() {
 
 // Run the test connection
 testConnection();
+
+// Re-export schema
+export * from './schema';

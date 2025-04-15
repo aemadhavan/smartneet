@@ -1,9 +1,7 @@
 // src/app/biology/page.tsx
 "use client";
 
-import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 
 // Define subject card interfaces
 interface SubjectCard {
