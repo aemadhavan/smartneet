@@ -1,4 +1,3 @@
-// src/app/api/practice-sessions/[sessionId]/bookmark/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { session_questions } from '@/db/schema';
@@ -9,13 +8,19 @@ import { z } from 'zod';
 // Schema for validating bookmark update request
 const bookmarkSchema = z.object({
   session_question_id: z.number(),
-  is_bookmarked: z.boolean()
+  is_bookmarked: z.boolean(),
 });
 
-// Update bookmark status for a session question
+// Proper context type that Next.js expects
+type Params = {
+  sessionId: string;
+};
+
+export const dynamic = 'force-dynamic';
+
 export async function POST(
-  request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  request: NextRequest, 
+  { params }: { params: Params }
 ) {
   try {
     const { userId } = await auth();
@@ -32,7 +37,7 @@ export async function POST(
       .update(session_questions)
       .set({
         is_bookmarked: validatedData.is_bookmarked,
-        updated_at: new Date()
+        updated_at: new Date(),
       })
       .where(
         and(
@@ -48,7 +53,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      is_bookmarked: updatedQuestion.is_bookmarked
+      is_bookmarked: updatedQuestion.is_bookmarked,
     });
   } catch (error) {
     console.error('Error updating bookmark status:', error);

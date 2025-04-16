@@ -29,6 +29,13 @@
       "when": 1744716527119,
       "tag": "0003_tricky_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1744795620355,
+      "tag": "0004_talented_tombstone",
+      "breakpoints": true
     }
   ]
 }

@@ -2,9 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { 
-  questions,
-  sequence_ordering_questions,
-  sequence_items
+  questions
 } from '@/db/schema';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
@@ -365,7 +363,7 @@ export async function POST(request: NextRequest) {
           const questionType = validateQuestionType(questionData.question_type);
           
           // Insert the base question with details field
-          const [insertedQuestion] = await tx
+          await tx
             .insert(questions)
             .values({
               paper_id: processedQuestion.paper_id,
@@ -382,53 +380,7 @@ export async function POST(request: NextRequest) {
               marks: processedQuestion.marks,
               negative_marks: processedQuestion.negative_marks,
               is_active: processedQuestion.is_active ?? true
-            })
-            .returning({ question_id: questions.question_id });
-
-          const questionId = insertedQuestion.question_id;
-
-          // For SequenceOrdering type, we still need to create sequence_ordering_questions and sequence_items
-          if (questionType === 'SequenceOrdering' && processedQuestion.details) {
-            // Extract sequence data from details
-            const sequenceData = processedQuestion.details;
-            if (sequenceData.correct_sequence || sequenceData.items) {
-              const correctSequenceStr = typeof sequenceData.correct_sequence === 'object' 
-                ? JSON.stringify(sequenceData.correct_sequence)
-                : sequenceData.correct_sequence?.toString() || '';
-              
-              const [sequenceInsert] = await tx
-                .insert(sequence_ordering_questions)
-                .values({
-                  question_id: questionId,
-                  intro_text: sequenceData.intro_text,
-                  correct_sequence: correctSequenceStr
-                })
-                .returning({ sequence_id: sequence_ordering_questions.sequence_id });
-          
-              const sequenceId = sequenceInsert.sequence_id;
-          
-              // Insert sequence items if present
-              if (sequenceData.items && Array.isArray(sequenceData.items)) {
-                // Check if items are SequenceItem[] by looking for item_number property
-                const isSequenceItems = sequenceData.items.length > 0 && 'item_number' in sequenceData.items[0];
-                
-                if (isSequenceItems) {
-                  await Promise.all(
-                    (sequenceData.items as SequenceItem[]).map(item =>
-                      tx.insert(sequence_items).values({
-                        sequence_id: sequenceId,
-                        item_number: item.item_number,
-                        item_label: item.item_label,
-                        item_text: item.item_text
-                      })
-                    )
-                  );
-                } else {
-                  console.warn('Expected SequenceItem[] but got different item type in sequenceData.items');
-                }
-              }
-            }
-          }
+            });
         });
 
         insertedCount++;

@@ -54,17 +54,14 @@ interface TopicMastery {
   last_practiced: string;
 }
 
-interface SessionData {
-  session_id: number;
-  session_type: string;
-  start_time: string;
-  subject_name: string;
-  topic_name: string | null;
-  questions_attempted: number;
-  questions_correct: number;
-  score: number;
-  max_score: number;
-  duration_minutes: number;
+interface UserStats {
+  totalSessions: number;
+  totalQuestionsAttempted: number;
+  totalCorrectAnswers: number;
+  averageAccuracy: number;
+  totalDurationMinutes: number;
+  streakCount: number;
+  masteredTopics: number;
 }
 
 export default function DashboardPage() {
@@ -73,7 +70,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [recentSessions, setRecentSessions] = useState<SessionSummary[]>([]);
   const [topicMastery, setTopicMastery] = useState<TopicMastery[]>([]);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<UserStats>({
     totalSessions: 0,
     totalQuestionsAttempted: 0,
     totalCorrectAnswers: 0,
@@ -87,17 +84,25 @@ export default function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      // In a real implementation, these would be API calls
+      // Fetch sessions data
       const sessionsData = await fetchRecentSessions();
-      const topicData = await fetchTopicMastery();
-      const statsData = await fetchUserStats();
-      
       setRecentSessions(sessionsData);
+      
+      // Fetch topic mastery data
+      const topicData = await fetchTopicMastery();
       setTopicMastery(topicData);
+      
+      // Fetch user stats
+      const statsData = await fetchUserStats();
       setStats(statsData);
+      
       setLoading(false);
     } catch (error) {
       console.error("Failed to fetch dashboard data:", error);
+      // Even in case of error, we still want to show something
+      setRecentSessions(mockFetchRecentSessions());
+      setTopicMastery(mockFetchTopicMastery());
+      setStats(mockFetchUserStats());
       setLoading(false);
     }
   }, []);
@@ -124,17 +129,17 @@ export default function DashboardPage() {
       const data = await response.json();
       
       // Transform data to match SessionSummary interface
-      return data.map((session: SessionData) => ({
+      return data.map((session: any) => ({
         session_id: session.session_id,
         session_type: session.session_type,
         start_time: session.start_time,
         subject_name: session.subject_name,
         topic_name: session.topic_name,
-        questions_attempted: session.questions_attempted,
-        questions_correct: session.questions_correct,
-        score: session.score,
-        max_score: session.max_score,
-        duration_minutes: session.duration_minutes,
+        questions_attempted: session.questions_attempted || 0,
+        questions_correct: session.questions_correct || 0,
+        score: session.score || 0,
+        max_score: session.max_score || 0,
+        duration_minutes: session.duration_minutes || 0,
         accuracy: session.questions_attempted > 0 
           ? (session.questions_correct / session.questions_attempted) * 100 
           : 0
@@ -163,14 +168,25 @@ export default function DashboardPage() {
   };
 
   // Fetch user statistics
-  const fetchUserStats = async () => {
+  const fetchUserStats = async (): Promise<UserStats> => {
     try {
       const response = await fetch('/api/user-stats');
       if (!response.ok) {
         throw new Error('Failed to fetch user stats');
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Ensure all required properties exist
+      return {
+        totalSessions: data.totalSessions || 0,
+        totalQuestionsAttempted: data.totalQuestionsAttempted || 0,
+        totalCorrectAnswers: data.totalCorrectAnswers || 0,
+        averageAccuracy: data.averageAccuracy || 0,
+        totalDurationMinutes: data.totalDurationMinutes || 0,
+        streakCount: data.streakCount || 0,
+        masteredTopics: data.masteredTopics || 0
+      };
     } catch (error) {
       console.error('Error fetching user stats:', error);
       // Return mock data in case of error
@@ -289,32 +305,36 @@ export default function DashboardPage() {
             </div>
             
             <div className="space-y-4">
-              {topicMastery.map(topic => (
-                <div key={topic.topic_id} className="bg-gray-50 p-3 rounded-md">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">{topic.topic_name}</h3>
-                    <span 
-                      className="text-xs px-2 py-0.5 rounded-full" 
-                      style={{ 
-                        backgroundColor: getMasteryColor(topic.mastery_level),
-                        color: topic.mastery_level === 'notStarted' ? '#6b7280' : '#1f2937'
-                      }}
-                    >
-                      {topic.mastery_level.charAt(0).toUpperCase() + topic.mastery_level.slice(1)}
-                    </span>
+              {topicMastery.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">No topic mastery data available yet.</p>
+              ) : (
+                topicMastery.map(topic => (
+                  <div key={topic.topic_id} className="bg-gray-50 p-3 rounded-md">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium">{topic.topic_name}</h3>
+                      <span 
+                        className="text-xs px-2 py-0.5 rounded-full" 
+                        style={{ 
+                          backgroundColor: getMasteryColor(topic.mastery_level),
+                          color: topic.mastery_level === 'notStarted' ? '#6b7280' : '#1f2937'
+                        }}
+                      >
+                        {topic.mastery_level.charAt(0).toUpperCase() + topic.mastery_level.slice(1)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-emerald-600 h-2 rounded-full" 
+                        style={{ width: `${topic.accuracy_percentage}%` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>Accuracy: {topic.accuracy_percentage}%</span>
+                      <span>{topic.questions_attempted} questions</span>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-emerald-600 h-2 rounded-full" 
-                      style={{ width: `${topic.accuracy_percentage}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>Accuracy: {topic.accuracy_percentage}%</span>
-                    <span>{topic.questions_attempted} questions</span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
             
             <div className="mt-6">
@@ -555,7 +575,7 @@ export default function DashboardPage() {
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
             <h3 className="font-medium text-green-800 mb-2">Strong Areas</h3>
             <p className="text-green-700 text-sm mb-3">
-              You&apos;re performing well in these topics:
+              You're performing well in these topics:
             </p>
             <ul className="space-y-2">
               <li className="flex items-center text-sm">
@@ -595,6 +615,7 @@ export default function DashboardPage() {
     </div>
   );
 }
+
 // Mock data functions (would be API calls in a real application)
 function mockFetchRecentSessions(): SessionSummary[] {
   return [
@@ -698,7 +719,7 @@ function mockFetchTopicMastery(): TopicMastery[] {
   ];
 }
 
-function mockFetchUserStats() {
+function mockFetchUserStats(): UserStats {
   return {
     totalSessions: 16,
     totalQuestionsAttempted: 285,

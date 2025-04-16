@@ -10,8 +10,8 @@ import {
   session_questions
 } from '@/db/schema';
 import { and, eq, desc } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server'; // Import from server module
-import { z } from 'zod'; // You'll need to install zod package
+import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
 
 // Schema for validating session creation request
 const createSessionSchema = z.object({
@@ -64,7 +64,10 @@ export async function POST(request: NextRequest) {
         session_id: newSession.session_id,
         question_id: question.question_id,
         question_order: index + 1,
-        is_bookmarked: false
+        is_bookmarked: false,
+        time_spent_seconds: 0,
+        user_id: userId,
+        topic_id: question.topic_id
       })
     ));
 

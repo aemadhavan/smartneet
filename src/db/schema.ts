@@ -176,11 +176,13 @@ export const session_questions = pgTable('session_questions', {
   question_order: integer('question_order').notNull(),
   time_spent_seconds: integer('time_spent_seconds'),
   is_bookmarked: boolean('is_bookmarked').default(false),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  topic_id: integer('topic_id').notNull().references(() => topics.topic_id),
   created_at: timestamp('created_at').defaultNow(),
   updated_at: timestamp('updated_at').defaultNow()
 }, (table) => {
   return {
-    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx').on(table.session_id, table.question_id)
+    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx2').on(table.session_id, table.question_id)
   };
 });
 
@@ -206,6 +208,8 @@ export const topic_mastery = pgTable('topic_mastery', {
   mastery_id: serial('mastery_id').primaryKey(),
   user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
   topic_id: integer('topic_id').notNull().references(() => topics.topic_id),
+  session_id: integer('session_id').references(() => practice_sessions.session_id),
+  question_id: integer('question_id').references(() => questions.question_id),
   mastery_level: masteryLevelEnum('mastery_level').notNull().default('notStarted'),
   questions_attempted: integer('questions_attempted').notNull().default(0),
   questions_correct: integer('questions_correct').notNull().default(0),
@@ -217,7 +221,9 @@ export const topic_mastery = pgTable('topic_mastery', {
   updated_at: timestamp('updated_at').defaultNow()
 }, (table) => {
   return {
-    uniqueUserTopic: uniqueIndex('unique_user_topic_idx').on(table.user_id, table.topic_id)
+    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx').on(table.session_id, table.question_id),
+    session_id: integer('session_id').references(() => practice_sessions.session_id),
+    question_id: integer('question_id').references(() => questions.question_id)
   };
 });
 
