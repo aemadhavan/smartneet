@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -16,24 +15,20 @@ interface MultipleChoiceOption {
   option_number: string;
   option_text: string;
 }
-
 interface MatchingItem {
   left_item_label: string;
   left_item_text: string;
   right_item_label: string;
   right_item_text: string;
 }
-
 interface Statement {
   statement_label: string;
   statement_text: string;
 }
-
 interface SequenceItem {
   item_number: string;
   item_text: string;
 }
-
 interface QuestionOption {
   option_number: string;
   option_text: string;
@@ -43,35 +38,31 @@ interface QuestionOption {
 interface MultipleChoiceDetails {
   options: MultipleChoiceOption[];
 }
-
 interface MatchingDetails {
   left_column_header?: string;
   right_column_header?: string;
   items: MatchingItem[];
   options: QuestionOption[];
 }
-
 interface AssertionReasonDetails {
   statements: Statement[];
   options: QuestionOption[];
 }
-
 interface MultipleCorrectStatementsDetails {
   statements: Statement[];
   options: QuestionOption[];
 }
-
 interface SequenceOrderingDetails {
   sequence_items: SequenceItem[];
   options: QuestionOption[];
 }
 
 // Union type for all question details
-type QuestionDetails = 
-  | MultipleChoiceDetails 
-  | MatchingDetails 
-  | AssertionReasonDetails 
-  | MultipleCorrectStatementsDetails 
+type QuestionDetails =
+  | MultipleChoiceDetails
+  | MatchingDetails
+  | AssertionReasonDetails
+  | MultipleCorrectStatementsDetails
   | SequenceOrderingDetails;
 
 interface Question {
@@ -98,17 +89,18 @@ export default function PracticePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subjectParam = searchParams.get('subject')?.toLowerCase();
-  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [session, setSession] = useState<SessionResponse | null>(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+
+  // Explicitly type userAnswers as Record<number, string>
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [sessionCompleted, setSessionCompleted] = useState(false);
-  
+
   // Step 1: Fetch available subjects
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -124,7 +116,6 @@ export default function PracticePage() {
         setError('Failed to load subjects. Please try again.');
       }
     };
-
     fetchSubjects();
   }, []);
 
@@ -132,10 +123,10 @@ export default function PracticePage() {
   useEffect(() => {
     if (subjects.length > 0 && subjectParam) {
       const matchedSubject = subjects.find(
-        s => s.subject_name.toLowerCase() === subjectParam || 
-             s.subject_code.toLowerCase() === subjectParam
+        (s) =>
+          s.subject_name.toLowerCase() === subjectParam ||
+          s.subject_code.toLowerCase() === subjectParam
       );
-      
       if (matchedSubject) {
         setSelectedSubject(matchedSubject);
       } else {
@@ -143,7 +134,6 @@ export default function PracticePage() {
         setLoading(false);
       }
     } else if (subjects.length > 0 && !subjectParam) {
-      // No subject specified, show selection UI
       setLoading(false);
     }
   }, [subjects, subjectParam]);
@@ -152,13 +142,11 @@ export default function PracticePage() {
   useEffect(() => {
     const createSession = async () => {
       if (!selectedSubject) return;
-      
       try {
         setLoading(true);
         setError(null);
         setSessionCompleted(false);
         setUserAnswers({});
-        
         const response = await fetch('/api/practice-sessions', {
           method: 'POST',
           headers: {
@@ -167,15 +155,13 @@ export default function PracticePage() {
           body: JSON.stringify({
             subject_id: selectedSubject.subject_id,
             session_type: 'Practice',
-            question_count: 10 // Default number of questions
+            question_count: 10, // Default number of questions
           }),
         });
-
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || 'Failed to create practice session');
         }
-
         const sessionData = await response.json();
         console.log('Session data:', sessionData);
         setSession(sessionData);
@@ -186,7 +172,6 @@ export default function PracticePage() {
         setLoading(false);
       }
     };
-
     if (selectedSubject) {
       createSession();
     }
@@ -204,15 +189,11 @@ export default function PracticePage() {
   const handleRetry = () => {
     setLoading(true);
     setError(null);
-    
-    // If we have a selected subject, try to create a session again
     if (selectedSubject) {
-      // This will trigger the useEffect to create a session
-      const tempSubject = {...selectedSubject};
+      const tempSubject = { ...selectedSubject };
       setSelectedSubject(null);
       setTimeout(() => setSelectedSubject(tempSubject), 100);
     } else {
-      // Just reset loading state if no subject is selected
       setLoading(false);
     }
   };
@@ -221,58 +202,60 @@ export default function PracticePage() {
   const handleSubjectSelect = (subject: Subject) => {
     router.push(`/practice?subject=${subject.subject_name.toLowerCase()}`);
   };
-  
+
   // Handle option selection
   const handleOptionSelect = (optionNumber: string) => {
     if (!session) return;
-    
     setSelectedOption(optionNumber);
     const questionId = session.questions[currentQuestionIndex].question_id;
-    
-    // Save user's answer
-    setUserAnswers(prev => ({
+    setUserAnswers((prev) => ({
       ...prev,
-      [questionId]: optionNumber
+      [questionId]: optionNumber,
     }));
   };
-  
+
   // Handle navigation to next question
   const handleNextQuestion = () => {
     if (!session) return;
-    
     if (currentQuestionIndex < session.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      // All questions answered, complete the session
       handleCompleteSession();
     }
   };
-  
+
   // Handle completion of session
   const handleCompleteSession = async () => {
     if (!session) return;
-    
     try {
-      // In a real implementation, you would send the answers to the server
-      // to be evaluated and save the results
-      
-      // Count number of answers provided
       const answeredCount = Object.keys(userAnswers).length;
-      
-      // If not all questions are answered, ask for confirmation
-      if (answeredCount < session.questions.length && !confirm('You have not answered all questions. Are you sure you want to finish the session?')) {
+      if (
+        answeredCount < session.questions.length &&
+        !confirm('You have not answered all questions. Are you sure you want to finish the session?')
+      ) {
         return;
       }
-      
-      // Here you would typically send the answers to your API
-      // await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ answers: userAnswers })
-      // });
-      
+      const answersPayload: Record<number, string> = {};
+      session.questions.forEach((question) => {
+        const questionId = question.question_id;
+        if (userAnswers[questionId]) {
+          answersPayload[questionId] = userAnswers[questionId];
+        }
+      });
+      const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ answers: answersPayload }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit answers.');
+      }
+      const responseData = await response.json();
+      console.log('Submission successful:', responseData);
       setSessionCompleted(true);
-      
     } catch (err) {
       console.error('Error completing session:', err);
       alert('Failed to submit answers. Please try again.');
@@ -284,10 +267,8 @@ export default function PracticePage() {
     setSessionCompleted(false);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
-    
-    // Trigger creation of a new session
     if (selectedSubject) {
-      const tempSubject = {...selectedSubject};
+      const tempSubject = { ...selectedSubject };
       setSelectedSubject(null);
       setTimeout(() => setSelectedSubject(tempSubject), 100);
     }
@@ -296,30 +277,24 @@ export default function PracticePage() {
   // Safely parse the details JSON if it's a string
   const parseDetails = (question: Question): QuestionDetails | null => {
     if (!question.details) return null;
-    
     if (typeof question.details === 'string') {
       try {
-        // Some strings might be double-encoded JSON
-        if (question.details.startsWith('"') && question.details.endsWith('"')) {
-          const unescaped = JSON.parse(question.details);
-          return typeof unescaped === 'string' ? JSON.parse(unescaped) : unescaped;
-        }
-        return JSON.parse(question.details);
+        const parsed = JSON.parse(question.details);
+        return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
       } catch (e) {
         console.error('Failed to parse question details:', e);
         return null;
       }
     }
-    
     return question.details as QuestionDetails;
   };
 
   // If session is completed, show the completion page
   if (sessionCompleted && session) {
     return (
-      <SessionCompletePage 
-        sessionId={session.sessionId} 
-        onStartNewSession={handleStartNewSession} 
+      <SessionCompletePage
+        sessionId={session.sessionId}
+        onStartNewSession={handleStartNewSession}
       />
     );
   }
@@ -340,12 +315,16 @@ export default function PracticePage() {
       <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
         <div className="text-red-500 mb-6">
           <svg className="w-20 h-20 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <path
+              fillRule="evenodd"
+              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+              clipRule="evenodd"
+            />
           </svg>
         </div>
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">Failed to load practice session</h2>
         <p className="text-gray-600 mb-8">{error}</p>
-        <button 
+        <button
           onClick={handleRetry}
           className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition duration-200"
         >
@@ -362,8 +341,8 @@ export default function PracticePage() {
         <h1 className="text-3xl font-bold text-gray-800 mb-8">Select a Subject</h1>
         <div className="grid md:grid-cols-3 gap-6">
           {subjects.map((subject) => (
-            <div 
-              key={subject.subject_id} 
+            <div
+              key={subject.subject_id}
               className="bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition duration-200 cursor-pointer"
               onClick={() => handleSubjectSelect(subject)}
             >
@@ -379,238 +358,241 @@ export default function PracticePage() {
   // Render practice session
   if (session && session.questions.length > 0) {
     const currentQuestion = session.questions[currentQuestionIndex];
-    console.log('Current question:', currentQuestion);
     const details = parseDetails(currentQuestion);
-    console.log('Parsed details:', details);
-    
-    // Check if all questions have been answered
     const isLastQuestion = currentQuestionIndex === session.questions.length - 1;
-    
+
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">
-            {selectedSubject.subject_name} Practice
-          </h1>
-          <div className="text-sm text-gray-600">
+          <h1 className="text-2xl font-bold text-gray-800">{selectedSubject.subject_name} Practice</h1>
+          <div className="text-sm text-gray-500">
             Question {currentQuestionIndex + 1} of {session.questions.length}
           </div>
         </div>
-        
+
         {/* Progress bar */}
         <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
-          <div 
-            className="bg-indigo-600 h-2.5 rounded-full" 
+          <div
+            className="bg-indigo-600 h-2.5 rounded-full"
             style={{ width: `${((currentQuestionIndex + 1) / session.questions.length) * 100}%` }}
           />
         </div>
-        
+
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <div className="mb-2 flex justify-between">
             <span className="text-sm font-medium text-gray-600">
-              {currentQuestion.topic_name} 
+              {currentQuestion.topic_name}
               {currentQuestion.subtopic_name && ` › ${currentQuestion.subtopic_name}`}
             </span>
-            <span className={`text-sm font-medium ${
-              currentQuestion.difficulty_level === 'easy' ? 'text-green-600' :
-              currentQuestion.difficulty_level === 'medium' ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {currentQuestion.difficulty_level.charAt(0).toUpperCase() + currentQuestion.difficulty_level.slice(1)}
+            <span
+              className={`text-sm font-medium ${
+                currentQuestion.difficulty_level === 'easy'
+                  ? 'text-green-600'
+                  : currentQuestion.difficulty_level === 'medium'
+                  ? 'text-yellow-600'
+                  : 'text-red-600'
+              }`}
+            >
+              {currentQuestion.difficulty_level.charAt(0).toUpperCase() +
+                currentQuestion.difficulty_level.slice(1)}
             </span>
           </div>
-          
           <div className="text-lg text-gray-800 mb-6">
             <div dangerouslySetInnerHTML={{ __html: currentQuestion.question_text }} />
           </div>
-          
           <div className="text-xs text-gray-500 mb-4">
             Question type: {currentQuestion.question_type}
           </div>
-          
+
           {/* Multiple Choice Questions */}
-          {currentQuestion.question_type === 'MultipleChoice' && 
-           details && 'options' in details && (
-            <div className="space-y-3">
-              {details.options.map((option, index) => (
-                <div 
-                  key={index}
-                  className={`border rounded-md p-4 cursor-pointer ${
-                    selectedOption === option.option_number
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleOptionSelect(option.option_number)}
-                >
-                  <div className="flex items-start">
-                    <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
-                    <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+          {currentQuestion.question_type === 'MultipleChoice' &&
+            details &&
+            'options' in details && (
+              <div className="space-y-3">
+                {details.options.map((option, index) => (
+                  <div
+                    key={index}
+                    className={`border rounded-md p-4 cursor-pointer ${
+                      selectedOption === option.option_number
+                        ? 'border-indigo-500 bg-indigo-50'
+                        : 'border-gray-200 hover:bg-gray-50'
+                    }`}
+                    onClick={() => handleOptionSelect(option.option_number)}
+                  >
+                    <div className="flex items-start">
+                      <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
+                      <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
+                ))}
+              </div>
+            )}
+
           {/* Matching Questions */}
-          {currentQuestion.question_type === 'Matching' && 
-           details && 'items' in details && 'options' in details && (
-            <div>
-              <div className="mb-6 overflow-x-auto">
-                <table className="min-w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="border px-4 py-2 bg-gray-50">
-                        {details.left_column_header || 'List I'}
-                      </th>
-                      <th className="border px-4 py-2 bg-gray-50">
-                        {details.right_column_header || 'List II'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {details.items.map((item, index) => (
-                      <tr key={index}>
-                        <td className="border px-4 py-2">
-                          <span className="font-medium mr-2">{item.left_item_label}.</span>
-                          {item.left_item_text}
-                        </td>
-                        <td className="border px-4 py-2">
-                          <span className="font-medium mr-2">{item.right_item_label}.</span>
-                          {item.right_item_text}
-                        </td>
+          {currentQuestion.question_type === 'Matching' &&
+            details &&
+            'items' in details &&
+            'options' in details && (
+              <div>
+                <div className="mb-6 overflow-x-auto">
+                  <table className="min-w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="border px-4 py-2 bg-gray-50">
+                          {details.left_column_header || 'List I'}
+                        </th>
+                        <th className="border px-4 py-2 bg-gray-50">
+                          {details.right_column_header || 'List II'}
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              
-              <div className="mt-6 space-y-3">
-                {details.options.map((option, index) => (
-                  <div 
-                    key={index}
-                    className={`border rounded-md p-4 cursor-pointer ${
-                      selectedOption === option.option_number
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleOptionSelect(option.option_number)}
-                  >
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
-                      <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                    </thead>
+                    <tbody>
+                      {details.items.map((item, index) => (
+                        <tr key={index}>
+                          <td className="border px-4 py-2">
+                            <span className="font-medium mr-2">{item.left_item_label}.</span>
+                            {item.left_item_text}
+                          </td>
+                          <td className="border px-4 py-2">
+                            <span className="font-medium mr-2">{item.right_item_label}.</span>
+                            {item.right_item_text}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-6 space-y-3">
+                  {details.options.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-4 cursor-pointer ${
+                        selectedOption === option.option_number
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleOptionSelect(option.option_number)}
+                    >
+                      <div className="flex items-start">
+                        <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
+                        <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
+            )}
+
           {/* Assertion-Reason Questions */}
-          {currentQuestion.question_type === 'AssertionReason' && 
-           details && 'statements' in details && 'options' in details && (
-            <div>
-              <div className="mb-6 space-y-4 border-b pb-4">
-                {details.statements.map((statement, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded">
-                    <p className="font-medium mb-1">{statement.statement_label}:</p>
-                    <p dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-3">
-                {details.options.map((option, index) => (
-                  <div 
-                    key={index}
-                    className={`border rounded-md p-4 cursor-pointer ${
-                      selectedOption === option.option_number
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleOptionSelect(option.option_number)}
-                  >
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
-                      <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+          {currentQuestion.question_type === 'AssertionReason' &&
+            details &&
+            'statements' in details &&
+            'options' in details && (
+              <div>
+                <div className="mb-6 space-y-4 border-b pb-4">
+                  {details.statements.map((statement, index) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded">
+                      <p className="font-medium mb-1">{statement.statement_label}:</p>
+                      <p dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  {details.options.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-4 cursor-pointer ${
+                        selectedOption === option.option_number
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleOptionSelect(option.option_number)}
+                    >
+                      <div className="flex items-start">
+                        <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
+                        <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
+            )}
+
           {/* Multiple Correct Statements */}
-          {currentQuestion.question_type === 'MultipleCorrectStatements' && 
-           details && 'statements' in details && 'options' in details && (
-            <div>
-              <div className="mb-6 space-y-3 border-b pb-4">
-                {details.statements.map((statement, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded">
-                    <div className="flex">
-                      <span className="font-medium mr-2">{statement.statement_label}:</span>
-                      <div dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+          {currentQuestion.question_type === 'MultipleCorrectStatements' &&
+            details &&
+            'statements' in details &&
+            'options' in details && (
+              <div>
+                <div className="mb-6 space-y-3 border-b pb-4">
+                  {details.statements.map((statement, index) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded">
+                      <div className="flex">
+                        <span className="font-medium mr-2">{statement.statement_label}:</span>
+                        <div dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-3">
-                {details.options.map((option, index) => (
-                  <div 
-                    key={index}
-                    className={`border rounded-md p-4 cursor-pointer ${
-                      selectedOption === option.option_number
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleOptionSelect(option.option_number)}
-                  >
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
-                      <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  {details.options.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-4 cursor-pointer ${
+                        selectedOption === option.option_number
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleOptionSelect(option.option_number)}
+                    >
+                      <div className="flex items-start">
+                        <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
+                        <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
+            )}
+
           {/* Sequence Ordering */}
-          {currentQuestion.question_type === 'SequenceOrdering' && 
-           details && 'sequence_items' in details && 'options' in details && (
-            <div>
-              <div className="mb-6 space-y-2 border-b pb-4">
-                <p className="font-medium mb-2">Arrange in correct sequence:</p>
-                {details.sequence_items.map((item, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded mb-2">
-                    <div className="flex">
-                      <span className="font-medium mr-2">{item.item_number}.</span>
-                      <div dangerouslySetInnerHTML={{ __html: item.item_text }} />
+          {currentQuestion.question_type === 'SequenceOrdering' &&
+            details &&
+            'sequence_items' in details &&
+            'options' in details && (
+              <div>
+                <div className="mb-6 space-y-2 border-b pb-4">
+                  <p className="font-medium mb-2">Arrange in correct sequence:</p>
+                  {details.sequence_items.map((item, index) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded mb-2">
+                      <div className="flex">
+                        <span className="font-medium mr-2">{item.item_number}.</span>
+                        <div dangerouslySetInnerHTML={{ __html: item.item_text }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="space-y-3">
-                {details.options.map((option, index) => (
-                  <div 
-                    key={index}
-                    className={`border rounded-md p-4 cursor-pointer ${
-                      selectedOption === option.option_number
-                        ? 'border-indigo-500 bg-indigo-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleOptionSelect(option.option_number)}
-                  >
-                    <div className="flex items-start">
-                      <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
-                      <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  {details.options.map((option, index) => (
+                    <div
+                      key={index}
+                      className={`border rounded-md p-4 cursor-pointer ${
+                        selectedOption === option.option_number
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleOptionSelect(option.option_number)}
+                    >
+                      <div className="flex items-start">
+                        <span className="font-medium mr-2">{option.option_number.toUpperCase()}.</span>
+                        <div dangerouslySetInnerHTML={{ __html: option.option_text }} />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
+            )}
+
           {/* Fallback if no known question type is matched */}
           {!details && (
             <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-6">
@@ -620,7 +602,7 @@ export default function PracticePage() {
               </pre>
             </div>
           )}
-          
+
           {/* Navigation and submit buttons */}
           <div className="flex justify-between mt-8">
             <button
@@ -634,7 +616,6 @@ export default function PracticePage() {
             >
               Previous
             </button>
-            
             <div className="flex space-x-4">
               {isLastQuestion ? (
                 <button
@@ -654,7 +635,7 @@ export default function PracticePage() {
             </div>
           </div>
         </div>
-        
+
         {/* Question navigation */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h3 className="text-sm font-medium text-gray-600 mb-4">Question Navigator</h3>
@@ -664,11 +645,11 @@ export default function PracticePage() {
                 key={q.question_id}
                 onClick={() => setCurrentQuestionIndex(idx)}
                 className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium
-                  ${idx === currentQuestionIndex 
-                    ? 'bg-indigo-600 text-white' 
-                    : userAnswers[q.question_id] 
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
-                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  ${idx === currentQuestionIndex
+                    ? 'bg-indigo-600 text-white'
+                    : userAnswers[q.question_id]
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                   }`}
               >
                 {idx + 1}
@@ -685,7 +666,7 @@ export default function PracticePage() {
     <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">No Questions Available</h2>
       <p className="text-gray-600 mb-8">No questions are available for this subject at the moment.</p>
-      <Link 
+      <Link
         href="/"
         className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition duration-200"
       >

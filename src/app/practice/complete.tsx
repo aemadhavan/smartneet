@@ -47,90 +47,25 @@ export default function SessionCompletePage({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch session summary
+    // Fetch session summary from our API
     const fetchSummary = async () => {
       try {
         setLoading(true);
         
-        // In development/demo mode, skip the actual API call and use mock data
-        // In production, you would uncomment this code once the API is implemented
-        /*
+        // Make the API call to the new endpoint
         const response = await fetch(`/api/practice-sessions/${sessionId}/summary`);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch session summary');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to fetch session summary');
         }
         
         const data = await response.json();
         setSummary(data);
-        */
-        
-        // Mock data for demonstration purposes
-        const mockSummary: SessionSummary = {
-          sessionId,
-          totalQuestions: 10,
-          questionsCorrect: 7,
-          questionsIncorrect: 3,
-          accuracy: 70,
-          timeTakenMinutes: 12,
-          score: 28,
-          maxScore: 40,
-          topicPerformance: [
-            {
-              topicId: 1,
-              topicName: 'Diversity in Living World',
-              questionsCorrect: 3,
-              questionsTotal: 3,
-              accuracy: 100
-            },
-            {
-              topicId: 3,
-              topicName: 'Cell Structure and Function',
-              questionsCorrect: 1,
-              questionsTotal: 2,
-              accuracy: 50
-            },
-            {
-              topicId: 4,
-              topicName: 'Biological Classification',
-              questionsCorrect: 2,
-              questionsTotal: 3,
-              accuracy: 67
-            },
-            {
-              topicId: 6,
-              topicName: 'Neural Control & Coordination',
-              questionsCorrect: 1,
-              questionsTotal: 2,
-              accuracy: 50
-            }
-          ]
-        };
-        
-        setSummary(mockSummary);
         setLoading(false);
-        
-        // In a real app, we'd also send a request to mark the session as completed
-        // This code would also need to be uncommented once the API is implemented
-        /*
-        const markComplete = await fetch(`/api/practice-sessions/${sessionId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            is_completed: true,
-            end_time: new Date().toISOString(),
-            questions_correct: mockSummary.questionsCorrect,
-            score: mockSummary.score,
-            max_score: mockSummary.maxScore
-          }),
-        });
-        */
-        
       } catch (err) {
         console.error('Error fetching summary:', err);
-        setError('Failed to load session summary. Please try again.');
+        setError(err instanceof Error ? err.message : 'Failed to load session summary. Please try again.');
         setLoading(false);
       }
     };
