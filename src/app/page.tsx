@@ -96,14 +96,38 @@ const HomePageContent = () => {
     return () => clearTimeout(timer);
   }, [isLoaded, isSignedIn, user]);
 
-  // The timer useEffect for auto-hiding overlay has been removed
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-poppins relative overflow-x-hidden">
       <Head>
         <title>SmarterNEET - Advanced NEET Exam Preparation Platform</title>
-        <meta name="description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics" />
+        <meta name="description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking." />
+        <meta name="keywords" content="NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="canonical" href="https://smarterneet.com/" />
+        
+        {/* Open Graph Tags for better social sharing */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://smarterneet.com/" />
+        <meta property="og:title" content="SmarterNEET - Advanced NEET Exam Preparation Platform" />
+        <meta property="og:description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking." />
+        <meta property="og:image" content="https://smarterneet.com/images/smarterneet-og-image.jpg" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:site_name" content="SmarterNEET" />
+        <meta property="og:locale" content="en_US" />
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@smarterneet" />
+        <meta name="twitter:creator" content="@smarterneet" />
+        <meta name="twitter:title" content="SmarterNEET - Advanced NEET Exam Preparation Platform" />
+        <meta name="twitter:description" content="Master your NEET preparation with AI-powered practice tests and personalized analytics for NEET medical entrance exams." />
+        <meta name="twitter:image" content="https://smarterneet.com/images/smarterneet-twitter-image.jpg" />
+        
+        {/* Additional meta tags for improved SEO */}
+        <meta name="robots" content="index, follow" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="author" content="SmarterNEET Team" />
       </Head>
 
       {/* Unified Overlay that always shows with content based on user status */}
@@ -155,8 +179,6 @@ const HomePageContent = () => {
                   Sign up now!
                 </Link>
               )}
-              
-              {/* No button needed for thank you message */}
             </motion.div>
           </motion.div>
         )}
