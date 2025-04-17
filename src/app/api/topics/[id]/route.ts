@@ -6,11 +6,11 @@ import { eq } from 'drizzle-orm';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Safe access to params
-    const topicId = Number(params.id);
+    const topicId = Number((await params).id);
     if (isNaN(topicId)) {
       return NextResponse.json({ error: 'Invalid topic ID' }, { status: 400 });
     }

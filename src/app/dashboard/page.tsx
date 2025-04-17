@@ -64,6 +64,20 @@ interface UserStats {
   masteredTopics: number;
 }
 
+// Session data interface from API
+interface ApiSessionData {
+  session_id: number;
+  session_type: string;
+  start_time: string;
+  subject_name: string;
+  topic_name: string | null;
+  questions_attempted?: number;
+  questions_correct?: number;
+  score?: number;
+  max_score?: number;
+  duration_minutes?: number;
+}
+
 export default function DashboardPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
@@ -129,21 +143,26 @@ export default function DashboardPage() {
       const data = await response.json();
       
       // Transform data to match SessionSummary interface
-      return data.map((session: any) => ({
-        session_id: session.session_id,
-        session_type: session.session_type,
-        start_time: session.start_time,
-        subject_name: session.subject_name,
-        topic_name: session.topic_name,
-        questions_attempted: session.questions_attempted || 0,
-        questions_correct: session.questions_correct || 0,
-        score: session.score || 0,
-        max_score: session.max_score || 0,
-        duration_minutes: session.duration_minutes || 0,
-        accuracy: session.questions_attempted > 0 
-          ? (session.questions_correct / session.questions_attempted) * 100 
-          : 0
-      }));
+      return data.map((session: ApiSessionData) => {
+        const questionsAttempted = session.questions_attempted ?? 0;
+        const questionsCorrect = session.questions_correct ?? 0;
+        
+        return {
+          session_id: session.session_id,
+          session_type: session.session_type,
+          start_time: session.start_time,
+          subject_name: session.subject_name,
+          topic_name: session.topic_name,
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
+          score: session.score ?? 0,
+          max_score: session.max_score ?? 0,
+          duration_minutes: session.duration_minutes ?? 0,
+          accuracy: questionsAttempted > 0 
+            ? (questionsCorrect / questionsAttempted) * 100 
+            : 0
+        };
+      });
     } catch (error) {
       console.error('Error fetching sessions:', error);
       // Return mock data in case of error
@@ -575,7 +594,7 @@ export default function DashboardPage() {
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
             <h3 className="font-medium text-green-800 mb-2">Strong Areas</h3>
             <p className="text-green-700 text-sm mb-3">
-              You're performing well in these topics:
+              You&apos;re performing well in these topics:
             </p>
             <ul className="space-y-2">
               <li className="flex items-center text-sm">

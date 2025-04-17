@@ -1,11 +1,11 @@
 // src/app/api/user-stats/route.ts
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { practice_sessions, question_attempts, topic_mastery } from '@/db';
-import { eq, count, sum, avg, and, gte } from 'drizzle-orm';
+import { practice_sessions, topic_mastery } from '@/db';
+import { eq, count, sum, and, gte } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const { userId } = await auth();
     if (!userId) {

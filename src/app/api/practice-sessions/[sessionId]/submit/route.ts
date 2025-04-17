@@ -7,7 +7,7 @@ import {
   question_attempts,
   questions,
 } from '@/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 
 // TypeScript Interfaces for Question Details
@@ -87,13 +87,21 @@ type QuestionDetails =
   | DiagramBasedDetails
   | MultipleCorrectStatementsDetails;
 
-  interface SubmitAnswersBody {
-    answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
-  }
+interface SubmitAnswersBody {
+  answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
+}
+
+interface QuestionDetailsWithSessionInfo {
+  session_question_id: number;
+  details: QuestionDetails;
+  marks: number | null;
+  negative_marks: number | null;
+  question_type: string;
+}
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     // Authenticate user
@@ -103,7 +111,7 @@ export async function POST(
     }
 
     // Get session ID from params
-    const sessionId = parseInt(params.sessionId);
+    const sessionId = parseInt((await params).sessionId);
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
@@ -169,31 +177,25 @@ export async function POST(
         )
       );
 
-    // Create a map for easier access (using string keys)
-    const questionDetailsMap: Record<
-      string,
-      {
-        session_question_id: number;
-        details: any; // Replace `any` with a more specific type if possible.
-        marks: number | null;
-        negative_marks: number | null;
-        question_type: string;
-      }
-    > = sessionQuestions.reduce((map, q) => {
-      map[q.question_id.toString()] = {
-        session_question_id: q.session_question_id,
-        details: q.details,
-        marks: q.marks,
-        negative_marks: q.negative_marks,
-        question_type: q.question_type,
-      };
-      return map;
-    }, {} as Record<string, any>);
+    // Create a map for easier access
+    const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = 
+      sessionQuestions.reduce((map, q) => {
+        map[q.question_id.toString()] = {
+          session_question_id: q.session_question_id,
+          details: typeof q.details === 'string' 
+            ? JSON.parse(q.details) 
+            : q.details,
+          marks: q.marks,
+          negative_marks: q.negative_marks,
+          question_type: q.question_type,
+        };
+        return map;
+      }, {} as Record<string, QuestionDetailsWithSessionInfo>);
 
     // Function to parse and validate question details
     function parseQuestionDetails(
       questionType: string,
-      details: any
+      details: QuestionDetails
     ): QuestionDetails | null {
       try {
         switch (questionType) {
@@ -293,9 +295,7 @@ export async function POST(
       try {
         const parsedDetails = parseQuestionDetails(
           questionDetails.question_type,
-          typeof questionDetails.details === 'string'
-            ? JSON.parse(questionDetails.details)
-            : questionDetails.details
+          questionDetails.details
         );
 
         if (!parsedDetails) {
@@ -307,20 +307,19 @@ export async function POST(
         } else {
           switch (questionDetails.question_type) {
             case 'MultipleChoice':
-              case 'MultipleChoice':
-                const correctOption = (parsedDetails as MultipleChoiceDetails).options.find(
-                  (opt) => opt.is_correct && opt.option_number === userAnswer
-                );
-                isCorrect = !!correctOption;
-                break;
+              const correctOption = (parsedDetails as MultipleChoiceDetails).options.find(
+                (opt) => opt.is_correct && opt.option_number === userAnswer
+              );
+              isCorrect = !!correctOption;
+              break;
 
-                case 'Matching':
-                  const matchingPairs = (parsedDetails as MatchingDetails).items;
-                  isCorrect = matchingPairs.every((pair) => {
-                    const userRightItemLabel = (userAnswer as { [key: string]: string })[pair.left_item_label];
-                    return userRightItemLabel === pair.right_item_label;
-                  });
-                  break;
+            case 'Matching':
+              const matchingPairs = (parsedDetails as MatchingDetails).items;
+              isCorrect = matchingPairs.every((pair) => {
+                const userRightItemLabel = (userAnswer as { [key: string]: string })[pair.left_item_label];
+                return userRightItemLabel === pair.right_item_label;
+              });
+              break;
 
             case 'AssertionReason':
               const assertionReason = parsedDetails as AssertionReasonDetails;
@@ -383,7 +382,7 @@ export async function POST(
       }
 
       // Create the question attempt record
-      const [attempt] = await db
+      await db
         .insert(question_attempts)
         .values({
           user_id: userId,
@@ -397,8 +396,7 @@ export async function POST(
           attempt_timestamp: new Date(),
           created_at: new Date(),
           updated_at: new Date(),
-        })
-        .returning();
+        });
 
       results.push({
         question_id: parseInt(questionId), // Convert back to number for consistency

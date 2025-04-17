@@ -13,17 +13,21 @@ import { auth } from '@clerk/nextjs/server';
 
 // Get details for a specific practice session
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  request: NextRequest
 ) {
   try {
     // Await the auth call to get userId
     const { userId } = await auth();
+    
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const pathname = request.nextUrl.pathname;
+    const match = pathname.match(/\/practice-sessions\/(\d+)/);
+    const sessionId = match ? parseInt(match[1], 10) : NaN;
 
-    const sessionId = Number((await params).sessionId);
+    //const sessionId = Number((await params).sessionId);
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
@@ -97,7 +101,7 @@ export async function GET(
 // Update session details (e.g., mark as completed)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     // Await the auth call to get userId
@@ -148,7 +152,7 @@ export async function PATCH(
 // Delete a session
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     // Await the auth call to get userId
@@ -182,9 +186,9 @@ export async function DELETE(
       .delete(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
 
-    return NextResponse.json({ success: true });
+    return Promise.resolve(NextResponse.json({ success: true }));
   } catch (error) {
     console.error('Error deleting session:', error);
-    return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
+    return Promise.resolve(NextResponse.json({ error: 'Failed to delete session' }, { status: 500 }));
   }
 }

@@ -8,7 +8,7 @@ import {
   pgTable, 
   primaryKey,
   pgEnum,
-  jsonb, // Add jsonb for PostgreSQL JSON support
+  jsonb,
   uniqueIndex
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -21,8 +21,7 @@ export const questionTypeEnum = pgEnum('question_type', [
   'AssertionReason',
   'DiagramBased',
   'SequenceOrdering',
-]
-);
+]);
 
 export const questionSourceTypeEnum = pgEnum('question_source_type', [
   'PreviousYear',
@@ -182,7 +181,7 @@ export const session_questions = pgTable('session_questions', {
   updated_at: timestamp('updated_at').defaultNow()
 }, (table) => {
   return {
-    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx2').on(table.session_id, table.question_id)
+    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx_sq').on(table.session_id, table.question_id)
   };
 });
 
@@ -204,6 +203,7 @@ export const question_attempts = pgTable('question_attempts', {
   updated_at: timestamp('updated_at').defaultNow()
 });
 
+// Fixed topic_mastery table - removed duplicate references and fixed unique index
 export const topic_mastery = pgTable('topic_mastery', {
   mastery_id: serial('mastery_id').primaryKey(),
   user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
@@ -221,9 +221,7 @@ export const topic_mastery = pgTable('topic_mastery', {
   updated_at: timestamp('updated_at').defaultNow()
 }, (table) => {
   return {
-    uniqueSessionQuestion: uniqueIndex('unique_session_question_idx').on(table.session_id, table.question_id),
-    session_id: integer('session_id').references(() => practice_sessions.session_id),
-    question_id: integer('question_id').references(() => questions.question_id)
+    uniqueTopicMastery: uniqueIndex('unique_topic_mastery_idx').on(table.user_id, table.topic_id)
   };
 });
 
@@ -304,5 +302,7 @@ export const questionAttemptsRelations = relations(question_attempts, ({ one }) 
 }));
 
 export const topicMasteryRelations = relations(topic_mastery, ({ one }) => ({
-  topic: one(topics, { fields: [topic_mastery.topic_id], references: [topics.topic_id] })
+  topic: one(topics, { fields: [topic_mastery.topic_id], references: [topics.topic_id] }),
+  session: one(practice_sessions, { fields: [topic_mastery.session_id], references: [practice_sessions.session_id] }),
+  question: one(questions, { fields: [topic_mastery.question_id], references: [questions.question_id] })
 }));

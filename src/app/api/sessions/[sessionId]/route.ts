@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { 
   practice_sessions, 
-  subjects, 
+  //subjects, 
   topics, 
   subtopics,
   session_questions,
@@ -46,7 +46,7 @@ type QuestionDetails =
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -54,7 +54,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const sessionId = parseInt(params.sessionId);
+    const sessionId = parseInt((await params).sessionId);
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }

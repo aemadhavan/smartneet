@@ -1,7 +1,7 @@
 // src/app/dashboard/topics/page.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -50,36 +50,6 @@ export default function TopicsDashboardPage() {
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [selectedMasteryLevel, setSelectedMasteryLevel] = useState<string | null>(null);
   
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect=dashboard/topics');
-      return;
-    }
-    
-    if (isSignedIn) {
-      fetchData();
-    }
-  }, [isSignedIn, isLoaded, router]);
-  
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // In a real implementation, fetch from API
-      const subjectsData = await fetchSubjects();
-      const topicsData = await fetchTopicMastery();
-      
-      setSubjects(subjectsData);
-      setTopics(topicsData);
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      // Use mock data even in case of error
-      setSubjects(mockFetchSubjects());
-      setTopics(mockFetchAllTopicsMastery());
-      setLoading(false);
-    }
-  };
-  
   // Fetch all subject data
   const fetchSubjects = async (): Promise<Subject[]> => {
     try {
@@ -109,6 +79,36 @@ export default function TopicsDashboardPage() {
       return mockFetchAllTopicsMastery();
     }
   };
+  
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // In a real implementation, fetch from API
+      const subjectsData = await fetchSubjects();
+      const topicsData = await fetchTopicMastery();
+      
+      setSubjects(subjectsData);
+      setTopics(topicsData);
+      setLoading(false);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      // Use mock data even in case of error
+      setSubjects(mockFetchSubjects());
+      setTopics(mockFetchAllTopicsMastery());
+      setLoading(false);
+    }
+  }, []);
+  
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect=dashboard/topics');
+      return;
+    }
+    
+    if (isSignedIn) {
+      fetchData();
+    }
+  }, [isSignedIn, isLoaded, router, fetchData]);
   
   // Get mastery level color
   const getMasteryColor = (level: string) => {

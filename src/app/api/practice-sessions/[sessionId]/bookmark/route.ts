@@ -1,3 +1,4 @@
+// app/api/practice-sessions/[sessionId]/bookmark/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { session_questions } from '@/db/schema';
@@ -11,24 +12,28 @@ const bookmarkSchema = z.object({
   is_bookmarked: z.boolean(),
 });
 
-// Proper context type that Next.js expects
-type Params = {
-  sessionId: string;
-};
-
+// Configure dynamic rendering for this route
 export const dynamic = 'force-dynamic';
 
-export async function POST(
-  request: NextRequest, 
-  { params }: { params: Params }
-) {
+// Route handler for Next.js 15.2.4
+export async function POST(request: NextRequest) {
   try {
+    // Get the session ID from the URL
+    const pathname = request.nextUrl.pathname;
+    const match = pathname.match(/\/practice-sessions\/(\d+)\/bookmark/);
+    const sessionId = match ? parseInt(match[1], 10) : NaN;
+    
+    if (isNaN(sessionId)) {
+      return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
+    }
+
+    // Authentication check
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const sessionId = parseInt(params.sessionId);
+    // Parse and validate request body
     const requestData = await request.json();
     const validatedData = bookmarkSchema.parse(requestData);
 
@@ -42,7 +47,8 @@ export async function POST(
       .where(
         and(
           eq(session_questions.session_id, sessionId),
-          eq(session_questions.session_question_id, validatedData.session_question_id)
+          eq(session_questions.session_question_id, validatedData.session_question_id),
+          eq(session_questions.user_id, userId)
         )
       )
       .returning();
@@ -57,9 +63,14 @@ export async function POST(
     });
   } catch (error) {
     console.error('Error updating bookmark status:', error);
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors }, { status: 400 });
+    }
+    
     return NextResponse.json(
-      { error: error instanceof z.ZodError ? error.errors : 'Failed to update bookmark status' },
-      { status: 400 }
+      { error: 'Failed to update bookmark status' },
+      { status: 500 }
     );
   }
 }

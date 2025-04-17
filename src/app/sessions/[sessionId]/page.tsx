@@ -21,11 +21,9 @@ import {
   ArrowLeft,
   Clock,
   CheckCircle,
-  XCircle,
   AlertCircle,
   BookOpen,
   Award,
-  BookMarked,
 } from 'lucide-react';
 
 // Types
@@ -55,8 +53,8 @@ interface QuestionResult {
   subtopic_name: string | null;
   is_correct: boolean;
   time_taken_seconds: number;
-  user_answer: any;
-  correct_answer: any;
+  user_answer: unknown;
+  correct_answer: unknown;
   explanation: string | null;
   marks_awarded: number;
   marks_available: number;
@@ -97,7 +95,7 @@ function mockSessionResults(): { session: SessionResult; questions: QuestionResu
   };
 }
 
-export default function SessionResultsPage({ params }: { params: { sessionId: string } }) {
+export default function SessionResultsPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -107,20 +105,25 @@ export default function SessionResultsPage({ params }: { params: { sessionId: st
   const [selectedTab, setSelectedTab] = useState<'summary' | 'questions' | 'topics'>('summary');
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect=/sessions/' + params.sessionId);
-      return;
-    }
-    if (isSignedIn) {
-      fetchSessionResults();
-    }
-  }, [isSignedIn, isLoaded, router, params.sessionId]);
+    const loadData = async () => {
+      if (isLoaded && !isSignedIn) {
+        const sessionId = (await params).sessionId;
+        router.push('/sign-in?redirect=/sessions/' + sessionId);
+        return;
+      }
+      if (isSignedIn) {
+        fetchSessionResults();
+      }
+    };
+    loadData();
+  }, [isSignedIn, isLoaded, router, params]);
 
   const fetchSessionResults = async () => {
     setLoading(true);
     try {
       // In a real implementation, fetch from API
-      // const response = await fetch(`/api/sessions/${params.sessionId}`);
+      // const sessionId = (await params).sessionId;
+      // const response = await fetch(`/api/sessions/${sessionId}`);
       // if (!response.ok) {
       //   throw new Error('Failed to fetch session results');
       // }
@@ -194,20 +197,13 @@ export default function SessionResultsPage({ params }: { params: { sessionId: st
     return 'text-red-600';
   };
 
-  // Get background color based on accuracy
-  const getAccuracyBgColor = (accuracy: number) => {
-    if (accuracy >= 80) return 'bg-emerald-100';
-    if (accuracy >= 60) return 'bg-amber-100';
-    return 'bg-red-100';
-  };
-
   // Get text color based on correctness
   const getCorrectColor = (isCorrect: boolean) => {
     return isCorrect ? 'text-emerald-600' : 'text-red-600';
   };
 
   // Helper function to render answer based on question type
-  const renderAnswer = (questionType: string, answer: any): string => {
+  const renderAnswer = (questionType: string, answer: unknown): string => {
     if (!answer) return 'No answer provided';
     try {
       switch (questionType) {
@@ -219,7 +215,7 @@ export default function SessionResultsPage({ params }: { params: { sessionId: st
           }
           return String(answer);
         case 'Matching':
-          if (typeof answer === 'object') {
+          if (typeof answer === 'object' && answer !== null) {
             return Object.entries(answer)
               .map(([key, val]) => `${key} → ${val}`)
               .join(', ');
@@ -264,7 +260,7 @@ export default function SessionResultsPage({ params }: { params: { sessionId: st
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Session Not Found</h3>
           <p className="text-gray-600 mb-6">
-            The practice session you're looking for doesn't exist or you don't have permission to view it.
+            The practice session you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
           </p>
           <Link
             href="/dashboard"

@@ -7,9 +7,9 @@ import {
   question_attempts,
   questions,
   topics,
-  subtopics
+  //subtopics
 } from '@/db';
-import { and, eq, count, sum, avg } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 
 interface TopicPerformance {
@@ -21,9 +21,9 @@ interface TopicPerformance {
 }
 
 type Params = {
-  params: {
+  params: Promise<{
     sessionId: string
-  }
+  }>
 }
 
 export async function GET(

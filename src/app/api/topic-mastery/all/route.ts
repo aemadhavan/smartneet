@@ -5,7 +5,7 @@ import { topic_mastery, topics, subjects } from '@/db';
 import { eq, desc } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -45,4 +45,3 @@ export async function GET(request: Request) {
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
-
