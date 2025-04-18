@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { auth } from '@clerk/nextjs/server';
-import { and, count, eq } from 'drizzle-orm';
+import { count, eq } from 'drizzle-orm';
 import { question_attempts, questions } from '@/db/schema';
 
 export async function GET() {
@@ -26,7 +26,7 @@ export async function GET() {
     // Format the response for the pie chart
     const formattedData = questionTypeDistribution.map((item) => {
       // Convert enum values to readable names
-      let name = item.question_type
+      const name = item.question_type
         .replace(/([A-Z])/g, ' $1') // Add space before capital letters
         .trim(); // Remove leading/trailing spaces
       

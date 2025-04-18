@@ -13,122 +13,102 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell
 } from 'recharts';
 import { 
-  ArrowLeft, 
-  Search, 
-  Filter, 
-  ChevronDown,
-  BookOpen
+  ArrowRight, 
+  ArrowLeft,
+  CheckCircle, 
+  Clock, 
+  Star,
+  Book,
+  ChevronRight
 } from 'lucide-react';
 
-// Types
+// Types for topic page
 interface TopicMastery {
+  mastery_id: number;
+  user_id: string;
   topic_id: number;
   topic_name: string;
+  mastery_level: string;
+  questions_attempted: number;
+  questions_correct: number;
+  accuracy_percentage: number;
+  last_practiced: string;
+  streak_count: number;
   subject_id: number;
   subject_name: string;
-  mastery_level: string;
-  accuracy_percentage: number;
-  questions_attempted: number;
-  last_practiced: string | null;
 }
 
-interface Subject {
+interface SubjectInfo {
   subject_id: number;
   subject_name: string;
   subject_code: string;
-  is_active: boolean;
+  topic_count: number;
+  mastered_topics: number;
 }
 
-export default function TopicsDashboardPage() {
+interface TopicStatsSummary {
+  totalTopics: number;
+  masteredTopics: number;
+  inProgressTopics: number;
+  notStartedTopics: number;
+  averageAccuracy: number;
+  strongestSubject: string;
+  weakestSubject: string;
+}
+
+interface PerformanceData {
+  name: string;
+  accuracy: number;
+}
+
+export default function TopicsPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
+  
+  // State for topics page
   const [loading, setLoading] = useState(true);
-  const [topics, setTopics] = useState<TopicMastery[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [topicMastery, setTopicMastery] = useState<TopicMastery[]>([]);
+  const [subjects, setSubjects] = useState<SubjectInfo[]>([]);
+  const [stats, setStats] = useState<TopicStatsSummary>({
+    totalTopics: 0,
+    masteredTopics: 0,
+    inProgressTopics: 0,
+    notStartedTopics: 0,
+    averageAccuracy: 0,
+    strongestSubject: '',
+    weakestSubject: ''
+  });
+  
+  // Filter state
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
-  const [selectedMasteryLevel, setSelectedMasteryLevel] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [filterMastery, setFilterMastery] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>('mastery'); // mastery, accuracy, name
   
-  // Fetch all subject data - wrapped in useCallback to use in dependency array
-  const fetchSubjects = useCallback(async (): Promise<Subject[]> => {
-    try {
-      const response = await fetch('/api/subjects?isActive=true');
-      if (!response.ok) {
-        throw new Error('Failed to fetch subjects');
-      }
-      
-      const result = await response.json();
-      
-      // Check if the response has the expected structure
-      if (result.success && Array.isArray(result.data)) {
-        return result.data;
-      } else {
-        throw new Error('Invalid response format from subjects API');
-      }
-    } catch (error) {
-      console.error('Error fetching subjects:', error);
-      setError('Failed to load subjects data. Please try again later.');
-      return [];
-    }
-  }, []);
-  
-  // Fetch all topic mastery data - wrapped in useCallback to use in dependency array
-  const fetchTopicMastery = useCallback(async (): Promise<TopicMastery[]> => {
-    try {
-      const response = await fetch('/api/topic-mastery/all');
-      if (!response.ok) {
-        throw new Error('Failed to fetch topic mastery');
-      }
-      
-      return await response.json();
-    } catch (error) {
-      console.error('Error fetching topic mastery:', error);
-      setError('Failed to load topic mastery data. Please try again later.');
-      return [];
-    }
-  }, []);
-  
-  // Combined data fetching function - wrapped in useCallback to use in dependency array
-  const fetchData = useCallback(async () => {
+  // Define fetchDashboardData using useCallback to avoid dependency issues
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    
     try {
       // Use Promise.all to fetch data in parallel
-      const [subjectsData, topicsData] = await Promise.all([
-        fetchSubjects(),
-        fetchTopicMastery()
+      const [masteryData, subjectData] = await Promise.all([
+        fetchTopicMastery(),
+        fetchSubjects()
       ]);
       
-      // Add additional validation
-      if (!Array.isArray(subjectsData)) {
-        console.error('Subjects data is not an array:', subjectsData);
-        setError('Received invalid data format from the server. Please contact support.');
-        setLoading(false);
-        return;
-      }
+      setTopicMastery(masteryData);
+      setSubjects(subjectData);
       
-      if (!Array.isArray(topicsData)) {
-        console.error('Topics data is not an array:', topicsData);
-        setError('Received invalid data format from the server. Please contact support.');
-        setLoading(false);
-        return;
-      }
-      
-      setSubjects(subjectsData);
-      setTopics(topicsData);
+      // Calculate summary statistics
+      calculateStats(masteryData);
     } catch (error) {
-      console.error("Failed to fetch data:", error);
-      setError('An error occurred while loading data. Please try again later.');
+      console.error("Failed to fetch topics data:", error);
     } finally {
       setLoading(false);
     }
-  }, [fetchSubjects, fetchTopicMastery]);
+  }, []);
   
+  // Redirect if not signed in
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/sign-in?redirect=dashboard/topics');
@@ -136,11 +116,161 @@ export default function TopicsDashboardPage() {
     }
     
     if (isSignedIn) {
-      fetchData();
+      fetchDashboardData();
     }
-  }, [isSignedIn, isLoaded, router, fetchData]);
+  }, [isSignedIn, isLoaded, router, fetchDashboardData]);
   
-  // Get mastery level color
+  // Fetch topic mastery data
+  const fetchTopicMastery = async (): Promise<TopicMastery[]> => {
+    try {
+      const response = await fetch('/api/topic-mastery/detailed');
+      if (!response.ok) {
+        throw new Error('Failed to fetch topic mastery');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching topic mastery:', error);
+      return [];
+    }
+  };
+
+  // Fetch subjects with topic counts
+  const fetchSubjects = async (): Promise<SubjectInfo[]> => {
+    try {
+      const response = await fetch('/api/subjects/with-topics');
+      if (!response.ok) {
+        throw new Error('Failed to fetch subjects');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching subjects:', error);
+      return [];
+    }
+  };
+
+  // Calculate summary statistics
+  const calculateStats = (topics: TopicMastery[]) => {
+    const masteredCount = topics.filter(t => t.mastery_level === 'mastered').length;
+    const inProgressCount = topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length;
+    const notStartedCount = topics.filter(t => t.mastery_level === 'notStarted').length;
+    
+    // Calculate average accuracy
+    const totalAccuracy = topics.reduce((sum, topic) => {
+      return sum + (topic.accuracy_percentage || 0);
+    }, 0);
+    const avgAccuracy = topics.length ? totalAccuracy / topics.length : 0;
+    
+    // Determine strongest and weakest subjects
+    const subjectPerformance = new Map<string, { total: number, count: number }>();
+    
+    topics.forEach(topic => {
+      const subjectName = topic.subject_name;
+      if (!subjectName) return;
+      
+      const current = subjectPerformance.get(subjectName) || { total: 0, count: 0 };
+      if (topic.accuracy_percentage) {
+        subjectPerformance.set(subjectName, {
+          total: current.total + topic.accuracy_percentage,
+          count: current.count + 1
+        });
+      }
+    });
+    
+    let strongestSubject = '';
+    let weakestSubject = '';
+    let highestAccuracy = 0;
+    let lowestAccuracy = 100;
+    
+    subjectPerformance.forEach((data, subject) => {
+      if (data.count) {
+        const avgSubjectAccuracy = data.total / data.count;
+        if (avgSubjectAccuracy > highestAccuracy) {
+          highestAccuracy = avgSubjectAccuracy;
+          strongestSubject = subject;
+        }
+        if (avgSubjectAccuracy < lowestAccuracy) {
+          lowestAccuracy = avgSubjectAccuracy;
+          weakestSubject = subject;
+        }
+      }
+    });
+    
+    setStats({
+      totalTopics: topics.length,
+      masteredTopics: masteredCount,
+      inProgressTopics: inProgressCount,
+      notStartedTopics: notStartedCount,
+      averageAccuracy: avgAccuracy,
+      strongestSubject,
+      weakestSubject
+    });
+  };
+  
+  // Get filtered and sorted topics
+  const getFilteredTopics = (): TopicMastery[] => {
+    return topicMastery
+      .filter(topic => {
+        // Apply subject filter
+        if (selectedSubject !== null && topic.subject_id !== selectedSubject) {
+          return false;
+        }
+        
+        // Apply mastery level filter
+        if (filterMastery !== null && topic.mastery_level !== filterMastery) {
+          return false;
+        }
+        
+        return true;
+      })
+      .sort((a, b) => {
+        // Apply sorting
+        if (sortBy === 'mastery') {
+          const masteryOrder = {
+            'mastered': 0,
+            'advanced': 1,
+            'intermediate': 2,
+            'beginner': 3,
+            'notStarted': 4
+          };
+          return (masteryOrder[a.mastery_level as keyof typeof masteryOrder] || 5) - 
+                 (masteryOrder[b.mastery_level as keyof typeof masteryOrder] || 5);
+        } else if (sortBy === 'accuracy') {
+          return (b.accuracy_percentage || 0) - (a.accuracy_percentage || 0);
+        } else if (sortBy === 'name') {
+          return (a.topic_name || '').localeCompare(b.topic_name || '');
+        }
+        return 0;
+      });
+  };
+  
+  // Get data for subject performance chart
+  const getSubjectPerformanceData = (): PerformanceData[] => {
+    const subjectPerformance = new Map<string, { total: number, count: number }>();
+    
+    topicMastery.forEach(topic => {
+      const subjectName = topic.subject_name;
+      if (!subjectName) return;
+      
+      const current = subjectPerformance.get(subjectName) || { total: 0, count: 0 };
+      if (topic.accuracy_percentage) {
+        subjectPerformance.set(subjectName, {
+          total: current.total + topic.accuracy_percentage,
+          count: current.count + 1
+        });
+      }
+    });
+    
+    return Array.from(subjectPerformance.entries())
+      .map(([name, data]) => ({
+        name,
+        accuracy: data.count ? Math.round(data.total / data.count) : 0
+      }))
+      .sort((a, b) => b.accuracy - a.accuracy);
+  };
+  
+  // Helper functions for UI formatting
   const getMasteryColor = (level: string) => {
     switch(level) {
       case 'notStarted': return '#f3f4f6'; // gray-100
@@ -152,14 +282,18 @@ export default function TopicsDashboardPage() {
     }
   };
   
-  // Get mastery level label color
   const getMasteryTextColor = (level: string) => {
-    if (level === 'notStarted') return '#6b7280'; // gray-500
-    return '#1f2937'; // gray-800
+    switch(level) {
+      case 'notStarted': return '#6b7280'; // gray-500
+      case 'beginner': return '#b91c1c'; // red-700
+      case 'intermediate': return '#b45309'; // yellow-700
+      case 'advanced': return '#1e40af'; // blue-800
+      case 'mastered': return '#047857'; // green-700
+      default: return '#6b7280'; // gray-500
+    }
   };
   
-  // Format date
-  const formatDate = (dateString: string | null) => {
+  const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'Never';
     
     const date = new Date(dateString);
@@ -170,325 +304,244 @@ export default function TopicsDashboardPage() {
     });
   };
   
-  // Filter topics based on search and filters
-  const filteredTopics = topics.filter(topic => {
-    const matchesSearch = searchQuery === '' || 
-      topic.topic_name.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesSubject = selectedSubject === null || 
-      selectedSubject === 0 || // All subjects option
-      topic.subject_id === selectedSubject;
-    
-    const matchesMastery = selectedMasteryLevel === null || 
-      topic.mastery_level === selectedMasteryLevel;
-    
-    return matchesSearch && matchesSubject && matchesMastery;
-  });
+  const formatAccuracy = (accuracy: number | undefined) => {
+    if (accuracy === undefined || accuracy === null) return 'N/A';
+    return `${Math.round(accuracy)}%`;
+  };
   
-  // Group by mastery level for chart
-  const masteryData = [
-    { name: 'Not Started', value: topics.filter(t => t.mastery_level === 'notStarted').length },
-    { name: 'Beginner', value: topics.filter(t => t.mastery_level === 'beginner').length },
-    { name: 'Intermediate', value: topics.filter(t => t.mastery_level === 'intermediate').length },
-    { name: 'Advanced', value: topics.filter(t => t.mastery_level === 'advanced').length },
-    { name: 'Mastered', value: topics.filter(t => t.mastery_level === 'mastered').length }
-  ];
-  
-  // Generate colors for chart
-  const masteryChartColors = [
-    '#f3f4f6', // Not Started - gray-100
-    '#fee2e2', // Beginner - red-100
-    '#fef3c7', // Intermediate - yellow-100
-    '#dbeafe', // Advanced - blue-100
-    '#d1fae5'  // Mastered - green-100
-  ];
-  
-  // Show loading state
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading topic data...</p>
+          <p className="text-lg text-gray-600">Loading topics...</p>
         </div>
       </div>
     );
   }
   
-  // Show error state
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center bg-red-50 p-8 rounded-lg max-w-md">
-          <div className="text-red-500 text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-red-700 mb-2">Error Loading Data</h2>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={fetchData} 
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const filteredTopics = getFilteredTopics();
+  const subjectPerformance = getSubjectPerformanceData();
   
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
-      {/* Header with back button */}
-      <div className="flex items-center mb-8">
-        <Link href="/dashboard" className="mr-4 text-gray-500 hover:text-gray-700">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">Topic Mastery</h1>
-          <p className="text-gray-600">Track your progress across all topics</p>
+      <header className="mb-8">
+        <div className="flex items-center mb-4">
+          <Link 
+            href="/dashboard"
+            className="text-indigo-600 hover:text-indigo-800 mr-4 flex items-center"
+          >
+            <ArrowLeft size={16} className="mr-1" />
+            Back to Dashboard
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-800">Topics & Mastery</h1>
         </div>
-      </div>
+        <p className="text-gray-600">
+          Track your mastery level across all topics
+        </p>
+      </header>
       
-      {/* Summary and Charts Row */}
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow-sm p-6 md:col-span-2">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Mastery Overview</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={masteryData}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis dataKey="name" type="category" />
-                <Tooltip />
-                <Bar dataKey="value" name="Topics" radius={[0, 4, 4, 0]}>
-                  {masteryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={masteryChartColors[index]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+      {/* Overview Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-emerald-100 text-emerald-600 mr-4">
+              <Book size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total Topics</p>
+              <p className="text-2xl font-bold">{stats.totalTopics}</p>
+            </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Progress Summary</h2>
-          <div className="space-y-4">
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-800">Total Topics</h3>
-                <span className="font-bold text-2xl text-gray-800">{topics.length}</span>
-              </div>
-              <div className="bg-gray-200 h-2 rounded-full w-full">
-                <div 
-                  className="bg-emerald-500 h-2 rounded-full" 
-                  style={{ width: '100%' }}
-                ></div>
-              </div>
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+              <CheckCircle size={24} />
             </div>
-            
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-800">Mastered</h3>
-                <span className="font-bold text-2xl text-emerald-600">
-                  {topics.filter(t => t.mastery_level === 'mastered').length}
-                </span>
-              </div>
-              <div className="bg-gray-200 h-2 rounded-full w-full">
-                <div 
-                  className="bg-emerald-500 h-2 rounded-full" 
-                  style={{ 
-                    width: topics.length > 0 
-                      ? `${(topics.filter(t => t.mastery_level === 'mastered').length / topics.length) * 100}%` 
-                      : '0%'
-                  }}
-                ></div>
-              </div>
+            <div>
+              <p className="text-sm text-gray-500">Mastered</p>
+              <p className="text-2xl font-bold">{stats.masteredTopics}</p>
             </div>
-            
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-800">In Progress</h3>
-                <span className="font-bold text-2xl text-blue-600">
-                  {topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length}
-                </span>
-              </div>
-              <div className="bg-gray-200 h-2 rounded-full w-full">
-                <div 
-                  className="bg-blue-500 h-2 rounded-full" 
-                  style={{ 
-                    width: topics.length > 0
-                      ? `${(topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length / topics.length) * 100}%` 
-                      : '0%'
-                  }}
-                ></div>
-              </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+              <Clock size={24} />
             </div>
-            
-            <div className="rounded-lg bg-gray-50 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-medium text-gray-800">Not Started</h3>
-                <span className="font-bold text-2xl text-gray-500">
-                  {topics.filter(t => t.mastery_level === 'notStarted').length}
-                </span>
-              </div>
-              <div className="bg-gray-200 h-2 rounded-full w-full">
-                <div 
-                  className="bg-gray-400 h-2 rounded-full" 
-                  style={{ 
-                    width: topics.length > 0
-                      ? `${(topics.filter(t => t.mastery_level === 'notStarted').length / topics.length) * 100}%` 
-                      : '0%'
-                  }}
-                ></div>
-              </div>
+            <div>
+              <p className="text-sm text-gray-500">In Progress</p>
+              <p className="text-2xl font-bold">{stats.inProgressTopics}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center">
+            <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
+              <Star size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Avg. Accuracy</p>
+              <p className="text-2xl font-bold">{formatAccuracy(stats.averageAccuracy)}</p>
             </div>
           </div>
         </div>
       </div>
       
-      {/* Search and Filters */}
-      <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search size={18} className="text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search topics..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <div className="relative">
-              <select
-                className="block appearance-none w-full bg-white border border-gray-300 hover:border-gray-400 px-4 py-2 pr-8 rounded shadow leading-tight focus:outline-none focus:shadow-outline"
-                value={selectedSubject || ''}
-                onChange={(e) => setSelectedSubject(e.target.value ? parseInt(e.target.value) : null)}
-              >
-                <option value="">All Subjects</option>
-                {Array.isArray(subjects) && subjects.length > 0 ? (
-                  subjects.map(subject => (
-                    <option key={subject.subject_id} value={subject.subject_id}>
-                      {subject.subject_name}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>No subjects available</option>
-                )}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <ChevronDown size={16} />
-              </div>
-            </div>
-            
-            <div className="relative">
-              <select
-                className="block appearance-none w-full bg-white border border-gray-300 hover:border-gray-400 px-4 py-2 pr-8 rounded shadow leading-tight focus:outline-none focus:shadow-outline"
-                value={selectedMasteryLevel || ''}
-                onChange={(e) => setSelectedMasteryLevel(e.target.value || null)}
-              >
-                <option value="">All Mastery Levels</option>
-                <option value="notStarted">Not Started</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="mastered">Mastered</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                <ChevronDown size={16} />
-              </div>
-            </div>
-            
-            <button 
-              className="flex items-center px-4 py-2 border border-gray-300 bg-white rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
-              onClick={() => {
-                setSearchQuery('');
-                setSelectedSubject(null);
-                setSelectedMasteryLevel(null);
-              }}
+      {/* Subject Performance Chart */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Subject Performance</h2>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={subjectPerformance}
+              margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
             >
-              <Filter size={16} className="mr-2" />
-              Reset
-            </button>
-          </div>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" />
+              <YAxis domain={[0, 100]} />
+              <Tooltip formatter={(value) => [`${value}%`, 'Accuracy']} />
+              <Bar dataKey="accuracy" name="Accuracy %" fill="#10b981" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
       
-      {/* Topics List */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="min-w-full divide-y divide-gray-200">
-          <div className="bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-            <div className="grid grid-cols-12 gap-2">
-              <div className="col-span-4">Topic</div>
-              <div className="col-span-2">Subject</div>
-              <div className="col-span-2">Mastery Level</div>
-              <div className="col-span-1 text-center">Accuracy</div>
-              <div className="col-span-1 text-center">Questions</div>
-              <div className="col-span-2">Last Practiced</div>
-            </div>
+      {/* Topic Filters */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <div className="flex flex-wrap items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-gray-800">Topic Mastery</h2>
+          <div className="text-sm text-gray-500">
+            Showing {filteredTopics.length} of {topicMastery.length} topics
+          </div>
+        </div>
+        
+        <div className="grid md:grid-cols-3 gap-4 mb-6">
+          {/* Subject Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <select 
+              className="w-full rounded-md border-gray-300 shadow-sm p-2"
+              value={selectedSubject || ''}
+              onChange={(e) => setSelectedSubject(e.target.value ? parseInt(e.target.value) : null)}
+            >
+              <option value="">All Subjects</option>
+              {subjects.map(subject => (
+                <option key={subject.subject_id} value={subject.subject_id}>
+                  {subject.subject_name} ({subject.topic_count} topics)
+                </option>
+              ))}
+            </select>
           </div>
           
-          <div className="divide-y divide-gray-200">
-            {filteredTopics.length === 0 ? (
-              <div className="px-6 py-10 text-center text-gray-500">
-                No topics match your search criteria. Try adjusting your filters.
-              </div>
-            ) : (
-              filteredTopics.map((topic) => (
-                <div key={topic.topic_id} className="px-6 py-4 hover:bg-gray-50">
-                  <div className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-4">
-                      <Link 
-                        href={`/practice?topic=${topic.topic_id}`}
-                        className="text-indigo-600 hover:text-indigo-900 font-medium flex items-center"
-                      >
-                        <BookOpen size={16} className="mr-2" />
-                        {topic.topic_name}
-                      </Link>
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-700">
-                      {topic.subject_name}
-                    </div>
-                    <div className="col-span-2">
-                      <span
-                        className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full"
-                        style={{ 
-                          backgroundColor: getMasteryColor(topic.mastery_level),
-                          color: getMasteryTextColor(topic.mastery_level)
-                        }}
-                      >
-                        {topic.mastery_level.charAt(0).toUpperCase() + topic.mastery_level.slice(1)}
-                      </span>
-                    </div>
-                    <div className="col-span-1 text-center">
-                      <span 
-                        className={`text-sm font-medium ${
-                          topic.accuracy_percentage >= 80 ? 'text-emerald-600' : 
-                          topic.accuracy_percentage >= 60 ? 'text-amber-600' : 
-                          topic.accuracy_percentage > 0 ? 'text-red-600' :
-                          'text-gray-400'
-                        }`}
-                      >
-                        {topic.accuracy_percentage}%
-                      </span>
-                    </div>
-                    <div className="col-span-1 text-center text-sm text-gray-700">
-                      {topic.questions_attempted}
-                    </div>
-                    <div className="col-span-2 text-sm text-gray-500">
-                      {formatDate(topic.last_practiced)}
-                    </div>
+          {/* Mastery Level Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mastery Level</label>
+            <select 
+              className="w-full rounded-md border-gray-300 shadow-sm p-2"
+              value={filterMastery || ''}
+              onChange={(e) => setFilterMastery(e.target.value || null)}
+            >
+              <option value="">All Levels</option>
+              <option value="mastered">Mastered</option>
+              <option value="advanced">Advanced</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="beginner">Beginner</option>
+              <option value="notStarted">Not Started</option>
+            </select>
+          </div>
+          
+          {/* Sorting */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+            <select 
+              className="w-full rounded-md border-gray-300 shadow-sm p-2"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="mastery">Mastery Level</option>
+              <option value="accuracy">Accuracy</option>
+              <option value="name">Topic Name</option>
+            </select>
+          </div>
+        </div>
+        
+        {/* Topics List */}
+        <div className="space-y-4">
+          {filteredTopics.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No topics match your filters. Try adjusting your selection.
+            </div>
+          ) : (
+            filteredTopics.map(topic => (
+              <div key={topic.topic_id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium text-lg text-gray-900">{topic.topic_name}</h3>
+                    <p className="text-sm text-gray-500">{topic.subject_name}</p>
+                  </div>
+                  <span 
+                    className="text-xs px-3 py-1 rounded-full" 
+                    style={{ 
+                      backgroundColor: getMasteryColor(topic.mastery_level),
+                      color: getMasteryTextColor(topic.mastery_level)
+                    }}
+                  >
+                    {topic.mastery_level.charAt(0).toUpperCase() + topic.mastery_level.slice(1)}
+                  </span>
+                </div>
+                
+                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Accuracy</p>
+                    <p className="font-medium">{formatAccuracy(topic.accuracy_percentage)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Questions</p>
+                    <p className="font-medium">{topic.questions_attempted || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Correct</p>
+                    <p className="font-medium">{topic.questions_correct || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Last Practiced</p>
+                    <p className="font-medium">{formatDate(topic.last_practiced)}</p>
                   </div>
                 </div>
-              ))
-            )}
-          </div>
+                
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-4">
+                  <div 
+                    className="bg-emerald-600 h-2 rounded-full" 
+                    style={{ width: `${topic.accuracy_percentage || 0}%` }}
+                  ></div>
+                </div>
+                
+                <div className="mt-4 flex justify-between">
+                  <Link 
+                    href={`/topics/${topic.topic_id}`} 
+                    className="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
+                  >
+                    View Details
+                    <ChevronRight size={16} className="ml-1" />
+                  </Link>
+                  
+                  <Link 
+                    href={`/practice?topic=${topic.topic_id}`}
+                    className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-sm font-medium px-4 py-2 rounded-md flex items-center"
+                  >
+                    Practice Topic
+                    <ArrowRight size={16} className="ml-1" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

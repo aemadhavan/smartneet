@@ -1,7 +1,8 @@
-// src/app/dashboard/page.tsx
+//File: src/app/dashboard/page.tsx
+
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -81,6 +82,12 @@ interface SubjectPerformance {
   accuracy: number;
 }
 
+interface PerformanceOverTime {
+  date: string;
+  accuracy: number;
+  score: number;
+}
+
 export default function DashboardPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
@@ -102,22 +109,10 @@ export default function DashboardPage() {
   // Derived state for charts
   const [questionTypeData, setQuestionTypeData] = useState<QuestionTypeData[]>([]);
   const [subjectPerformance, setSubjectPerformance] = useState<SubjectPerformance[]>([]);
-  const [performanceOverTime, setPerformanceOverTime] = useState<any[]>([]);
-  
-  // Redirect if not signed in
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.push('/sign-in?redirect=dashboard');
-      return;
-    }
-    
-    if (isSignedIn) {
-      fetchDashboardData();
-    }
-  }, [isSignedIn, isLoaded, router]);
+  const [performanceOverTime, setPerformanceOverTime] = useState<PerformanceOverTime[]>([]);
   
   // Main data fetching function
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       // Use Promise.all to fetch data in parallel
@@ -144,7 +139,19 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+  
+  // Redirect if not signed in
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push('/sign-in?redirect=dashboard');
+      return;
+    }
+    
+    if (isSignedIn) {
+      fetchDashboardData();
+    }
+  }, [isSignedIn, isLoaded, router, fetchDashboardData]);
   
   // Fetch recent practice sessions
   const fetchRecentSessions = async (): Promise<SessionSummary[]> => {
@@ -157,7 +164,7 @@ export default function DashboardPage() {
       const data = await response.json();
       
       // Transform data to include calculated accuracy
-      return data.map((session: any) => {
+      return data.map((session: SessionSummary) => {
         const questionsAttempted = session.questions_attempted ?? 0;
         const questionsCorrect = session.questions_correct ?? 0;
         
@@ -257,7 +264,7 @@ export default function DashboardPage() {
   };
 
   // Helper to derive performance over time data
-  const derivePerformanceData = (sessions: SessionSummary[]) => {
+  const derivePerformanceData = (sessions: SessionSummary[]): PerformanceOverTime[] => {
     // Sort sessions by date and take the last 7
     const sortedSessions = [...sessions]
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
@@ -342,8 +349,8 @@ export default function DashboardPage() {
           <p className="text-lg text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
-    );
-  }
+      );
+    }
   
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
@@ -674,7 +681,7 @@ export default function DashboardPage() {
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
             <h3 className="font-medium text-green-800 mb-2">Strong Areas</h3>
             <p className="text-green-700 text-sm mb-3">
-              You're performing well in these topics:
+              You&apos;re performing well in these topics:
             </p>
             <ul className="space-y-2">
               {generateStrongAreas(topicMastery).map((area, index) => (
