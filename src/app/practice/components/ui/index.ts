@@ -5,4 +5,5 @@ export { LoadingSpinner } from './LoadingSpinner';
 export { ErrorDisplay } from './ErrorDisplay';
 export { ProgressBar } from './ProgressBar';
 export { OptionButton } from './OptionButton';
+export { DiagramDisplay } from './DiagramDisplay';
 

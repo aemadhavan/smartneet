@@ -1,10 +1,10 @@
 // File: src/app/practice/hooks/usePracticeSession.ts
 import { useState, useEffect } from 'react';
-import { Subject, SessionResponse, Question } from '@/app/practice/types';
+import { Subject, SessionResponse, Question } from '../types';
 
 export function usePracticeSession(
-  selectedSubject: Subject | null, 
-  onResetSubject?: (subject: Subject | null) => void // Add this callback prop
+  selectedSubject: Subject | null,
+  onResetSubject?: (subject: Subject | null) => void // Add callback prop
 ) {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);

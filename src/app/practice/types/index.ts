@@ -90,10 +90,25 @@ export interface Subject {
     options: QuestionOption[];
   }
   
-  // Union type for all question details
-  export type QuestionDetails =
-    | MultipleChoiceDetails
-    | MatchingDetails
-    | AssertionReasonDetails
-    | MultipleCorrectStatementsDetails
-    | SequenceOrderingDetails;
+  // Define DiagramBased question details structure
+export interface DiagramBasedDetails {
+  diagram_url: string;
+  labels?: DiagramLabel[];
+  options: QuestionOption[];
+}
+
+export interface DiagramLabel {
+  label_id: string;
+  label_text: string;
+  x_position?: number;
+  y_position?: number;
+}
+
+// Union type for all question details
+export type QuestionDetails =
+  | MultipleChoiceDetails
+  | MatchingDetails
+  | AssertionReasonDetails
+  | MultipleCorrectStatementsDetails
+  | SequenceOrderingDetails
+  | DiagramBasedDetails;
