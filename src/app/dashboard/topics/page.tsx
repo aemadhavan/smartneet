@@ -27,17 +27,19 @@ import {
 interface TopicMastery {
   topic_id: number;
   topic_name: string;
-  subject_id: number; // Added missing property
+  subject_id: number;
   subject_name: string;
   mastery_level: string;
   accuracy_percentage: number;
   questions_attempted: number;
-  last_practiced: string | null; // Updated to allow null values
+  last_practiced: string | null;
 }
 
 interface Subject {
   subject_id: number;
   subject_name: string;
+  subject_code: string;
+  is_active: boolean;
 }
 
 export default function TopicsDashboardPage() {
@@ -49,24 +51,33 @@ export default function TopicsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubject, setSelectedSubject] = useState<number | null>(null);
   const [selectedMasteryLevel, setSelectedMasteryLevel] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
-  // Fetch all subject data
-  const fetchSubjects = async (): Promise<Subject[]> => {
+  // Fetch all subject data - wrapped in useCallback to use in dependency array
+  const fetchSubjects = useCallback(async (): Promise<Subject[]> => {
     try {
-      const response = await fetch('/api/subjects');
+      const response = await fetch('/api/subjects?isActive=true');
       if (!response.ok) {
         throw new Error('Failed to fetch subjects');
       }
       
-      return await response.json();
+      const result = await response.json();
+      
+      // Check if the response has the expected structure
+      if (result.success && Array.isArray(result.data)) {
+        return result.data;
+      } else {
+        throw new Error('Invalid response format from subjects API');
+      }
     } catch (error) {
       console.error('Error fetching subjects:', error);
-      return mockFetchSubjects();
+      setError('Failed to load subjects data. Please try again later.');
+      return [];
     }
-  };
+  }, []);
   
-  // Fetch all topic mastery data
-  const fetchTopicMastery = async (): Promise<TopicMastery[]> => {
+  // Fetch all topic mastery data - wrapped in useCallback to use in dependency array
+  const fetchTopicMastery = useCallback(async (): Promise<TopicMastery[]> => {
     try {
       const response = await fetch('/api/topic-mastery/all');
       if (!response.ok) {
@@ -76,28 +87,47 @@ export default function TopicsDashboardPage() {
       return await response.json();
     } catch (error) {
       console.error('Error fetching topic mastery:', error);
-      return mockFetchAllTopicsMastery();
+      setError('Failed to load topic mastery data. Please try again later.');
+      return [];
     }
-  };
+  }, []);
   
+  // Combined data fetching function - wrapped in useCallback to use in dependency array
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // In a real implementation, fetch from API
-      const subjectsData = await fetchSubjects();
-      const topicsData = await fetchTopicMastery();
+      // Use Promise.all to fetch data in parallel
+      const [subjectsData, topicsData] = await Promise.all([
+        fetchSubjects(),
+        fetchTopicMastery()
+      ]);
+      
+      // Add additional validation
+      if (!Array.isArray(subjectsData)) {
+        console.error('Subjects data is not an array:', subjectsData);
+        setError('Received invalid data format from the server. Please contact support.');
+        setLoading(false);
+        return;
+      }
+      
+      if (!Array.isArray(topicsData)) {
+        console.error('Topics data is not an array:', topicsData);
+        setError('Received invalid data format from the server. Please contact support.');
+        setLoading(false);
+        return;
+      }
       
       setSubjects(subjectsData);
       setTopics(topicsData);
-      setLoading(false);
     } catch (error) {
       console.error("Failed to fetch data:", error);
-      // Use mock data even in case of error
-      setSubjects(mockFetchSubjects());
-      setTopics(mockFetchAllTopicsMastery());
+      setError('An error occurred while loading data. Please try again later.');
+    } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchSubjects, fetchTopicMastery]);
   
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -173,12 +203,32 @@ export default function TopicsDashboardPage() {
     '#d1fae5'  // Mastered - green-100
   ];
   
+  // Show loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-lg text-gray-600">Loading topic data...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center bg-red-50 p-8 rounded-lg max-w-md">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-xl font-bold text-red-700 mb-2">Error Loading Data</h2>
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={fetchData} 
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -249,7 +299,9 @@ export default function TopicsDashboardPage() {
                 <div 
                   className="bg-emerald-500 h-2 rounded-full" 
                   style={{ 
-                    width: `${(topics.filter(t => t.mastery_level === 'mastered').length / topics.length) * 100}%` 
+                    width: topics.length > 0 
+                      ? `${(topics.filter(t => t.mastery_level === 'mastered').length / topics.length) * 100}%` 
+                      : '0%'
                   }}
                 ></div>
               </div>
@@ -266,7 +318,9 @@ export default function TopicsDashboardPage() {
                 <div 
                   className="bg-blue-500 h-2 rounded-full" 
                   style={{ 
-                    width: `${(topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length / topics.length) * 100}%` 
+                    width: topics.length > 0
+                      ? `${(topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length / topics.length) * 100}%` 
+                      : '0%'
                   }}
                 ></div>
               </div>
@@ -283,7 +337,9 @@ export default function TopicsDashboardPage() {
                 <div 
                   className="bg-gray-400 h-2 rounded-full" 
                   style={{ 
-                    width: `${(topics.filter(t => t.mastery_level === 'notStarted').length / topics.length) * 100}%` 
+                    width: topics.length > 0
+                      ? `${(topics.filter(t => t.mastery_level === 'notStarted').length / topics.length) * 100}%` 
+                      : '0%'
                   }}
                 ></div>
               </div>
@@ -308,7 +364,7 @@ export default function TopicsDashboardPage() {
             />
           </div>
           
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
             <div className="relative">
               <select
                 className="block appearance-none w-full bg-white border border-gray-300 hover:border-gray-400 px-4 py-2 pr-8 rounded shadow leading-tight focus:outline-none focus:shadow-outline"
@@ -316,11 +372,15 @@ export default function TopicsDashboardPage() {
                 onChange={(e) => setSelectedSubject(e.target.value ? parseInt(e.target.value) : null)}
               >
                 <option value="">All Subjects</option>
-                {subjects.map(subject => (
-                  <option key={subject.subject_id} value={subject.subject_id}>
-                    {subject.subject_name}
-                  </option>
-                ))}
+                {Array.isArray(subjects) && subjects.length > 0 ? (
+                  subjects.map(subject => (
+                    <option key={subject.subject_id} value={subject.subject_id}>
+                      {subject.subject_name}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>No subjects available</option>
+                )}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                 <ChevronDown size={16} />
@@ -411,7 +471,8 @@ export default function TopicsDashboardPage() {
                         className={`text-sm font-medium ${
                           topic.accuracy_percentage >= 80 ? 'text-emerald-600' : 
                           topic.accuracy_percentage >= 60 ? 'text-amber-600' : 
-                          'text-red-600'
+                          topic.accuracy_percentage > 0 ? 'text-red-600' :
+                          'text-gray-400'
                         }`}
                       >
                         {topic.accuracy_percentage}%
@@ -432,219 +493,4 @@ export default function TopicsDashboardPage() {
       </div>
     </div>
   );
-}
-
-// Mock data functions (for development and testing)
-function mockFetchSubjects(): Subject[] {
-  return [
-    { subject_id: 1, subject_name: 'Biology' },
-    { subject_id: 2, subject_name: 'Physics' },
-    { subject_id: 3, subject_name: 'Chemistry' },
-    { subject_id: 4, subject_name: 'Mathematics' }
-  ];
-}
-
-function mockFetchAllTopicsMastery(): TopicMastery[] {
-  return [
-    {
-      topic_id: 1,
-      topic_name: 'Diversity in Living World',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'mastered',
-      accuracy_percentage: 92,
-      questions_attempted: 35,
-      last_practiced: '2025-04-11T10:20:00Z'
-    },
-    {
-      topic_id: 2,
-      topic_name: 'Structural Organization in Plants & Animals',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'advanced',
-      accuracy_percentage: 81,
-      questions_attempted: 28,
-      last_practiced: '2025-04-09T14:30:00Z'
-    },
-    {
-      topic_id: 3,
-      topic_name: 'Cell Structure and Function',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'beginner',
-      accuracy_percentage: 42,
-      questions_attempted: 25,
-      last_practiced: '2025-04-12T09:30:00Z'
-    },
-    {
-      topic_id: 4,
-      topic_name: 'Plant Physiology',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 68,
-      questions_attempted: 30,
-      last_practiced: '2025-04-10T14:15:00Z'
-    },
-    {
-      topic_id: 5,
-      topic_name: 'Human Physiology',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 6,
-      topic_name: 'Reproduction',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 72,
-      questions_attempted: 18,
-      last_practiced: '2025-04-07T16:20:00Z'
-    },
-    {
-      topic_id: 7,
-      topic_name: 'Genetics and Evolution',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'beginner',
-      accuracy_percentage: 54,
-      questions_attempted: 22,
-      last_practiced: '2025-04-08T11:45:00Z'
-    },
-    {
-      topic_id: 8,
-      topic_name: 'Biology and Human Welfare',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 9,
-      topic_name: 'Biotechnology and its Applications',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 10,
-      topic_name: 'Ecology and Environment',
-      subject_id: 1,
-      subject_name: 'Biology',
-      mastery_level: 'advanced',
-      accuracy_percentage: 85,
-      questions_attempted: 24,
-      last_practiced: '2025-04-05T10:10:00Z'
-    },
-    {
-      topic_id: 11,
-      topic_name: 'Physical World and Measurement',
-      subject_id: 2,
-      subject_name: 'Physics',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 65,
-      questions_attempted: 20,
-      last_practiced: '2025-04-02T13:40:00Z'
-    },
-    {
-      topic_id: 12,
-      topic_name: 'Kinematics',
-      subject_id: 2,
-      subject_name: 'Physics',
-      mastery_level: 'beginner',
-      accuracy_percentage: 48,
-      questions_attempted: 15,
-      last_practiced: '2025-04-03T09:20:00Z'
-    },
-    {
-      topic_id: 13,
-      topic_name: 'Laws of Motion',
-      subject_id: 2,
-      subject_name: 'Physics',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 14,
-      topic_name: 'Work, Energy and Power',
-      subject_id: 2,
-      subject_name: 'Physics',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 15,
-      topic_name: 'Atomic Structure',
-      subject_id: 3,
-      subject_name: 'Chemistry',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 70,
-      questions_attempted: 22,
-      last_practiced: '2025-04-01T11:15:00Z'
-    },
-    {
-      topic_id: 16,
-      topic_name: 'Chemical Bonding',
-      subject_id: 3,
-      subject_name: 'Chemistry',
-      mastery_level: 'beginner',
-      accuracy_percentage: 52,
-      questions_attempted: 18,
-      last_practiced: '2025-03-30T14:20:00Z'
-    },
-    {
-      topic_id: 17,
-      topic_name: 'Organic Chemistry',
-      subject_id: 3,
-      subject_name: 'Chemistry',
-      mastery_level: 'notStarted',
-      accuracy_percentage: 0,
-      questions_attempted: 0,
-      last_practiced: null
-    },
-    {
-      topic_id: 18,
-      topic_name: 'Algebra',
-      subject_id: 4,
-      subject_name: 'Mathematics',
-      mastery_level: 'mastered',
-      accuracy_percentage: 94,
-      questions_attempted: 30,
-      last_practiced: '2025-03-28T10:30:00Z'
-    },
-    {
-      topic_id: 19,
-      topic_name: 'Calculus',
-      subject_id: 4,
-      subject_name: 'Mathematics',
-      mastery_level: 'advanced',
-      accuracy_percentage: 86,
-      questions_attempted: 25,
-      last_practiced: '2025-03-29T09:45:00Z'
-    },
-    {
-      topic_id: 20,
-      topic_name: 'Statistics',
-      subject_id: 4,
-      subject_name: 'Mathematics',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 74,
-      questions_attempted: 20,
-      last_practiced: '2025-04-02T15:50:00Z'
-    }
-  ];
 }

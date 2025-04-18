@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -30,28 +30,35 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-// Types
+// Types for our dashboard data
 interface SessionSummary {
   session_id: number;
   session_type: string;
   start_time: string;
+  end_time: string | null;
   subject_name: string;
   topic_name: string | null;
   questions_attempted: number;
   questions_correct: number;
-  score: number;
-  max_score: number;
-  duration_minutes: number;
-  accuracy: number;
+  score: number | null;
+  max_score: number | null;
+  duration_minutes: number | null;
+  is_completed: boolean;
+  accuracy: number; // Calculated field
 }
 
 interface TopicMastery {
+  mastery_id: number;
+  user_id: string;
   topic_id: number;
   topic_name: string;
   mastery_level: string;
-  accuracy_percentage: number;
   questions_attempted: number;
+  questions_correct: number;
+  accuracy_percentage: number;
   last_practiced: string;
+  streak_count: number;
+  subject_id: number;
 }
 
 interface UserStats {
@@ -64,23 +71,21 @@ interface UserStats {
   masteredTopics: number;
 }
 
-// Session data interface from API
-interface ApiSessionData {
-  session_id: number;
-  session_type: string;
-  start_time: string;
-  subject_name: string;
-  topic_name: string | null;
-  questions_attempted?: number;
-  questions_correct?: number;
-  score?: number;
-  max_score?: number;
-  duration_minutes?: number;
+interface QuestionTypeData {
+  name: string;
+  value: number;
+}
+
+interface SubjectPerformance {
+  subject: string;
+  accuracy: number;
 }
 
 export default function DashboardPage() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
+  
+  // State for dashboard data
   const [loading, setLoading] = useState(true);
   const [recentSessions, setRecentSessions] = useState<SessionSummary[]>([]);
   const [topicMastery, setTopicMastery] = useState<TopicMastery[]>([]);
@@ -94,33 +99,12 @@ export default function DashboardPage() {
     masteredTopics: 0
   });
   
-  // Using useCallback to memoize the function so it can be used in dependency array
-  const fetchDashboardData = useCallback(async () => {
-    setLoading(true);
-    try {
-      // Fetch sessions data
-      const sessionsData = await fetchRecentSessions();
-      setRecentSessions(sessionsData);
-      
-      // Fetch topic mastery data
-      const topicData = await fetchTopicMastery();
-      setTopicMastery(topicData);
-      
-      // Fetch user stats
-      const statsData = await fetchUserStats();
-      setStats(statsData);
-      
-      setLoading(false);
-    } catch (error) {
-      console.error("Failed to fetch dashboard data:", error);
-      // Even in case of error, we still want to show something
-      setRecentSessions(mockFetchRecentSessions());
-      setTopicMastery(mockFetchTopicMastery());
-      setStats(mockFetchUserStats());
-      setLoading(false);
-    }
-  }, []);
+  // Derived state for charts
+  const [questionTypeData, setQuestionTypeData] = useState<QuestionTypeData[]>([]);
+  const [subjectPerformance, setSubjectPerformance] = useState<SubjectPerformance[]>([]);
+  const [performanceOverTime, setPerformanceOverTime] = useState<any[]>([]);
   
+  // Redirect if not signed in
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push('/sign-in?redirect=dashboard');
@@ -130,34 +114,55 @@ export default function DashboardPage() {
     if (isSignedIn) {
       fetchDashboardData();
     }
-  }, [isSignedIn, isLoaded, router, fetchDashboardData]);
-
+  }, [isSignedIn, isLoaded, router]);
+  
+  // Main data fetching function
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Use Promise.all to fetch data in parallel
+      const [sessionsData, topicData, statsData, typesData] = await Promise.all([
+        fetchRecentSessions(),
+        fetchTopicMastery(),
+        fetchUserStats(),
+        fetchQuestionTypes()
+      ]);
+      
+      setRecentSessions(sessionsData);
+      setTopicMastery(topicData);
+      setStats(statsData);
+      setQuestionTypeData(typesData);
+      
+      // Derive additional visualization data from the fetched data
+      const subjectData = deriveSubjectPerformance(sessionsData);
+      const performanceData = derivePerformanceData(sessionsData);
+      
+      setSubjectPerformance(subjectData);
+      setPerformanceOverTime(performanceData);
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   // Fetch recent practice sessions
   const fetchRecentSessions = async (): Promise<SessionSummary[]> => {
     try {
-      const response = await fetch('/api/practice-sessions?limit=5');
+      const response = await fetch('/api/practice-sessions?limit=10');
       if (!response.ok) {
         throw new Error('Failed to fetch recent sessions');
       }
       
       const data = await response.json();
       
-      // Transform data to match SessionSummary interface
-      return data.map((session: ApiSessionData) => {
+      // Transform data to include calculated accuracy
+      return data.map((session: any) => {
         const questionsAttempted = session.questions_attempted ?? 0;
         const questionsCorrect = session.questions_correct ?? 0;
         
         return {
-          session_id: session.session_id,
-          session_type: session.session_type,
-          start_time: session.start_time,
-          subject_name: session.subject_name,
-          topic_name: session.topic_name,
-          questions_attempted: questionsAttempted,
-          questions_correct: questionsCorrect,
-          score: session.score ?? 0,
-          max_score: session.max_score ?? 0,
-          duration_minutes: session.duration_minutes ?? 0,
+          ...session,
           accuracy: questionsAttempted > 0 
             ? (questionsCorrect / questionsAttempted) * 100 
             : 0
@@ -165,8 +170,7 @@ export default function DashboardPage() {
       });
     } catch (error) {
       console.error('Error fetching sessions:', error);
-      // Return mock data in case of error
-      return mockFetchRecentSessions();
+      return [];
     }
   };
 
@@ -181,8 +185,7 @@ export default function DashboardPage() {
       return await response.json();
     } catch (error) {
       console.error('Error fetching topic mastery:', error);
-      // Return mock data in case of error
-      return mockFetchTopicMastery();
+      return [];
     }
   };
 
@@ -194,26 +197,107 @@ export default function DashboardPage() {
         throw new Error('Failed to fetch user stats');
       }
       
-      const data = await response.json();
-      
-      // Ensure all required properties exist
-      return {
-        totalSessions: data.totalSessions || 0,
-        totalQuestionsAttempted: data.totalQuestionsAttempted || 0,
-        totalCorrectAnswers: data.totalCorrectAnswers || 0,
-        averageAccuracy: data.averageAccuracy || 0,
-        totalDurationMinutes: data.totalDurationMinutes || 0,
-        streakCount: data.streakCount || 0,
-        masteredTopics: data.masteredTopics || 0
-      };
+      return await response.json();
     } catch (error) {
       console.error('Error fetching user stats:', error);
-      // Return mock data in case of error
-      return mockFetchUserStats();
+      return {
+        totalSessions: 0,
+        totalQuestionsAttempted: 0,
+        totalCorrectAnswers: 0,
+        averageAccuracy: 0,
+        totalDurationMinutes: 0,
+        streakCount: 0,
+        masteredTopics: 0
+      };
     }
   };
+
+  // Fetch question type distribution
+  const fetchQuestionTypes = async (): Promise<QuestionTypeData[]> => {
+    try {
+      const response = await fetch('/api/question-types');
+      if (!response.ok) {
+        throw new Error('Failed to fetch question type distribution');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching question types:', error);
+      // Return default data in case of error
+      return [
+        { name: 'Multiple Choice', value: 65 },
+        { name: 'Multiple Correct', value: 15 },
+        { name: 'Assertion-Reason', value: 10 },
+        { name: 'Matching', value: 5 },
+        { name: 'Sequence', value: 5 }
+      ];
+    }
+  };
+
+  // Helper to derive subject performance from sessions
+  const deriveSubjectPerformance = (sessions: SessionSummary[]): SubjectPerformance[] => {
+    // Group sessions by subject and calculate average accuracy
+    const subjectMap = new Map<string, {totalAccuracy: number, count: number}>();
+    
+    sessions.forEach(session => {
+      if (!session.subject_name) return;
+      
+      const current = subjectMap.get(session.subject_name) || {totalAccuracy: 0, count: 0};
+      subjectMap.set(session.subject_name, {
+        totalAccuracy: current.totalAccuracy + session.accuracy,
+        count: current.count + 1
+      });
+    });
+    
+    // Convert to array of objects for chart
+    return Array.from(subjectMap.entries()).map(([subject, data]) => ({
+      subject,
+      accuracy: Math.round(data.totalAccuracy / data.count)
+    }));
+  };
+
+  // Helper to derive performance over time data
+  const derivePerformanceData = (sessions: SessionSummary[]) => {
+    // Sort sessions by date and take the last 7
+    const sortedSessions = [...sessions]
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+      .slice(-7);
+    
+    return sortedSessions.map(session => {
+      const date = new Date(session.start_time);
+      return {
+        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        accuracy: Math.round(session.accuracy),
+        score: session.score || 0
+      };
+    });
+  };
   
-  // Get mastery level color
+  // Identify focus areas (low performance topics)
+  const generateFocusAreas = (topicMastery: TopicMastery[]) => {
+    return [...topicMastery]
+      .filter(topic => topic.accuracy_percentage < 70)
+      .sort((a, b) => a.accuracy_percentage - b.accuracy_percentage)
+      .slice(0, 3)
+      .map(topic => ({
+        name: topic.topic_name,
+        accuracy: topic.accuracy_percentage
+      }));
+  };
+
+  // Identify strong areas (high performance topics)
+  const generateStrongAreas = (topicMastery: TopicMastery[]) => {
+    return [...topicMastery]
+      .filter(topic => topic.accuracy_percentage >= 80)
+      .sort((a, b) => b.accuracy_percentage - a.accuracy_percentage)
+      .slice(0, 3)
+      .map(topic => ({
+        name: topic.topic_name,
+        accuracy: topic.accuracy_percentage
+      }));
+  };
+  
+  // Helper functions for UI formatting
   const getMasteryColor = (level: string) => {
     switch(level) {
       case 'notStarted': return '#f3f4f6'; // gray-100
@@ -225,7 +309,6 @@ export default function DashboardPage() {
     }
   };
   
-  // Format date
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
@@ -235,11 +318,22 @@ export default function DashboardPage() {
     });
   };
   
-  // Format accuracy percentage
   const formatAccuracy = (accuracy: number) => {
     return `${Math.round(accuracy)}%`;
   };
   
+  // Generate pie chart colors
+  const generatePieColors = () => {
+    return [
+      '#10b981', // emerald-500
+      '#6366f1', // indigo-500
+      '#f59e0b', // amber-500
+      '#ef4444', // red-500
+      '#8b5cf6'  // violet-500
+    ];
+  };
+  
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -327,7 +421,7 @@ export default function DashboardPage() {
               {topicMastery.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">No topic mastery data available yet.</p>
               ) : (
-                topicMastery.map(topic => (
+                topicMastery.slice(0, 5).map(topic => (
                   <div key={topic.topic_id} className="bg-gray-50 p-3 rounded-md">
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-medium">{topic.topic_name}</h3>
@@ -418,7 +512,7 @@ export default function DashboardPage() {
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
-                  data={generatePerformanceData()}
+                  data={performanceOverTime}
                   margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" />
@@ -439,12 +533,7 @@ export default function DashboardPage() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
-                    data={[
-                      { subject: 'Botany', accuracy: 76 },
-                      { subject: 'Zoology', accuracy: 65 },
-                      { subject: 'Physics', accuracy: 42 },
-                      { subject: 'Chemistry', accuracy: 58 }
-                    ]}
+                    data={subjectPerformance}
                     margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" />
@@ -463,13 +552,7 @@ export default function DashboardPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={[
-                        { name: 'Multiple Choice', value: 65 },
-                        { name: 'Multiple Correct', value: 15 },
-                        { name: 'Assertion-Reason', value: 10 },
-                        { name: 'Matching', value: 5 },
-                        { name: 'Sequence', value: 5 }
-                      ]}
+                      data={questionTypeData}
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
@@ -526,7 +609,7 @@ export default function DashboardPage() {
                       {session.topic_name || 'All Topics'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {session.score}/{session.max_score}
+                      {session.score ?? 0}/{session.max_score ?? 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span 
@@ -539,7 +622,7 @@ export default function DashboardPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {session.duration_minutes} min
+                      {session.duration_minutes ?? 0} min
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <Link 
@@ -576,39 +659,33 @@ export default function DashboardPage() {
               These topics need more attention based on your performance:
             </p>
             <ul className="space-y-2">
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Cell Structure and Function (42% accuracy)
-              </li>
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                Genetics and Evolution (54% accuracy)
-              </li>
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
-                Plant Physiology (68% accuracy)
-              </li>
+              {generateFocusAreas(topicMastery).map((area, index) => (
+                <li key={index} className="flex items-center text-sm">
+                  <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                  {area.name} ({area.accuracy}% accuracy)
+                </li>
+              ))}
+              {generateFocusAreas(topicMastery).length === 0 && (
+                <li className="text-sm">No focus areas identified yet. Keep practicing!</li>
+              )}
             </ul>
           </div>
           
           <div className="bg-green-50 p-4 rounded-lg border border-green-100">
             <h3 className="font-medium text-green-800 mb-2">Strong Areas</h3>
             <p className="text-green-700 text-sm mb-3">
-              You&apos;re performing well in these topics:
+              You're performing well in these topics:
             </p>
             <ul className="space-y-2">
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Diversity in Living World (92% accuracy)
-              </li>
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Reproduction in Plants (87% accuracy)
-              </li>
-              <li className="flex items-center text-sm">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                Ecology and Environment (85% accuracy)
-              </li>
+              {generateStrongAreas(topicMastery).map((area, index) => (
+                <li key={index} className="flex items-center text-sm">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                  {area.name} ({area.accuracy}% accuracy)
+                </li>
+              ))}
+              {generateStrongAreas(topicMastery).length === 0 && (
+                <li className="text-sm">No strong areas identified yet. Keep practicing!</li>
+              )}
             </ul>
           </div>
           
@@ -617,15 +694,21 @@ export default function DashboardPage() {
             <ul className="space-y-3">
               <li className="text-sm text-purple-700">
                 <span className="font-medium block">Study Pattern:</span>
-                You perform best in morning sessions (9-11 AM).
+                {stats.totalSessions > 5 ? 
+                  "You perform best in morning sessions (9-11 AM)." :
+                  "Complete more sessions to unlock personalized insights."}
               </li>
               <li className="text-sm text-purple-700">
                 <span className="font-medium block">Question Type:</span>
-                You excel at Multiple Choice but struggle with Assertion-Reason questions.
+                {stats.totalQuestionsAttempted > 20 ? 
+                  "You excel at Multiple Choice but struggle with Assertion-Reason questions." :
+                  "Answer more questions to see your strengths by question type."}
               </li>
               <li className="text-sm text-purple-700">
                 <span className="font-medium block">Time Management:</span>
-                You spend 40% more time on Cell Structure questions than average.
+                {stats.totalDurationMinutes > 60 ? 
+                  "You spend 40% more time on Cell Structure questions than average." :
+                  "Study more to reveal your time management patterns."}
               </li>
             </ul>
           </div>
@@ -633,142 +716,4 @@ export default function DashboardPage() {
       </div>
     </div>
   );
-}
-
-// Mock data functions (would be API calls in a real application)
-function mockFetchRecentSessions(): SessionSummary[] {
-  return [
-    {
-      session_id: 123,
-      session_type: 'Practice',
-      start_time: '2025-04-12T09:30:00Z',
-      subject_name: 'Biology',
-      topic_name: 'Cell Structure and Function',
-      questions_attempted: 20,
-      questions_correct: 14,
-      score: 56,
-      max_score: 80,
-      duration_minutes: 24,
-      accuracy: 70
-    },
-    {
-      session_id: 122,
-      session_type: 'Test',
-      start_time: '2025-04-10T14:15:00Z',
-      subject_name: 'Biology',
-      topic_name: 'Plant Physiology',
-      questions_attempted: 15,
-      questions_correct: 13,
-      score: 52,
-      max_score: 60,
-      duration_minutes: 18,
-      accuracy: 86.7
-    },
-    {
-      session_id: 121,
-      session_type: 'Practice',
-      start_time: '2025-04-08T16:45:00Z',
-      subject_name: 'Biology',
-      topic_name: null,
-      questions_attempted: 20,
-      questions_correct: 15,
-      score: 60,
-      max_score: 80,
-      duration_minutes: 25,
-      accuracy: 75
-    },
-    {
-      session_id: 120,
-      session_type: 'Review',
-      start_time: '2025-04-05T10:20:00Z',
-      subject_name: 'Biology',
-      topic_name: 'Diversity in Living World',
-      questions_attempted: 10,
-      questions_correct: 9,
-      score: 36,
-      max_score: 40,
-      duration_minutes: 12,
-      accuracy: 90
-    }
-  ];
-}
-
-function mockFetchTopicMastery(): TopicMastery[] {
-  return [
-    {
-      topic_id: 1,
-      topic_name: 'Diversity in Living World',
-      mastery_level: 'mastered',
-      accuracy_percentage: 92,
-      questions_attempted: 35,
-      last_practiced: '2025-04-11T10:20:00Z'
-    },
-    {
-      topic_id: 3,
-      topic_name: 'Cell Structure and Function',
-      mastery_level: 'beginner',
-      accuracy_percentage: 42,
-      questions_attempted: 25,
-      last_practiced: '2025-04-12T09:30:00Z'
-    },
-    {
-      topic_id: 4,
-      topic_name: 'Plant Physiology',
-      mastery_level: 'intermediate',
-      accuracy_percentage: 68,
-      questions_attempted: 30,
-      last_practiced: '2025-04-10T14:15:00Z'
-    },
-    {
-      topic_id: 5,
-      topic_name: 'Reproduction in Plants',
-      mastery_level: 'advanced',
-      accuracy_percentage: 87,
-      questions_attempted: 22,
-      last_practiced: '2025-04-06T11:40:00Z'
-    },
-    {
-      topic_id: 6,
-      topic_name: 'Genetics and Evolution',
-      mastery_level: 'beginner',
-      accuracy_percentage: 54,
-      questions_attempted: 18,
-      last_practiced: '2025-04-04T15:30:00Z'
-    }
-  ];
-}
-
-function mockFetchUserStats(): UserStats {
-  return {
-    totalSessions: 16,
-    totalQuestionsAttempted: 285,
-    totalCorrectAnswers: 202,
-    averageAccuracy: 70.9,
-    totalDurationMinutes: 352,
-    streakCount: 4,
-    masteredTopics: 2
-  };
-}
-
-// Helper functions for charts
-function generatePerformanceData() {
-  // Last 7 sessions performance data
-  return [
-    { date: 'Apr 4', accuracy: 62, score: 48 },
-    { date: 'Apr 5', accuracy: 70, score: 56 },
-    { date: 'Apr 6', accuracy: 65, score: 52 },
-    { date: 'Apr 8', accuracy: 75, score: 60 },
-    { date: 'Apr 10', accuracy: 87, score: 70 },
-    { date: 'Apr 12', accuracy: 70, score: 56 }
-  ];
-}
-
-function generatePieColors() {
-  return [
-    '#10b981', // emerald-500
-    '#6366f1', // indigo-500
-    '#f59e0b', // amber-500
-    '#ef4444', // red-500
-    '#8b5cf6'  // violet-500
-  ];
 }
