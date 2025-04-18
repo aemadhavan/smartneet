@@ -1,10 +1,10 @@
 // File: src/app/practice/components/questions/MatchingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { MatchingItem, QuestionOption } from '@/app/practice/types';
+//import { MatchingDetails } from '@/app/practice/types';
 import { normalizeMatchingDetails } from '@/app/practice/utils/questionUtils';
 
 interface MatchingQuestionProps {
-  details: any;
+  details: unknown;
   questionText: string;
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;

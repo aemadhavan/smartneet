@@ -1,6 +1,15 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
 import { useState } from 'react';
-import { Question } from '@/app/practice/types';
+import { 
+  Question, 
+  QuestionDetails,
+  MultipleChoiceDetails,
+  MatchingDetails,
+  AssertionReasonDetails,
+  MultipleCorrectStatementsDetails,
+  SequenceOrderingDetails,
+  DiagramBasedDetails
+} from '@/app/practice/types';
 import { 
   MultipleChoiceQuestion, 
   MatchingQuestion, 
@@ -34,13 +43,13 @@ export function QuestionDisplay({
   const [showExplanation, setShowExplanation] = useState(false);
 
   // Helper to handle potential JSON strings in the details property
-  const parseDetails = (details: any) => {
+  const parseDetails = (details: string | QuestionDetails): QuestionDetails => {
     if (typeof details === 'string') {
       try {
         return JSON.parse(details);
       } catch (e) {
         console.error('Error parsing question details:', e);
-        return { error: 'Invalid JSON format', raw: details };
+        return { error: 'Invalid JSON format', raw: details } as unknown as QuestionDetails;
       }
     }
     return details;
@@ -79,7 +88,7 @@ export function QuestionDisplay({
       case 'MultipleChoice':
         return (
           <MultipleChoiceQuestion
-            details={details}
+            details={details as MultipleChoiceDetails}
             selectedOption={selectedOption}
             onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
           />
@@ -87,7 +96,7 @@ export function QuestionDisplay({
       case 'Matching':
         return (
           <MatchingQuestion
-            details={details}
+            details={details as MatchingDetails}
             questionText={question.question_text}
             selectedOption={selectedOption}
             onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
@@ -96,7 +105,7 @@ export function QuestionDisplay({
       case 'AssertionReason':
         return (
           <AssertionReasonQuestion
-            details={details}
+            details={details as AssertionReasonDetails}
             questionText={question.question_text}
             selectedOption={selectedOption}
             onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
@@ -105,7 +114,7 @@ export function QuestionDisplay({
       case 'MultipleCorrectStatements':
         return (
           <MultipleCorrectStatementsQuestion
-            details={details}
+            details={details as MultipleCorrectStatementsDetails}
             selectedOption={selectedOption}
             onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
           />
@@ -113,7 +122,7 @@ export function QuestionDisplay({
       case 'SequenceOrdering':
         return (
           <SequenceOrderingQuestion
-            details={details}
+            details={details as SequenceOrderingDetails}
             selectedOption={selectedOption}
             onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
           />
@@ -121,7 +130,7 @@ export function QuestionDisplay({
       case 'DiagramBased':
         return (
           <DiagramBasedQuestion
-            details={details}
+            details={details as DiagramBasedDetails}
             imageUrl={getDiagramImageUrl()} // Use the helper function
             questionText={question.question_text}
             selectedOption={selectedOption}

@@ -1,13 +1,20 @@
 // File: src/app/practice/components/questions/AssertionReasonQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { Statement, QuestionOption } from '@/app/practice/types';
+import { Statement, QuestionOption, AssertionReasonDetails } from '@/app/practice/types';
 import { parseJsonDetails, extractStatementsFromText } from '@/app/practice/utils/questionUtils';
 
 interface AssertionReasonQuestionProps {
-  details: any; // Using 'any' initially to handle different formats
+  details: unknown;
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
   questionText?: string; // Pass the question text for extracting statements if needed
+}
+
+interface ParsedOption {
+  option_number?: string;
+  optionNumber?: string;
+  option_text?: string;
+  optionText?: string;
 }
 
 export function AssertionReasonQuestion({ 
@@ -17,7 +24,7 @@ export function AssertionReasonQuestion({
   questionText = '' 
 }: AssertionReasonQuestionProps) {
   // Parse the details if it's a string
-  const parsedDetails = parseJsonDetails(details);
+  const parsedDetails = parseJsonDetails<Partial<AssertionReasonDetails>>(details as string | Partial<AssertionReasonDetails>);
   
   if (!parsedDetails) {
     return (
@@ -53,9 +60,9 @@ export function AssertionReasonQuestion({
   }
   
   // Map the options to the expected format if needed
-  const options: QuestionOption[] = parsedDetails.options.map((opt: any) => ({
-    option_number: opt.option_number || opt.optionNumber,
-    option_text: opt.option_text || opt.optionText
+  const options: QuestionOption[] = parsedDetails.options.map((opt: ParsedOption) => ({
+    option_number: opt.option_number || opt.optionNumber || '',
+    option_text: opt.option_text || opt.optionText || ''
   }));
 
   return (

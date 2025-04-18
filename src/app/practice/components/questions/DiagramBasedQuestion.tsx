@@ -1,10 +1,10 @@
 // File: src/app/practice/components/questions/DiagramBasedQuestion.tsx
 import { OptionButton, DiagramDisplay } from '@/app/practice/components/ui';
-import { DiagramBasedDetails, QuestionOption } from '@/app/practice/types';
+import { QuestionOption } from '@/app/practice/types';
 import { normalizeDiagramBasedDetails, extractDiagramLabelsFromText } from '@/app/practice/utils/questionUtils';
 
 interface DiagramBasedQuestionProps {
-  details: any;
+  details: unknown;
   imageUrl?: string | null;
   questionText?: string;
   selectedOption: string | null;
@@ -14,7 +14,7 @@ interface DiagramBasedQuestionProps {
 export function DiagramBasedQuestion({ 
   details, 
   imageUrl,
-  questionText,
+  questionText = '',
   selectedOption, 
   onOptionSelect 
 }: DiagramBasedQuestionProps) {
@@ -49,7 +49,7 @@ export function DiagramBasedQuestion({
   const effectiveImageUrl = imageUrl || generateDefaultImageUrl();
   
   // Normalize details to ensure they're in the correct format
-  const normalizedDetails = normalizeDiagramBasedDetails(details, effectiveImageUrl);
+  const normalizedDetails = normalizeDiagramBasedDetails(details, effectiveImageUrl, questionText);
   
   // Check if normalization was successful
   if (!normalizedDetails || !normalizedDetails.diagram_url || !Array.isArray(normalizedDetails.options)) {
