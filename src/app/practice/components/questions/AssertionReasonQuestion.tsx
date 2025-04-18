@@ -1,22 +1,11 @@
 // File: src/app/practice/components/questions/AssertionReasonQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { AssertionReasonDetails } from '@/app/practice/types';
-
-// Define interfaces for the statement and option types
-interface Statement {
-  statement_label: string;
-  statement_text: string;
-}
-
-interface OptionItem {
-  option_number: string;
-  option_text: string;
-}
+import { Statement, QuestionOption } from '@/app/practice/types';
 
 interface AssertionReasonQuestionProps {
   details: {
     statements: Statement[];
-    options: OptionItem[];
+    options: QuestionOption[];
   };
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
@@ -39,7 +28,7 @@ export function AssertionReasonQuestion({
   return (
     <div>
       <div className="mb-6 space-y-4 border-b pb-4">
-        {details.statements.map((statement: Statement, index: number) => (
+        {details.statements.map((statement, index) => (
           <div key={index} className="bg-gray-50 p-3 rounded">
             <p className="font-medium mb-1">{statement.statement_label}:</p>
             <p dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
@@ -47,7 +36,7 @@ export function AssertionReasonQuestion({
         ))}
       </div>
       <div className="space-y-3">
-        {details.options.map((option: OptionItem, index: number) => (
+        {details.options.map((option, index) => (
           <OptionButton
             key={index}
             option={option}

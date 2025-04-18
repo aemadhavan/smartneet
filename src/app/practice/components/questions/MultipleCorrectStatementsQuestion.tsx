@@ -1,22 +1,11 @@
 // File: src/app/practice/components/questions/MultipleCorrectStatementsQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { MultipleCorrectStatementsDetails } from '@/app/practice/types';
-
-// Define interfaces for the statement and option types
-interface Statement {
-  statement_label: string;
-  statement_text: string;
-}
-
-interface OptionItem {
-  option_number: string;
-  option_text: string;
-}
+import { Statement, QuestionOption } from '@/app/practice/types';
 
 interface MultipleCorrectStatementsQuestionProps {
   details: {
     statements: Statement[];
-    options: OptionItem[];
+    options: QuestionOption[];
   };
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
@@ -39,7 +28,7 @@ export function MultipleCorrectStatementsQuestion({
   return (
     <div>
       <div className="mb-6 space-y-3 border-b pb-4">
-        {details.statements.map((statement: Statement, index: number) => (
+        {details.statements.map((statement, index) => (
           <div key={index} className="bg-gray-50 p-3 rounded">
             <div className="flex">
               <span className="font-medium mr-2">{statement.statement_label}:</span>
@@ -49,7 +38,7 @@ export function MultipleCorrectStatementsQuestion({
         ))}
       </div>
       <div className="space-y-3">
-        {details.options.map((option: OptionItem, index: number) => (
+        {details.options.map((option, index) => (
           <OptionButton
             key={index}
             option={option}

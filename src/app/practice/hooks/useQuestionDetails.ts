@@ -1,25 +1,37 @@
 // File: src/app/practice/hooks/useQuestionDetails.ts
 import { useState, useEffect } from 'react';
-import { Question, QuestionDetails, QuestionType } from '../types';
+import { 
+  Question, 
+  QuestionDetails, 
+  QuestionType
+} from '@/app/practice/types';
 
 export function useQuestionDetails(question: Question) {
   const [details, setDetails] = useState<QuestionDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Validate details structure based on question type
-  const validateDetails = (parsedDetails: any, questionType: QuestionType): boolean => {
+  const validateDetails = (parsedDetails: unknown, questionType: QuestionType): boolean => {
+    // Basic type guard to ensure we're dealing with an object
+    if (!parsedDetails || typeof parsedDetails !== 'object' || parsedDetails === null) {
+      return false;
+    }
+    
+    // Type assertion to allow property access (after we've checked it's an object)
+    const detailsObj = parsedDetails as Record<string, unknown>;
+    
     switch (questionType) {
       case 'MultipleChoice':
-        return Array.isArray(parsedDetails.options);
+        return Array.isArray(detailsObj.options);
       case 'Matching':
-        return Array.isArray(parsedDetails.items) && Array.isArray(parsedDetails.options);
+        return Array.isArray(detailsObj.items) && Array.isArray(detailsObj.options);
       case 'AssertionReason':
       case 'MultipleCorrectStatements':
-        return Array.isArray(parsedDetails.statements) && Array.isArray(parsedDetails.options);
+        return Array.isArray(detailsObj.statements) && Array.isArray(detailsObj.options);
       case 'SequenceOrdering':
-        return Array.isArray(parsedDetails.sequence_items) && Array.isArray(parsedDetails.options);
+        return Array.isArray(detailsObj.sequence_items) && Array.isArray(detailsObj.options);
       case 'DiagramBased':
-        return parsedDetails.diagram_url && Array.isArray(parsedDetails.options);
+        return Boolean(detailsObj.diagram_url) && Array.isArray(detailsObj.options);
       default:
         return false;
     }
@@ -32,13 +44,15 @@ export function useQuestionDetails(question: Question) {
     }
 
     try {
-      let parsedDetails: any;
+      let parsedDetails: unknown;
       
       if (typeof question.details === 'string') {
         // Try to parse the details if it's a string
         parsedDetails = JSON.parse(question.details);
         // Handle double-encoded JSON (happens sometimes)
-        parsedDetails = typeof parsedDetails === 'string' ? JSON.parse(parsedDetails) : parsedDetails;
+        if (typeof parsedDetails === 'string') {
+          parsedDetails = JSON.parse(parsedDetails);
+        }
       } else {
         // If it's already an object, use it directly
         parsedDetails = question.details;
@@ -46,12 +60,14 @@ export function useQuestionDetails(question: Question) {
       
       // Validate the structure based on question type
       if (validateDetails(parsedDetails, question.question_type)) {
-        setDetails(parsedDetails);
+        // We've validated the structure matches what we expect, so safe to cast
+        setDetails(parsedDetails as QuestionDetails);
         setError(null);
       } else {
         console.error('Invalid question details structure for type:', question.question_type);
         setError(`Invalid structure for ${question.question_type} question type`);
-        setDetails(parsedDetails); // Still set details so we can display whatever we have
+        // Cast to QuestionDetails but we know it might not be fully valid
+        setDetails(parsedDetails as QuestionDetails); 
       }
     } catch (e) {
       console.error('Failed to parse question details:', e);

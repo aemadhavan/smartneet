@@ -1,6 +1,6 @@
 // File: src/app/practice/hooks/usePracticeSession.ts
 import { useState, useEffect } from 'react';
-import { Subject, SessionResponse, Question } from '../types';
+import { Subject, SessionResponse } from '../types';
 
 export function usePracticeSession(
   selectedSubject: Subject | null,
@@ -58,9 +58,10 @@ export function usePracticeSession(
 
   // Reset selected option when changing questions
   useEffect(() => {
+    // Only run this effect if we have a valid session and question
     if (session && session.questions[currentQuestionIndex]) {
-      const questionId = session.questions[currentQuestionIndex].question_id;
-      // We don't need to set selectedOption here as it's derived in the component
+      // We don't need to set or use questionId here
+      // Just confirming we have a valid question at the current index
     }
   }, [currentQuestionIndex, userAnswers, session]);
 

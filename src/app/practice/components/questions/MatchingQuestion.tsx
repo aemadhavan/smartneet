@@ -1,24 +1,11 @@
 // File: src/app/practice/components/questions/MatchingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { MatchingDetails } from '@/app/practice/types';
-
-// Define interfaces for the item and option types
-interface MatchingItem {
-  left_item_label: string;
-  left_item_text: string;
-  right_item_label: string;
-  right_item_text: string;
-}
-
-interface OptionItem {
-  option_number: string;
-  option_text: string;
-}
+import { MatchingItem, QuestionOption } from '@/app/practice/types';
 
 interface MatchingQuestionProps {
   details: {
     items: MatchingItem[];
-    options: OptionItem[];
+    options: QuestionOption[];
     left_column_header?: string;
     right_column_header?: string;
   };
@@ -55,7 +42,7 @@ export function MatchingQuestion({
             </tr>
           </thead>
           <tbody>
-            {details.items.map((item: MatchingItem, index: number) => (
+            {details.items.map((item, index) => (
               <tr key={index}>
                 <td className="border px-4 py-2">
                   <span className="font-medium mr-2">{item.left_item_label}.</span>
@@ -71,7 +58,7 @@ export function MatchingQuestion({
         </table>
       </div>
       <div className="mt-6 space-y-3">
-        {details.options.map((option: OptionItem, index: number) => (
+        {details.options.map((option, index) => (
           <OptionButton
             key={index}
             option={option}

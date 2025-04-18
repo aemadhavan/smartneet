@@ -1,5 +1,6 @@
 // File: src/app/practice/components/ui/DiagramDisplay.tsx
 import { useState } from 'react';
+import Image from 'next/image';
 import { DiagramLabel } from '@/app/practice/types';
 
 interface DiagramDisplayProps {
@@ -32,16 +33,20 @@ export function DiagramDisplay({ imageUrl, labels, altText = "Question diagram" 
       )}
       
       {/* Image */}
-      <img 
-        src={imageUrl} 
-        alt={altText}
-        className={`max-w-full ${imageLoaded ? 'block' : 'hidden'}`}
-        onLoad={() => setImageLoaded(true)}
-        onError={() => {
-          setImageError(true);
-          setImageLoaded(false);
-        }}
-      />
+      <div className={`relative w-full ${imageLoaded ? 'block' : 'hidden'}`}>
+        <Image 
+          src={imageUrl} 
+          alt={altText}
+          width={600}
+          height={400}
+          className="max-w-full"
+          onLoad={() => setImageLoaded(true)}
+          onError={() => {
+            setImageError(true);
+            setImageLoaded(false);
+          }}
+        />
+      </div>
       
       {/* Labels display */}
       {imageLoaded && labels && labels.length > 0 && (

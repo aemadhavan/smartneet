@@ -1,22 +1,11 @@
 // File: src/app/practice/components/questions/SequenceOrderingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
-import { SequenceOrderingDetails } from '@/app/practice/types';
-
-// Define interfaces for the item types to avoid 'any' types
-interface SequenceItem {
-  item_number: string | number;
-  item_text: string;
-}
-
-interface OptionItem {
-  option_number: string;
-  option_text: string;
-}
+import { SequenceItem, QuestionOption } from '@/app/practice/types';
 
 interface SequenceOrderingQuestionProps {
   details: {
     sequence_items: SequenceItem[];
-    options: OptionItem[];
+    options: QuestionOption[];
   };
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
@@ -40,7 +29,7 @@ export function SequenceOrderingQuestion({
     <div>
       <div className="mb-6 space-y-2 border-b pb-4">
         <p className="font-medium mb-2">Arrange in correct sequence:</p>
-        {details.sequence_items.map((item: SequenceItem, index: number) => (
+        {details.sequence_items.map((item, index) => (
           <div key={index} className="bg-gray-50 p-3 rounded mb-2">
             <div className="flex">
               <span className="font-medium mr-2">{item.item_number}.</span>
@@ -50,7 +39,7 @@ export function SequenceOrderingQuestion({
         ))}
       </div>
       <div className="space-y-3">
-        {details.options.map((option: OptionItem, index: number) => (
+        {details.options.map((option, index) => (
           <OptionButton
             key={index}
             option={option}

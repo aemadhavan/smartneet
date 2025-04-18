@@ -1,6 +1,5 @@
 // File: src/app/practice/client-page.tsx
 'use client';
-import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import SessionCompletePage from './complete';
@@ -17,7 +16,7 @@ import {
   useSubjects, 
   usePracticeSession 
 } from './hooks';
-import { Subject, Question, SessionResponse } from './types';
+import { Subject } from './types';
 
 export default function PracticeClientPage() {
   const router = useRouter();
@@ -40,13 +39,11 @@ export default function PracticeClientPage() {
     currentQuestionIndex,
     setCurrentQuestionIndex,
     userAnswers,
-    setUserAnswers,
-    sessionCompleted,
-    setSessionCompleted,
     handleOptionSelect,
     handleNextQuestion,
     handleCompleteSession,
-    handleStartNewSession
+    handleStartNewSession,
+    sessionCompleted
   } = usePracticeSession(selectedSubject, setSelectedSubject); // Pass setSelectedSubject as the callback
 
   // Derived loading and error states
