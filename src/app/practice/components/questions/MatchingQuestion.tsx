@@ -1,31 +1,38 @@
 // File: src/app/practice/components/questions/MatchingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
 import { MatchingItem, QuestionOption } from '@/app/practice/types';
+import { normalizeMatchingDetails } from '@/app/practice/utils/questionUtils';
 
 interface MatchingQuestionProps {
-  details: {
-    items: MatchingItem[];
-    options: QuestionOption[];
-    left_column_header?: string;
-    right_column_header?: string;
-  };
+  details: any;
+  questionText: string;
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
 }
 
 export function MatchingQuestion({ 
   details, 
+  questionText,
   selectedOption, 
   onOptionSelect 
 }: MatchingQuestionProps) {
-  // Check if details has the expected structure
-  if (!details || !Array.isArray(details.items) || !Array.isArray(details.options)) {
+  // Normalize details to ensure they're in the correct format
+  const normalizedDetails = normalizeMatchingDetails(details, questionText);
+  
+  // Check if normalization was successful
+  if (!normalizedDetails || !Array.isArray(normalizedDetails.items) || !Array.isArray(normalizedDetails.options)) {
     return (
       <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
         <p className="text-yellow-700">Invalid question details format.</p>
+        <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
+          {JSON.stringify(details, null, 2)}
+        </pre>
       </div>
     );
   }
+
+  // Use the normalized details
+  const { items, options, left_column_header, right_column_header } = normalizedDetails;
 
   return (
     <div>
@@ -34,15 +41,15 @@ export function MatchingQuestion({
           <thead>
             <tr>
               <th className="border px-4 py-2 bg-gray-50">
-                {details.left_column_header || 'List I'}
+                {left_column_header || 'List I'}
               </th>
               <th className="border px-4 py-2 bg-gray-50">
-                {details.right_column_header || 'List II'}
+                {right_column_header || 'List II'}
               </th>
             </tr>
           </thead>
           <tbody>
-            {details.items.map((item, index) => (
+            {items.map((item, index) => (
               <tr key={index}>
                 <td className="border px-4 py-2">
                   <span className="font-medium mr-2">{item.left_item_label}.</span>
@@ -58,7 +65,7 @@ export function MatchingQuestion({
         </table>
       </div>
       <div className="mt-6 space-y-3">
-        {details.options.map((option, index) => (
+        {options.map((option, index) => (
           <OptionButton
             key={index}
             option={option}

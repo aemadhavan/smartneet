@@ -1,28 +1,23 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
+import { useState } from 'react';
+import { Question } from '@/app/practice/types';
 import { 
-  Question, 
-  QuestionDetails, 
-  MultipleChoiceDetails, 
-  MatchingDetails, 
-  AssertionReasonDetails, 
-  MultipleCorrectStatementsDetails, 
-  SequenceOrderingDetails 
-} from '@/app/practice/types';
-import { useQuestionDetails } from '@/app/practice/hooks';
-import { MultipleChoiceQuestion } from './MultipleChoiceQuestion';
-import { MatchingQuestion } from './MatchingQuestion';
-import { AssertionReasonQuestion } from './AssertionReasonQuestion';
-import { MultipleCorrectStatementsQuestion } from './MultipleCorrectStatementsQuestion';
-import { SequenceOrderingQuestion } from './SequenceOrderingQuestion';
+  MultipleChoiceQuestion, 
+  MatchingQuestion, 
+  AssertionReasonQuestion,
+  MultipleCorrectStatementsQuestion,
+  SequenceOrderingQuestion,
+  DiagramBasedQuestion
+} from '@/app/practice/components/questions';
 
 interface QuestionDisplayProps {
   question: Question;
   selectedOption: string | null;
-  onOptionSelect: (questionId: number, optionNumber: string) => void;
+  onOptionSelect: (questionId: number, option: string) => void;
   onNextQuestion: () => void;
   onCompleteSession: () => void;
-  onPreviousQuestion: () => void;
   isLastQuestion: boolean;
+  onPreviousQuestion: () => void;
   currentQuestionIndex: number;
 }
 
@@ -32,176 +27,192 @@ export function QuestionDisplay({
   onOptionSelect,
   onNextQuestion,
   onCompleteSession,
-  onPreviousQuestion,
   isLastQuestion,
+  onPreviousQuestion,
   currentQuestionIndex
 }: QuestionDisplayProps) {
-  const { details, error } = useQuestionDetails(question);
+  const [showExplanation, setShowExplanation] = useState(false);
 
-  // Type guard functions to check the shape of the details object
-  const isMultipleChoiceDetails = (details: QuestionDetails): details is MultipleChoiceDetails => {
-    return 'options' in details && !('items' in details) && !('statements' in details) && !('sequence_items' in details);
+  // Helper to handle potential JSON strings in the details property
+  const parseDetails = (details: any) => {
+    if (typeof details === 'string') {
+      try {
+        return JSON.parse(details);
+      } catch (e) {
+        console.error('Error parsing question details:', e);
+        return { error: 'Invalid JSON format', raw: details };
+      }
+    }
+    return details;
   };
 
-  const isMatchingDetails = (details: QuestionDetails): details is MatchingDetails => {
-    return 'items' in details && 'options' in details;
+  const details = parseDetails(question.details);
+
+  // For debugging - log diagram-based questions
+  if (question.question_type === 'DiagramBased') {
+    console.log('Diagram question:', {
+      id: question.question_id,
+      is_image_based: question.is_image_based,
+      image_url: question.image_url
+    });
+  }
+
+  // Helper function to determine the image URL for diagram questions
+  const getDiagramImageUrl = () => {
+    // If it's explicitly marked as image-based
+    if (question.is_image_based && question.image_url) {
+      return question.image_url;
+    }
+    
+    // As a fallback, if image_url exists even if is_image_based isn't set
+    if (question.image_url) {
+      return question.image_url;
+    }
+    
+    // No image URL available
+    return null;
   };
 
-  const isAssertionReasonDetails = (details: QuestionDetails): details is AssertionReasonDetails => {
-    return 'statements' in details && 'options' in details && !('sequence_items' in details);
-  };
-
-  const isMultipleCorrectStatementsDetails = (details: QuestionDetails): details is MultipleCorrectStatementsDetails => {
-    return 'statements' in details && 'options' in details && !('sequence_items' in details);
-  };
-
-  const isSequenceOrderingDetails = (details: QuestionDetails): details is SequenceOrderingDetails => {
-    return 'sequence_items' in details && 'options' in details;
+  // Render different question types
+  const renderQuestionContent = () => {
+    switch (question.question_type) {
+      case 'MultipleChoice':
+        return (
+          <MultipleChoiceQuestion
+            details={details}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      case 'Matching':
+        return (
+          <MatchingQuestion
+            details={details}
+            questionText={question.question_text}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      case 'AssertionReason':
+        return (
+          <AssertionReasonQuestion
+            details={details}
+            questionText={question.question_text}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      case 'MultipleCorrectStatements':
+        return (
+          <MultipleCorrectStatementsQuestion
+            details={details}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      case 'SequenceOrdering':
+        return (
+          <SequenceOrderingQuestion
+            details={details}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      case 'DiagramBased':
+        return (
+          <DiagramBasedQuestion
+            details={details}
+            imageUrl={getDiagramImageUrl()} // Use the helper function
+            questionText={question.question_text}
+            selectedOption={selectedOption}
+            onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
+          />
+        );
+      default:
+        return (
+          <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
+            <p className="text-yellow-700">Unsupported question type: {question.question_type}</p>
+          </div>
+        );
+    }
   };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-      <div className="mb-2 flex justify-between">
-        <span className="text-sm font-medium text-gray-600">
-          {question.topic_name}
-          {question.subtopic_name && ` › ${question.subtopic_name}`}
-        </span>
-        <span
-          className={`text-sm font-medium ${
-            question.difficulty_level === 'easy'
-              ? 'text-green-600'
-              : question.difficulty_level === 'medium'
-              ? 'text-yellow-600'
-              : 'text-red-600'
-          }`}
-        >
-          {question.difficulty_level.charAt(0).toUpperCase() +
-            question.difficulty_level.slice(1)}
-        </span>
-      </div>
-      <div className="text-lg text-gray-800 mb-6">
-        <div dangerouslySetInnerHTML={{ __html: question.question_text }} />
-      </div>
-      <div className="text-xs text-gray-500 mb-4">
-        Question type: {question.question_type}
-      </div>
-
-      {/* Display different question types based on the question_type */}
-      {error && (
-        <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200 mb-6">
-          <p className="text-yellow-700 font-medium">Question details format not recognized</p>
-          <pre className="mt-2 text-xs overflow-auto bg-gray-50 p-2 rounded">
-            {JSON.stringify(question.details, null, 2)}
-          </pre>
+      {/* Question metadata */}
+      <div className="flex flex-wrap justify-between items-start mb-4">
+        <div className="flex items-center mb-2 md:mb-0">
+          <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-sm font-medium mr-2">
+            {question.topic_name}
+          </span>
+          {question.subtopic_name && (
+            <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-sm">
+              {question.subtopic_name}
+            </span>
+          )}
         </div>
-      )}
+        <div className="flex space-x-2">
+          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm">
+            {question.difficulty_level}
+          </span>
+          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+            {question.marks} marks
+          </span>
+        </div>
+      </div>
 
-      {!error && details && (() => {
-        switch (question.question_type) {
-          case 'MultipleChoice':
-            if (isMultipleChoiceDetails(details)) {
-              return (
-                <MultipleChoiceQuestion
-                  details={details}
-                  selectedOption={selectedOption}
-                  onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
-                />
-              );
-            }
-            break;
-          case 'Matching':
-            if (isMatchingDetails(details)) {
-              return (
-                <MatchingQuestion
-                  details={details}
-                  selectedOption={selectedOption}
-                  onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
-                />
-              );
-            }
-            break;
-          case 'AssertionReason':
-            if (isAssertionReasonDetails(details)) {
-              return (
-                <AssertionReasonQuestion
-                  details={details}
-                  selectedOption={selectedOption}
-                  onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
-                />
-              );
-            }
-            break;
-          case 'MultipleCorrectStatements':
-            if (isMultipleCorrectStatementsDetails(details)) {
-              return (
-                <MultipleCorrectStatementsQuestion
-                  details={details}
-                  selectedOption={selectedOption}
-                  onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
-                />
-              );
-            }
-            break;
-          case 'SequenceOrdering':
-            if (isSequenceOrderingDetails(details)) {
-              return (
-                <SequenceOrderingQuestion
-                  details={details}
-                  selectedOption={selectedOption}
-                  onOptionSelect={(option) => onOptionSelect(question.question_id, option)}
-                />
-              );
-            }
-            break;
-        }
-        
-        // Fall through to here if the question type doesn't match or details don't match expected format
-        return (
-          <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-            <p className="text-yellow-700">
-              {question.question_type === 'MultipleChoice' || 
-               question.question_type === 'Matching' || 
-               question.question_type === 'AssertionReason' || 
-               question.question_type === 'MultipleCorrectStatements' || 
-               question.question_type === 'SequenceOrdering' 
-                ? `Invalid details format for ${question.question_type} question.`
-                : `Question type '${question.question_type}' is not supported yet.`}
-            </p>
-          </div>
-        );
-      })()}
+      {/* Question text */}
+      <div className="mb-6">
+        <div 
+          className="prose prose-indigo max-w-none"
+          dangerouslySetInnerHTML={{ __html: question.question_text }}
+        />
+      </div>
 
-      {/* Navigation and submit buttons */}
-      <div className="flex justify-between mt-8">
+      {/* Question content based on type */}
+      <div className="mb-6">
+        {renderQuestionContent()}
+      </div>
+
+      {/* Navigation buttons */}
+      <div className="flex flex-wrap justify-between mt-8">
         <button
           onClick={onPreviousQuestion}
           disabled={currentQuestionIndex === 0}
-          className={`px-4 py-2 rounded ${
+          className={`px-4 py-2 rounded-md ${
             currentQuestionIndex === 0
               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
           }`}
         >
           Previous
         </button>
-        <div className="flex space-x-4">
-          {isLastQuestion ? (
-            <button
-              onClick={onCompleteSession}
-              className="bg-emerald-600 text-white px-6 py-2 rounded hover:bg-emerald-700 transition duration-200"
-            >
-              Finish Session
-            </button>
-          ) : (
-            <button
-              onClick={onNextQuestion}
-              className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700 transition duration-200"
-            >
-              Next
-            </button>
-          )}
-        </div>
+
+        <button
+          onClick={() => setShowExplanation(!showExplanation)}
+          className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
+        >
+          {showExplanation ? 'Hide Explanation' : 'Show Explanation'}
+        </button>
+
+        <button
+          onClick={isLastQuestion ? onCompleteSession : onNextQuestion}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+        >
+          {isLastQuestion ? 'Complete' : 'Next'}
+        </button>
       </div>
+
+      {/* Explanation section */}
+      {showExplanation && question.explanation && (
+        <div className="mt-6 p-4 bg-blue-50 rounded-md">
+          <h3 className="text-lg font-medium text-blue-800 mb-2">Explanation</h3>
+          <div 
+            className="prose prose-sm prose-blue max-w-none"
+            dangerouslySetInnerHTML={{ __html: question.explanation }}
+          />
+        </div>
+      )}
     </div>
   );
 }

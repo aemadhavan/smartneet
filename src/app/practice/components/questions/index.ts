@@ -4,6 +4,7 @@ export { MatchingQuestion } from './MatchingQuestion';
 export { AssertionReasonQuestion } from './AssertionReasonQuestion';
 export { MultipleCorrectStatementsQuestion } from './MultipleCorrectStatementsQuestion';
 export { SequenceOrderingQuestion } from './SequenceOrderingQuestion';
+export { DiagramBasedQuestion } from './DiagramBasedQuestion';
 
 
 

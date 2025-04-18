@@ -18,6 +18,8 @@ export interface Subject {
     topic_name: string;
     subtopic_id: number | null;
     subtopic_name: string | null;
+    is_image_based?: boolean; // Add this property
+    image_url?: string;      // Add this property
   }
   
   export interface SessionResponse {
@@ -46,6 +48,13 @@ export interface Subject {
     left_item_text: string;
     right_item_label: string;
     right_item_text: string;
+  }
+  
+  export interface MatchingDetails {
+    items: MatchingItem[];
+    options: QuestionOption[];
+    left_column_header?: string;
+    right_column_header?: string;
   }
   
   export interface Statement {
