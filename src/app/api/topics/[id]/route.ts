@@ -3,18 +3,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { topics, subtopics } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { cache } from '@/lib/cache';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    // Safe access to params
-    const topicId = Number((await params).id);
+    // Get the topic ID from params
+    const topicId = Number(params.id);
     if (isNaN(topicId)) {
-      return NextResponse.json({ error: 'Invalid topic ID' }, { status: 400 });
+      return NextResponse.json({ 
+        success: false,
+        error: 'Invalid topic ID' 
+      }, { status: 400 });
     }
 
+    // Define cache key for this topic with its related subtopics
+    const cacheKey = `api:topics/${topicId}`;
+    
+    // Try to get data from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({
+        ...cachedData,
+        source: 'cache'
+      }, { status: 200 });
+    }
+    
+    // Cache miss - execute database queries
     // Get topic details
     const [topic] = await db
       .select()
@@ -22,7 +39,10 @@ export async function GET(
       .where(eq(topics.topic_id, topicId));
 
     if (!topic) {
-      return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Topic not found' 
+      }, { status: 404 });
     }
 
     // Get subtopics for this topic
@@ -31,11 +51,21 @@ export async function GET(
       .from(subtopics)
       .where(eq(subtopics.topic_id, topicId))
       .orderBy(subtopics.subtopic_name);
-
-    return NextResponse.json({
+    
+    // Prepare response data
+    const responseData = {
       success: true,
       topic,
       subtopics: relatedSubtopics
+    };
+    
+    // Store in cache - topics with subtopics can be cached for longer
+    // since this hierarchical data changes less frequently
+    await cache.set(cacheKey, responseData, 7200); // Cache for 2 hours
+    
+    return NextResponse.json({
+      ...responseData,
+      source: 'database'
     });
   } catch (error) {
     console.error('Error fetching topic details:', error);

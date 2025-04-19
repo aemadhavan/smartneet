@@ -23,7 +23,9 @@
   "dependencies": {
     "@clerk/nextjs": "^6.13.0",
     "@types/recharts": "^1.8.29",
+    "@upstash/redis": "^1.34.8",
     "framer-motion": "^12.6.3",
+    "lru-cache": "^10.4.3",
     "lucide-react": "^0.488.0",
     "next": "15.2.4",
     "react": "^19.0.0",

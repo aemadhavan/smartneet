@@ -12,6 +12,7 @@ import {
 import { and, eq, desc } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import { cache } from '@/lib/cache';
 
 // Schema for validating session creation request
 const createSessionSchema = z.object({
@@ -71,6 +72,9 @@ export async function POST(request: NextRequest) {
       })
     ));
 
+    // Invalidate user's practice sessions list cache
+    await cache.delete(`api:practice-sessions:user:${userId}`);
+
     return NextResponse.json({
       sessionId: newSession.session_id,
       questions: sessionQuestions
@@ -96,6 +100,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') ?? '10');
     const offset = parseInt(searchParams.get('offset') ?? '0');
 
+    // Create a cache key based on user ID and pagination parameters
+    const cacheKey = `api:practice-sessions:user:${userId}:limit:${limit}:offset:${offset}`;
+    
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json(cachedData);
+    }
+
     // Get user's practice sessions
     const sessions = await db.select({
       session_id: practice_sessions.session_id,
@@ -120,6 +133,9 @@ export async function GET(request: NextRequest) {
     .limit(limit)
     .offset(offset);
     
+    // Cache the result, but with a shorter TTL since this is user-specific activity data
+    await cache.set(cacheKey, sessions, 300); // Cache for 5 minutes
+    
     return NextResponse.json(sessions);
   } catch (error) {
     console.error('Error fetching practice sessions:', error);
@@ -127,7 +143,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper function to get personalized questions
+// Helper function to get personalized questions with caching for question pools
 async function getPersonalizedQuestions(
   userId: string, 
   subjectId: number, 
@@ -135,41 +151,59 @@ async function getPersonalizedQuestions(
   subtopicId?: number, 
   questionCount: number = 20
 ) {
-  // Query to build the set of questions
-  // Base query: include questions from the specified subject
-  const baseQuery = db.select({
-    question_id: questions.question_id,
-    question_text: questions.question_text,
-    question_type: questions.question_type,
-    details: questions.details,
-    explanation: questions.explanation,
-    difficulty_level: questions.difficulty_level,
-    marks: questions.marks,
-    negative_marks: questions.negative_marks,
-    topic_id: topics.topic_id,
-    topic_name: topics.topic_name,
-    subtopic_id: subtopics.subtopic_id,
-    subtopic_name: subtopics.subtopic_name
-  })
-  .from(questions)
-  .innerJoin(topics, eq(questions.topic_id, topics.topic_id))
-  .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id));
+  // Cache key for the potential questions pool
+  // Note: We don't include userId in this cache key because the potential
+  // questions pool is the same for all users with the same parameters
+  const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}`;
   
-  // Build conditions array
-  const conditions = [eq(questions.subject_id, subjectId)];
+  // Try to get the potential questions pool from cache
+  let potentialQuestions = await cache.get<any[]>(poolCacheKey);
   
-  // Add topic filter if specified
-  if (topicId) {
-    conditions.push(eq(questions.topic_id, topicId));
+  if (!potentialQuestions) {
+    // Cache miss - execute query to get potential questions
+    // Query to build the set of questions
+    // Base query: include questions from the specified subject
+    const baseQuery = db.select({
+      question_id: questions.question_id,
+      question_text: questions.question_text,
+      question_type: questions.question_type,
+      details: questions.details,
+      explanation: questions.explanation,
+      difficulty_level: questions.difficulty_level,
+      marks: questions.marks,
+      negative_marks: questions.negative_marks,
+      topic_id: topics.topic_id,
+      topic_name: topics.topic_name,
+      subtopic_id: subtopics.subtopic_id,
+      subtopic_name: subtopics.subtopic_name
+    })
+    .from(questions)
+    .innerJoin(topics, eq(questions.topic_id, topics.topic_id))
+    .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id));
+    
+    // Build conditions array
+    const conditions = [eq(questions.subject_id, subjectId)];
+    
+    // Add topic filter if specified
+    if (topicId) {
+      conditions.push(eq(questions.topic_id, topicId));
+    }
+    
+    // Add subtopic filter if specified
+    if (subtopicId) {
+      conditions.push(eq(questions.subtopic_id, subtopicId));
+    }
+    
+    // Apply all conditions with 'and'
+    potentialQuestions = await baseQuery.where(and(...conditions));
+    
+    // Cache the potential questions pool for future use
+    // Questions change less frequently, so we can cache longer
+    await cache.set(poolCacheKey, potentialQuestions, 3600); // Cache for 1 hour
   }
   
-  // Add subtopic filter if specified
-  if (subtopicId) {
-    conditions.push(eq(questions.subtopic_id, subtopicId));
-  }
-  
-  // Apply all conditions with 'and'
-  const potentialQuestions = await baseQuery.where(and(...conditions));
+  // Now that we have the potential questions (either from cache or database),
+  // we need to personalize them for this specific user
   
   // In a real implementation, we would apply more sophisticated logic:
   // 1. Check user's question_attempts to identify weak areas
@@ -178,8 +212,61 @@ async function getPersonalizedQuestions(
   // 4. Include some previously incorrect questions for reinforcement
   
   // For now, we'll just randomize the order and take the requested count
-  const shuffled = [...potentialQuestions].sort(() => 0.5 - Math.random());
+  // Note: We don't cache this personalized selection since it should be different each time
+  // Make sure potentialQuestions is an array before spreading
+  const questionsArray = Array.isArray(potentialQuestions) ? potentialQuestions : [];
+  const shuffled = [...questionsArray].sort(() => 0.5 - Math.random());
   const selectedQuestions = shuffled.slice(0, questionCount);
   
   return selectedQuestions;
+}
+
+// Add an endpoint to get a specific practice session with its questions
+export async function PATCH(request: NextRequest) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { sessionId, isCompleted, questionsAttempted, questionsCorrect, score } = body;
+
+    // Update session in database
+    await db.update(practice_sessions)
+      .set({
+        is_completed: isCompleted,
+        questions_attempted: questionsAttempted,
+        questions_correct: questionsCorrect,
+        score: score,
+        end_time: isCompleted ? new Date() : undefined
+      })
+      .where(
+        and(
+          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.user_id, userId)
+        )
+      );
+
+    // Invalidate all session cache keys for this user
+    await invalidateUserSessionCaches(userId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating practice session:', error);
+    return NextResponse.json({ error: 'Failed to update practice session' }, { status: 500 });
+  }
+}
+
+// Helper function to invalidate all session cache entries for a user
+async function invalidateUserSessionCaches(userId: string) {
+  // This is a simple approach - in a production environment with many cache keys,
+  // you might want to use Redis pattern deletion if available
+  await cache.delete(`api:practice-sessions:user:${userId}`);
+  
+  // If you need to be more specific with pagination parameters:
+  // You could also delete specific pagination variants
+  await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
+  await cache.delete(`api:practice-sessions:user:${userId}:limit:20:offset:0`);
+  // etc.
 }
