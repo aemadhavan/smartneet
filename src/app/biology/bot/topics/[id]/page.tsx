@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
 
 interface Topic {
@@ -27,7 +28,10 @@ interface Subtopic {
   updated_at: string;
 }
 
-export default function TopicDetailPage({ params }: { params: { id: string } }) {
+export default function TopicDetailPage() {
+  const params = useParams();
+  const topicId = params.id as string;
+  
   const [topic, setTopic] = useState<Topic | null>(null);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -38,7 +42,6 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     const fetchTopicDetails = async () => {
       try {
         setIsLoading(true);
-        const topicId = params.id;
         
         // Fetch topic details using the API
         const response = await fetch(`/api/topics/${topicId}`);
@@ -69,7 +72,7 @@ export default function TopicDetailPage({ params }: { params: { id: string } }) 
     };
     
     fetchTopicDetails();
-  }, [params.id]);
+  }, [topicId]);
 
   // Find the active subtopic
   const activeSubtopic = subtopics.find(s => s.subtopic_id === activeSubtopicId);

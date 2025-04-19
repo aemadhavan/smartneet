@@ -16,15 +16,15 @@ interface Topic {
   updated_at: string;
 }
 
-interface Subtopic {
-  subtopic_id: number;
-  topic_id: number;
-  subtopic_name: string;
-  description: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
+// interface Subtopic {
+//   subtopic_id: number;
+//   topic_id: number;
+//   subtopic_name: string;
+//   description: string | null;
+//   is_active: boolean;
+//   created_at: string;
+//   updated_at: string;
+// }
 
 interface TopicsWithSubtopicCount extends Topic {
   subtopicsCount: number;
