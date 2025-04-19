@@ -151,13 +151,29 @@ async function getPersonalizedQuestions(
   subtopicId?: number, 
   questionCount: number = 20
 ) {
+  // Define a type for the question object that matches the database query result
+  interface QuestionWithDetails {
+    question_id: number;
+    question_text: string;
+    question_type: "MultipleChoice" | "Matching" | "MultipleCorrectStatements" | "AssertionReason" | "DiagramBased" | "SequenceOrdering";
+    details: unknown;
+    explanation: string | null;
+    difficulty_level: string | null; // Make nullable to match database schema
+    marks: number;
+    negative_marks: number;
+    topic_id: number;
+    topic_name: string;
+    subtopic_id: number | null;
+    subtopic_name: string | null;
+  }
+  
   // Cache key for the potential questions pool
   // Note: We don't include userId in this cache key because the potential
   // questions pool is the same for all users with the same parameters
   const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}`;
   
   // Try to get the potential questions pool from cache
-  let potentialQuestions = await cache.get<any[]>(poolCacheKey);
+  let potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey);
   
   if (!potentialQuestions) {
     // Cache miss - execute query to get potential questions
@@ -170,8 +186,8 @@ async function getPersonalizedQuestions(
       details: questions.details,
       explanation: questions.explanation,
       difficulty_level: questions.difficulty_level,
-      marks: questions.marks,
-      negative_marks: questions.negative_marks,
+      marks: questions.marks ?? 0,
+      negative_marks: questions.negative_marks ?? 0,
       topic_id: topics.topic_id,
       topic_name: topics.topic_name,
       subtopic_id: subtopics.subtopic_id,
@@ -195,7 +211,14 @@ async function getPersonalizedQuestions(
     }
     
     // Apply all conditions with 'and'
-    potentialQuestions = await baseQuery.where(and(...conditions));
+    const queryResults = await baseQuery.where(and(...conditions));
+    
+    // Ensure marks and negative_marks are always numbers
+    potentialQuestions = queryResults.map(q => ({
+      ...q,
+      marks: q.marks ?? 0,
+      negative_marks: q.negative_marks ?? 0
+    }));
     
     // Cache the potential questions pool for future use
     // Questions change less frequently, so we can cache longer

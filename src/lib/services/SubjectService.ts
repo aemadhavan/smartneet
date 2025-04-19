@@ -1,6 +1,6 @@
 // lib/services/SubjectService.ts
 import { db } from '@/db'
-import { subjects, topics, subtopics } from '@/db/schema'
+import { subjects, topics } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { cache, withCache, Cached } from '../cache'
 

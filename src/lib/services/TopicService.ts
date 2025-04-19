@@ -2,7 +2,7 @@
 import { db } from '@/db'
 import { topics, subtopics } from '@/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
-import { cache, withCache, Cached } from '../cache'
+import { cache, Cached } from '../cache'
 
 export class TopicService {
   /**
@@ -10,8 +10,8 @@ export class TopicService {
    */
   @Cached('topics', 3600)
   async getTopics(subjectId?: number, parentTopicId?: number | null) {
-    let query = db.select().from(topics);
-    let conditions = [eq(topics.is_active, true)];
+    const query = db.select().from(topics);
+    const conditions = [eq(topics.is_active, true)];
     
     if (subjectId !== undefined) {
       conditions.push(eq(topics.subject_id, subjectId));

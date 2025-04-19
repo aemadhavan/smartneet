@@ -1,7 +1,7 @@
 // lib/services/QuestionService.ts
 import { db } from '@/db'
 import { questions, topics, subtopics } from '@/db/schema'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { cache, withCache } from '../cache'
 
 export class QuestionService {

@@ -17,7 +17,7 @@ if (REDIS_URL && REDIS_TOKEN) {
 }
 
 // In-memory LRU cache as fallback or for development
-const memoryCache = new LRUCache<string, any>({
+const memoryCache = new LRUCache<string, Record<string, unknown>>({
   max: 500, // Maximum items in cache
   ttl: CACHE_TTL * 1000, // Convert to milliseconds
   allowStale: false,
@@ -67,7 +67,7 @@ class Cache implements CacheProvider {
       }
       
       // Also set in memory cache
-      memoryCache.set(key, value, { ttl: ttl * 1000 })
+      memoryCache.set(key, value as Record<string, unknown>)
     } catch (error) {
       console.error('Cache set error:', error)
     }
@@ -108,12 +108,12 @@ export const cache = new Cache()
 /**
  * Higher-order function to cache the results of any async function
  */
-export function withCache<T>(
-  fn: (...args: any[]) => Promise<T>,
+export function withCache<T, Args extends unknown[]>(
+  fn: (...args: Args) => Promise<T>,
   keyPrefix: string,
   ttl?: number
 ) {
-  return async (...args: any[]): Promise<T> => {
+  return async (...args: Args): Promise<T> => {
     // Create a cache key based on the function name, prefix and arguments
     const cacheKey = `${keyPrefix}:${JSON.stringify(args)}`
     
@@ -139,13 +139,13 @@ export function withCache<T>(
  */
 export function Cached(keyPrefix: string, ttl?: number): MethodDecorator {
   return function (
-    target: Object,
+    target: object,
     propertyKey: string | symbol,
     descriptor: PropertyDescriptor
   ): PropertyDescriptor {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function(...args: any[]) {
+    descriptor.value = async function(...args: unknown[]) {
       const cacheKey = `${keyPrefix}:${String(propertyKey)}:${JSON.stringify(args)}`;
       
       // Try to get from cache first
