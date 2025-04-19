@@ -22,6 +22,12 @@ export default function PracticeClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subjectParam = searchParams.get('subject')?.toLowerCase();
+  const topicIdParam = searchParams.get('topicId');
+  const subtopicIdParam = searchParams.get('subtopicId');
+  
+  // Parse topic and subtopic IDs if they exist
+  const topicId = topicIdParam ? parseInt(topicIdParam) : null;
+  const subtopicId = subtopicIdParam ? parseInt(subtopicIdParam) : null;
   
   // Custom hooks for data fetching and state management
   const { 
@@ -44,7 +50,7 @@ export default function PracticeClientPage() {
     handleCompleteSession,
     handleStartNewSession,
     sessionCompleted
-  } = usePracticeSession(selectedSubject, setSelectedSubject); // Pass setSelectedSubject as the callback
+  } = usePracticeSession(selectedSubject, setSelectedSubject, topicId, subtopicId); // Pass topic and subtopic IDs
 
   // Derived loading and error states
   const loading = subjectsLoading || sessionLoading;
@@ -61,7 +67,11 @@ export default function PracticeClientPage() {
 
   // Handle subject selection
   const handleSubjectSelect = (subject: Subject) => {
-    router.push(`/practice?subject=${subject.subject_name.toLowerCase()}`);
+    // Preserve topic and subtopic IDs when changing subject if they were specified
+    let url = `/practice?subject=${subject.subject_name.toLowerCase()}`;
+    if (topicId) url += `&topicId=${topicId}`;
+    if (subtopicId) url += `&subtopicId=${subtopicId}`;
+    router.push(url);
   };
 
   // If session is completed, show the completion page
@@ -89,8 +99,31 @@ export default function PracticeClientPage() {
     return <SubjectSelector subjects={subjects} onSelect={handleSubjectSelect} />;
   }
 
+  // Create session title based on filtering parameters
+  const getSessionTitle = () => {
+    let title = `${selectedSubject.subject_name} Practice`;
+    
+    // Add topic information if filtering by topic
+    if (topicId && session?.questions && session.questions.length > 0) {
+      const firstQuestion = session.questions[0];
+      if (firstQuestion.topic_name) {
+        title = `${firstQuestion.topic_name} Practice`;
+      }
+    }
+    
+    // Add subtopic information if filtering by subtopic
+    if (subtopicId && session?.questions && session.questions.length > 0) {
+      const firstQuestion = session.questions[0];
+      if (firstQuestion.subtopic_name) {
+        title = `${firstQuestion.subtopic_name} Practice`;
+      }
+    }
+    
+    return title;
+  };
+
   // Render practice session
-  if (session && session.questions.length > 0) {
+  if (session && session.questions && session.questions.length > 0) {
     const currentQuestion = session.questions[currentQuestionIndex];
     const isLastQuestion = currentQuestionIndex === session.questions.length - 1;
     const selectedOption = userAnswers[currentQuestion.question_id] || null;
@@ -98,7 +131,7 @@ export default function PracticeClientPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">{selectedSubject.subject_name} Practice</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{getSessionTitle()}</h1>
           <div className="text-sm text-gray-500">
             Question {currentQuestionIndex + 1} of {session.questions.length}
           </div>
@@ -138,12 +171,19 @@ export default function PracticeClientPage() {
   return (
     <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">No Questions Available</h2>
-      <p className="text-gray-600 mb-8">No questions are available for this subject at the moment.</p>
+      <p className="text-gray-600 mb-8">
+        {topicId 
+          ? "No questions are available for this topic at the moment." 
+          : subtopicId 
+            ? "No questions are available for this subtopic at the moment."
+            : "No questions are available for this subject at the moment."
+        }
+      </p>
       <Link
-        href="/"
+        href="/biology/bot"
         className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition duration-200"
       >
-        Back to Home
+        Back to Botany
       </Link>
     </div>
   );

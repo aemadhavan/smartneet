@@ -4,7 +4,9 @@ import { Subject, SessionResponse } from '../types';
 
 export function usePracticeSession(
   selectedSubject: Subject | null,
-  onResetSubject?: (subject: Subject | null) => void // Add callback prop
+  onResetSubject?: (subject: Subject | null) => void, // Callback prop
+  topicId?: number | null, // New parameter for topic ID
+  subtopicId?: number | null // New parameter for subtopic ID
 ) {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
@@ -13,7 +15,7 @@ export function usePracticeSession(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Create a new practice session when subject is selected
+  // Create a new practice session when subject, topic, or subtopic changes
   useEffect(() => {
     const createSession = async () => {
       if (!selectedSubject) return;
@@ -24,16 +26,35 @@ export function usePracticeSession(
         setUserAnswers({});
         setCurrentQuestionIndex(0);
         
+        // Build the session request payload
+        const sessionPayload: {
+          subject_id: number;
+          topic_id?: number;
+          subtopic_id?: number;
+          session_type: string;
+          question_count: number;
+        } = {
+          subject_id: selectedSubject.subject_id,
+          session_type: 'Practice',
+          question_count: 10, // Default number of questions
+        };
+        
+        // Add topic_id if provided
+        if (topicId) {
+          sessionPayload.topic_id = topicId;
+        }
+        
+        // Add subtopic_id if provided
+        if (subtopicId) {
+          sessionPayload.subtopic_id = subtopicId;
+        }
+        
         const response = await fetch('/api/practice-sessions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            subject_id: selectedSubject.subject_id,
-            session_type: 'Practice',
-            question_count: 10, // Default number of questions
-          }),
+          body: JSON.stringify(sessionPayload),
         });
         
         if (!response.ok) {
@@ -54,7 +75,7 @@ export function usePracticeSession(
     if (selectedSubject) {
       createSession();
     }
-  }, [selectedSubject]);
+  }, [selectedSubject, topicId, subtopicId]); // Add dependencies for topic and subtopic IDs
 
   // Reset selected option when changing questions
   useEffect(() => {

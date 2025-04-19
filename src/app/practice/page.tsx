@@ -1,3 +1,5 @@
+//File: src/app/dashboard/page.tsx
+
 import { Suspense } from 'react';
 import PracticeClientPage from './client-page';
 

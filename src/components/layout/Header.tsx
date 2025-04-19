@@ -21,7 +21,7 @@ const Header = () => {
               <Link href="/" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
                 Home
               </Link>
-              <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
+              <Link href="/biology" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
                 Biology
               </Link>
               <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
