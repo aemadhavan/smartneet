@@ -20,15 +20,9 @@ interface TopicPerformance {
   accuracy: number;
 }
 
-type Params = {
-  params: Promise<{
-    sessionId: string
-  }>
-}
-
 export async function GET(
   request: NextRequest,
-  context: Params
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -36,8 +30,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Access the sessionId after awaiting params
-    const sessionId = parseInt((await context.params).sessionId);
+    // Access the sessionId from params
+    const sessionId = parseInt((await params).sessionId);
 
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });

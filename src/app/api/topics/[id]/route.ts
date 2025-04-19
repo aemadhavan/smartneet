@@ -7,11 +7,11 @@ import { cache } from '@/lib/cache';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Get the topic ID from params
-    const topicId = Number(params.id);
+    const topicId = Number((await params).id);
     if (isNaN(topicId)) {
       return NextResponse.json({ 
         success: false,

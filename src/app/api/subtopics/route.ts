@@ -110,30 +110,8 @@ export async function POST(req: NextRequest) {
     
     // Your existing code to create a subtopic...
     
-    // After successful creation, invalidate relevant cache keys
-    if (body.topic_id) {
-      // Invalidate topic-specific subtopics cache
-      await cache.delete(`api:subtopics:topicId:${body.topic_id}:subjectId:undefined:isActive:undefined`);
-      await cache.delete(`api:subtopics:topicId:${body.topic_id}:subjectId:undefined:isActive:true`);
-      await cache.delete(`api:subtopics:topicId:${body.topic_id}:subjectId:undefined:isActive:false`);
-      
-      // Get subject_id for this topic to invalidate subject-level caches too
-      const topicResult = await db.select({ subject_id: topics.subject_id })
-        .from(topics)
-        .where(eq(topics.topic_id, body.topic_id));
-      
-      if (topicResult.length > 0 && topicResult[0].subject_id) {
-        const subjectId = topicResult[0].subject_id;
-        await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:undefined`);
-        await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:true`);
-        await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:false`);
-      }
-    }
-    
-    // Also invalidate the general subtopics list
-    await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:undefined`);
-    await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:true`);
-    await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:false`);
+    // Use the utility function to invalidate caches
+    await invalidateSubtopicCaches(undefined, body.topic_id);
     
     // Return the response...
     return NextResponse.json({
