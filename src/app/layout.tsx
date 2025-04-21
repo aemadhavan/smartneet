@@ -76,7 +76,7 @@ export default function RootLayout({
         <link rel="canonical" href="https://smarterneet.com/" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white`}>
-        <ClerkProvider>
+        <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
           <Header />
           <main>{children}</main>
           <Footer />

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ url });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating customer portal session:', error);
     return NextResponse.json(
       { error: 'Failed to create customer portal session' },

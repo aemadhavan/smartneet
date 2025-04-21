@@ -155,15 +155,16 @@ export async function GET(request: NextRequest) {
     .orderBy(desc(practice_sessions.start_time))
     .limit(limit)
     .offset(offset);
-    
+
     // Get total count using SQL count function
-    const countResult = await db.select({
-      count: sql<number>`count(*)`
-    })
-    .from(practice_sessions)
-    .where(eq(practice_sessions.user_id, userId));
-    
-    const total = countResult[0]?.count || 0;
+    const countResult = await db
+      .select({
+        count: sql<number>`count(*)`
+      })
+      .from(practice_sessions)
+      .where(eq(practice_sessions.user_id, userId));
+
+    const total: number = countResult[0]?.count || 0;
     
     const result = {
       sessions,

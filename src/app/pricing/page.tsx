@@ -2,11 +2,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { formatAmountForDisplay, getStripe } from '@/lib/stripe';
-import { Check, X, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle } from 'lucide-react';
 
+// Types
 type SubscriptionPlan = {
   plan_id: number;
   plan_name: string;
@@ -20,19 +21,52 @@ type SubscriptionPlan = {
   is_active: boolean;
 };
 
+type UserSubscription = {
+  subscription_id: number;
+  plan_id: number;
+  plan?: SubscriptionPlan;
+  // Add other subscription properties as needed
+};
+
 export default function PricingPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userSubscription, setUserSubscription] = useState<any>(null);
+  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutPlanId, setCheckoutPlanId] = useState<number | null>(null);
+  const [canceled, setCanceled] = useState<string | null>(null);
   
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const { userId, isSignedIn } = useAuth();
-  
-  const canceled = searchParams.get('canceled');
+  const { isSignedIn } = useAuth();
+
+  // Debug environment variables
+  useEffect(() => {
+    console.log('DEBUG - Stripe key available:', !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+    if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+      console.log('DEBUG - Stripe key prefix:', process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.substring(0, 10));
+    } else {
+      console.log('DEBUG - Stripe key is undefined or empty');
+    }
+  }, []);
+
+  // Refresh Clerk session
+  useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.Clerk !== 'undefined' && window.Clerk.session) {
+      try {
+        // @ts-ignore
+        window.Clerk.session.refresh();
+      } catch (e) {
+        console.error("Failed to refresh Clerk session", e);
+      }
+    }
+  }, []);
+
+  // Use regular browser APIs to get query params instead of useSearchParams
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    setCanceled(searchParams.get('canceled'));
+  }, []);
 
   // Fetch plans and user subscription
   useEffect(() => {
@@ -55,8 +89,10 @@ export default function PricingPage() {
             setUserSubscription(subData.subscription);
           }
         }
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+        setError(errorMessage);
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
@@ -78,11 +114,16 @@ export default function PricingPage() {
       return;
     }
     
+    // Debug Stripe availability
+    console.log('DEBUG - Attempting checkout. Stripe key available:', 
+      !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+    
     // Start checkout process
     setIsCheckingOut(true);
     setCheckoutPlanId(plan.plan_id);
     
     try {
+      // Create checkout session
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
@@ -94,20 +135,33 @@ export default function PricingPage() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create checkout session');
       }
       
       const { sessionId } = await response.json();
+      console.log('DEBUG - Got session ID:', sessionId ? 'Yes (valid ID)' : 'No');
       
       // Load Stripe.js and redirect to checkout
+      console.log('DEBUG - Loading Stripe.js...');
       const stripe = await getStripe();
+      console.log('DEBUG - Stripe loaded:', !!stripe);
+      
       if (!stripe) {
-        throw new Error('Failed to initialize Stripe');
+        throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
       }
       
-      await stripe.redirectToCheckout({ sessionId });
-    } catch (err: any) {
-      setError(err.message);
+      console.log('DEBUG - Redirecting to checkout...');
+      const result = await stripe.redirectToCheckout({ sessionId });
+      console.log('DEBUG - Redirect result:', result);
+      
+      if (result.error) {
+        throw new Error(result.error.message || 'Error redirecting to checkout');
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during checkout';
+      setError(errorMessage);
+      console.error('Checkout error:', err);
       setIsCheckingOut(false);
       setCheckoutPlanId(null);
     }
@@ -127,7 +181,7 @@ export default function PricingPage() {
         <div className="max-w-md mx-auto bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center mb-4">
             <AlertCircle className="h-6 w-6 text-red-600 mr-2" />
-            <h2 className="text-xl font-semibold text-red-600">Error Loading Plans</h2>
+            <h2 className="text-xl font-semibold text-red-600">Error</h2>
           </div>
           <p className="text-gray-700 mb-4">{error}</p>
           <button
@@ -194,11 +248,7 @@ export default function PricingPage() {
               <div className="p-6">
                 <ul className="space-y-4">
                   <li className="flex items-start">
-                    {plan.test_limit_daily === null ? (
-                      <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                    ) : (
-                      <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                    )}
+                    <Check className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
                     <span>
                       {plan.test_limit_daily === null 
                         ? 'Unlimited tests per day' 

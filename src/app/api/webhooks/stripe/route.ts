@@ -6,9 +6,39 @@ import { eq } from 'drizzle-orm';
 import { subscription_plans } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { headers } from 'next/headers';
+import Stripe from 'stripe';
+
+// Define types for Stripe objects
+type StripeSubscription = {
+  id: string;
+  customer: string;
+  metadata?: { userId?: string };
+  items: { data: Array<{ price: { id: string } }> };
+  status: string;
+  current_period_start: number;
+  current_period_end: number;
+  trial_end: number | null;
+};
+
+type StripeInvoice = {
+  id: string;
+  subscription?: string;
+  customer: string;
+  metadata?: { userId?: string };
+  amount_paid: number;
+  payment_intent: string;
+  payment_method_details?: { type: string };
+  status: string;
+  created: number;
+  next_payment_attempt: number;
+  hosted_invoice_url: string;
+  customer_tax_ids?: Array<{ value: string }>;
+  tax?: number;
+  tax_percent?: number;
+};
 
 // Event handler functions
-async function handleSubscriptionChange(subscription: any) {
+async function handleSubscriptionChange(subscription: StripeSubscription) {
   try {
     const stripeSubscriptionId = subscription.id;
     const stripeCustomerId = subscription.customer;
@@ -46,11 +76,11 @@ async function handleSubscriptionChange(subscription: any) {
       planId: plan.plan_id,
       stripeSubscriptionId,
       stripeCustomerId,
-      status: subscription.status,
+      status: subscription.status as "active" | "canceled" | "past_due" | "unpaid" | "trialing" | "incomplete" | "incomplete_expired" | undefined,
       periodStart: new Date(subscription.current_period_start * 1000),
       periodEnd: new Date(subscription.current_period_end * 1000),
-      trialEnd: subscription.trial_end 
-        ? new Date(subscription.trial_end * 1000) 
+      trialEnd: subscription.trial_end
+        ? new Date(subscription.trial_end * 1000)
         : null
     });
   } catch (error) {
@@ -59,7 +89,7 @@ async function handleSubscriptionChange(subscription: any) {
   }
 }
 
-async function handleSubscriptionDeleted(subscription: any) {
+async function handleSubscriptionDeleted(subscription: StripeSubscription) {
   try {
     // Update subscription status to canceled
     await subscriptionService.updateSubscriptionFromStripe(subscription.id);
@@ -69,18 +99,20 @@ async function handleSubscriptionDeleted(subscription: any) {
   }
 }
 
-async function handlePaymentSucceeded(invoice: any) {
+async function handlePaymentSucceeded(invoice: StripeInvoice) {
   try {
     const stripeSubscriptionId = invoice.subscription;
     if (!stripeSubscriptionId) return;
     
-    const stripeCustomerId = invoice.customer;
     const userId = invoice.metadata?.userId;
     
     // Get user ID from subscription if not in invoice metadata
+    let userIdFromSubscription: string | undefined;
+    
     if (!userId) {
       const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-      if (!subscription.metadata.userId) {
+      userIdFromSubscription = subscription.metadata.userId;
+      if (!userIdFromSubscription) {
         console.error('No userId found in subscription metadata');
         return;
       }
@@ -98,7 +130,7 @@ async function handlePaymentSucceeded(invoice: any) {
     
     // Record payment
     await subscriptionService.recordPayment({
-      userId: userId || subscription.user_id,
+      userId: userId || userIdFromSubscription || subscription.user_id,
       subscriptionId: subscription.subscription_id,
       amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
       stripePaymentId: invoice.payment_intent,
@@ -109,7 +141,7 @@ async function handlePaymentSucceeded(invoice: any) {
       nextBillingDate: new Date(invoice.next_payment_attempt * 1000),
       receiptUrl: invoice.hosted_invoice_url,
       gstDetails: {
-        gstNumber: invoice.customer_tax_ids?.[0]?.value,
+        gstNumber: invoice.customer_tax_ids?.[0]?.value ?? null,
         taxAmount: invoice.tax || 0,
         taxPercentage: invoice.tax_percent || 0,
         hasGST: !!invoice.customer_tax_ids?.length
@@ -121,7 +153,7 @@ async function handlePaymentSucceeded(invoice: any) {
   }
 }
 
-async function handlePaymentFailed(invoice: any) {
+async function handlePaymentFailed(invoice: StripeInvoice) {
   try {
     const stripeSubscriptionId = invoice.subscription;
     if (!stripeSubscriptionId) return;
@@ -140,7 +172,7 @@ export async function POST(req: NextRequest) {
   const headerList = await headers();
   const signature = headerList.get('stripe-signature') as string;
 
-  let event;
+  let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(
@@ -148,9 +180,10 @@ export async function POST(req: NextRequest) {
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-  } catch (error: any) {
-    console.error(`Webhook signature verification failed: ${error.message}`);
-    return NextResponse.json({ error: `Webhook Error: ${error.message}` }, { status: 400 });
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error(`Webhook signature verification failed: ${err.message}`);
+    return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
   // Handle the event
@@ -159,22 +192,22 @@ export async function POST(req: NextRequest) {
       // Subscription created or updated
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await handleSubscriptionChange(event.data.object);
+        await handleSubscriptionChange(event.data.object as unknown as StripeSubscription);
         break;
 
       // Subscription deleted
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object);
+        await handleSubscriptionDeleted(event.data.object as unknown as StripeSubscription);
         break;
 
       // Payment succeeded
       case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object);
+        await handlePaymentSucceeded(event.data.object as unknown as StripeInvoice);
         break;
 
       // Payment failed
       case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object);
+        await handlePaymentFailed(event.data.object as unknown as StripeInvoice);
         break;
 
       default:
@@ -182,10 +215,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
-    console.error(`Error handling webhook: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error(`Error handling webhook: ${err.message}`);
     return NextResponse.json(
-      { error: `Webhook handler failed: ${error.message}` },
+      { error: `Webhook handler failed: ${err.message}` },
       { status: 500 }
     );
   }

@@ -1,13 +1,13 @@
 // src/app/api/user/subscription/route.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/db';
 import { eq } from 'drizzle-orm';
-import { user_subscriptions, subscription_plans } from '@/db/schema';
+import { subscription_plans } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { cache } from '@/lib/cache';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // Check authentication
     const { userId } = await auth();
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       subscription: subscriptionData,
       source
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching user subscription:', error);
     return NextResponse.json(
       { error: 'Failed to fetch subscription details' },

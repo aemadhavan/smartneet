@@ -2,20 +2,37 @@
 import { loadStripe, Stripe as StripeClient } from '@stripe/stripe-js';
 import Stripe from 'stripe';
 
-// Initialize Stripe server-side instance
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-03-31.basil', // Use the latest API version
-  appInfo: {
-    name: 'NEET Exam Prep Platform',
-    version: '1.0.0',
-  },
-});
+// Initialize Stripe server-side instance with better error handling
+let stripe: Stripe | null = null;
+let secretKey: string = '';
+if (typeof window === 'undefined') {
+  secretKey = process.env.STRIPE_SECRET_KEY || '';
+  if (!secretKey) {
+    console.error('Missing Stripe secret key in environment variables');
+  }
 
-// Initialize Stripe client-side
+  if (secretKey) {
+    stripe = new Stripe(secretKey, {
+      apiVersion: '2025-03-31.basil', // Use the latest API version
+      appInfo: {
+        name: 'NEET Exam Prep Platform',
+        version: '1.0.0',
+      },
+    });
+  }
+}
+export { stripe };
+
+// Initialize Stripe client-side with proper error handling
 let stripePromise: Promise<StripeClient | null>;
 export const getStripe = () => {
   if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+    const key = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!key) {
+      console.error('Missing Stripe publishable key in environment variables');
+      return Promise.resolve(null);
+    }
+    stripePromise = loadStripe(key);
   }
   return stripePromise;
 };
@@ -49,6 +66,13 @@ export async function createCheckoutSession({
   successUrl: string;
   cancelUrl: string;
 }) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  if (!secretKey) {
+    throw new Error('Stripe secret key is not configured');
+  }
+
   try {
     // Look for existing customers with this email
     const existingCustomers = await stripe.customers.list({
@@ -115,6 +139,13 @@ export async function createCustomerPortalSession({
   customerId: string;
   returnUrl: string;
 }) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  if (!secretKey) {
+    throw new Error('Stripe secret key is not configured');
+  }
+  
   try {
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId,
@@ -130,6 +161,13 @@ export async function createCustomerPortalSession({
 
 // Get subscription data from Stripe
 export async function getSubscriptionFromStripe(subscriptionId: string): Promise<Stripe.Subscription> {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  if (!secretKey) {
+    throw new Error('Stripe secret key is not configured');
+  }
+  
   try {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['customer', 'default_payment_method', 'items.data.price.product'],
@@ -143,6 +181,13 @@ export async function getSubscriptionFromStripe(subscriptionId: string): Promise
 
 // Cancel subscription in Stripe
 export async function cancelSubscription(subscriptionId: string) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  if (!secretKey) {
+    throw new Error('Stripe secret key is not configured');
+  }
+  
   try {
     return await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
@@ -155,6 +200,13 @@ export async function cancelSubscription(subscriptionId: string) {
 
 // Reactivate subscription in Stripe
 export async function reactivateSubscription(subscriptionId: string) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  if (!secretKey) {
+    throw new Error('Stripe secret key is not configured');
+  }
+  
   try {
     return await stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: false,

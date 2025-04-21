@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
-import { getStripe, formatAmountForDisplay } from '@/lib/stripe';
+import { formatAmountForDisplay } from '@/lib/stripe';
 
 type SubscriptionPlan = {
   plan_id: number;
@@ -35,6 +35,9 @@ type UserSubscription = {
   plan?: SubscriptionPlan;
 };
 
+// Custom error type for better type safety - we'll use it for type assertions, not in catch clauses
+type AppError = Error | { message: string };
+
 const SubscriptionInfo = () => {
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,8 +59,10 @@ const SubscriptionInfo = () => {
         }
         const data = await response.json();
         setSubscription(data.subscription);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        // Type assertion for the error
+        const error = err as AppError;
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -65,37 +70,6 @@ const SubscriptionInfo = () => {
 
     fetchSubscription();
   }, [userId, isLoaded]);
-
-  // Handle checkout for a new subscription
-  const handleCheckout = async (planId: number) => {
-    try {
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          planId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Checkout API error');
-      }
-
-      const { sessionId } = await response.json();
-      const stripe = await getStripe();
-      
-      if (!stripe) {
-        throw new Error('Failed to initialize Stripe');
-      }
-      
-      // Redirect to Stripe Checkout
-      await stripe.redirectToCheckout({ sessionId });
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
 
   // Handle subscription management
   const handleManageSubscription = async () => {
@@ -122,8 +96,10 @@ const SubscriptionInfo = () => {
 
       const { url } = await response.json();
       window.location.href = url;
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      // Type assertion for the error
+      const error = err as AppError;
+      setError(error.message);
     } finally {
       setIsManaging(false);
     }
@@ -157,8 +133,10 @@ const SubscriptionInfo = () => {
 
       // Refresh subscription data
       router.refresh();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      // Type assertion for the error
+      const error = err as AppError;
+      setError(error.message);
     }
   };
 
@@ -184,7 +162,7 @@ const SubscriptionInfo = () => {
     return (
       <div className="p-6 bg-white rounded-lg shadow-md">
         <h2 className="text-xl font-bold mb-4">No Subscription Found</h2>
-        <p>You don't have an active subscription. Choose a plan to get started.</p>
+        <p>You don&apos;t have an active subscription. Choose a plan to get started.</p>
         <button 
           onClick={() => router.push('/pricing')} 
           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"

@@ -1,5 +1,5 @@
 // src/lib/middleware/subscriptionMiddleware.ts
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 
@@ -34,7 +34,7 @@ export async function checkSubscriptionLimitServerAction(userId: string) {
 /**
  * Middleware for API routes
  */
-export async function checkSubscriptionLimit(req: NextRequest) {
+export async function checkSubscriptionLimit() {
   try {
     const { userId } = await auth();
     

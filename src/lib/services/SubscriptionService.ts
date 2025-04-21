@@ -10,9 +10,12 @@ import {
 import { withCache } from '@/lib/cache';
 import { CacheInvalidator } from '@/lib/cacheInvalidation';
 import { getSubscriptionFromStripe } from '@/lib/stripe';
+import Stripe from 'stripe';
 import { addDays } from 'date-fns';
 import { GSTDetails } from '@/types/payment';
 
+// This type is no longer needed as we're using the official Stripe.Subscription type
+// and accessing properties through the correct paths
 
 export class SubscriptionService {
   /**
@@ -209,99 +212,102 @@ export class SubscriptionService {
   /**
    * Update subscription status from Stripe webhook
    */
-  // Update for the updateSubscriptionFromStripe method in SubscriptionService.ts
-
-/**
- * Update subscription status from Stripe webhook
- */
-async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
-  try {
-    const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId);
-    
-    // Find the user subscription
-    let userQuery = db
-      .select()
-      .from(user_subscriptions)
-      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
-      .limit(1);
-    
-    if (userId) {
-      userQuery = db
+  async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
+    try {
+      const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
+      
+      // Find the user subscription
+      let userQuery = db
         .select()
         .from(user_subscriptions)
-        .where(and(
-          eq(user_subscriptions.user_id, userId),
-          eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-        ))
+        .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
         .limit(1);
+      
+      if (userId) {
+        userQuery = db
+          .select()
+          .from(user_subscriptions)
+          .where(and(
+            eq(user_subscriptions.user_id, userId),
+            eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
+          ))
+          .limit(1);
+      }
+      
+      const subscriptions = await userQuery;
+      
+      if (subscriptions.length === 0) {
+        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+        return null;
+      }
+      
+      const subscription = subscriptions[0];
+      
+      // Map Stripe status to our enum
+      let status: typeof subscriptionStatusEnum.enumValues[number] = 'active';
+      
+      switch (stripeSubscription.status) {
+        case 'active':
+          status = 'active';
+          break;
+        case 'canceled':
+          status = 'canceled';
+          break;
+        case 'past_due':
+          status = 'past_due';
+          break;
+        case 'unpaid':
+          status = 'unpaid';
+          break;
+        case 'trialing':
+          status = 'trialing';
+          break;
+        case 'incomplete':
+          status = 'incomplete';
+          break;
+        case 'incomplete_expired':
+          status = 'incomplete_expired';
+          break;
+        default:
+          console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
+      }
+      
+      // Access values from the Stripe subscription object
+      // The Stripe API response has these properties but the TypeScript types are sometimes lagging behind
+      // We need to use a type assertion to access these timestamp properties
+      const stripeData = stripeSubscription as unknown as {
+        current_period_start: number;
+        current_period_end: number;
+        cancel_at_period_end: boolean;
+        canceled_at: number | null;
+      };
+      
+      const currentPeriodStart = stripeData.current_period_start;
+      const currentPeriodEnd = stripeData.current_period_end;
+      const cancelAtPeriodEnd = stripeData.cancel_at_period_end || false;
+      const canceledAt = stripeData.canceled_at;
+      
+      // Update subscription in our database
+      await db.update(user_subscriptions)
+        .set({
+          status,
+          current_period_start: new Date(currentPeriodStart * 1000),
+          current_period_end: new Date(currentPeriodEnd * 1000),
+          cancel_at_period_end: cancelAtPeriodEnd,
+          canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
+          updated_at: new Date()
+        })
+        .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
+      
+      await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
+      
+      return subscription;
+    } catch (error) {
+      console.error('Error updating subscription from Stripe:', error);
+      throw error;
     }
-    
-    const subscriptions = await userQuery;
-    
-    if (subscriptions.length === 0) {
-      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-      return null;
-    }
-    
-    const subscription = subscriptions[0];
-    
-    // Map Stripe status to our enum
-    let status: typeof subscriptionStatusEnum.enumValues[number] = 'active';
-    
-    switch (stripeSubscription.status) {
-      case 'active':
-        status = 'active';
-        break;
-      case 'canceled':
-        status = 'canceled';
-        break;
-      case 'past_due':
-        status = 'past_due';
-        break;
-      case 'unpaid':
-        status = 'unpaid';
-        break;
-      case 'trialing':
-        status = 'trialing';
-        break;
-      case 'incomplete':
-        status = 'incomplete';
-        break;
-      case 'incomplete_expired':
-        status = 'incomplete_expired';
-        break;
-      default:
-        console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
-    }
-    
-    // Use type assertion to access timestamp properties
-    // This is needed because TypeScript's type definitions for Stripe might not
-    // properly expose all properties that are actually returned by the API
-    const currentPeriodStart = (stripeSubscription as any).current_period_start;
-    const currentPeriodEnd = (stripeSubscription as any).current_period_end;
-    const cancelAtPeriodEnd = (stripeSubscription as any).cancel_at_period_end || false;
-    const canceledAt = (stripeSubscription as any).canceled_at;
-    
-    // Update subscription in our database
-    await db.update(user_subscriptions)
-      .set({
-        status,
-        current_period_start: new Date(currentPeriodStart * 1000),
-        current_period_end: new Date(currentPeriodEnd * 1000),
-        cancel_at_period_end: cancelAtPeriodEnd,
-        canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
-        updated_at: new Date()
-      })
-      .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
-    
-    await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
-    
-    return subscription;
-  } catch (error) {
-    console.error('Error updating subscription from Stripe:', error);
-    throw error;
   }
-}
+
   /**
    * Create or update a subscription after successful payment
    */
