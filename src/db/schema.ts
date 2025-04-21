@@ -9,6 +9,7 @@ import {
   primaryKey,
   pgEnum,
   jsonb,
+  json,
   uniqueIndex
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
@@ -50,6 +51,24 @@ export const masteryLevelEnum = pgEnum('mastery_level', [
   'intermediate',
   'advanced',
   'mastered'
+]);
+
+// New enum for subscription plans
+export const subscriptionPlanEnum = pgEnum('subscription_plan', [
+  'free',
+  'premium',
+  'institutional'
+]);
+
+// New enum for subscription status
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'active',
+  'canceled',
+  'past_due',
+  'unpaid',
+  'trialing',
+  'incomplete',
+  'incomplete_expired'
 ]);
 
 // --- Core Tables ---
@@ -225,6 +244,67 @@ export const topic_mastery = pgTable('topic_mastery', {
   };
 });
 
+// --- Subscription Management Tables ---
+// Add subscription plans table
+export const subscription_plans = pgTable('subscription_plans', {
+  plan_id: serial('plan_id').primaryKey(),
+  plan_name: varchar('plan_name', { length: 50 }).notNull(),
+  plan_code: subscriptionPlanEnum('plan_code').notNull(),
+  description: varchar('description', { length: 255 }),
+  price_inr: integer('price_inr').notNull(),
+  price_id_stripe: varchar('price_id_stripe', { length: 100 }).notNull(),
+  product_id_stripe: varchar('product_id_stripe', { length: 100 }).notNull(),
+  features: json('features'), // JSON array of features for this plan
+  test_limit_daily: integer('test_limit_daily'), // Null for unlimited
+  duration_days: integer('duration_days').notNull(), // e.g., 30, 90, 365
+  is_active: boolean('is_active').default(true),
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+});
+
+// Add user subscriptions table
+export const user_subscriptions = pgTable('user_subscriptions', {
+  subscription_id: serial('subscription_id').primaryKey(),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  plan_id: integer('plan_id').notNull().references(() => subscription_plans.plan_id),
+  stripe_subscription_id: varchar('stripe_subscription_id', { length: 100 }),
+  stripe_customer_id: varchar('stripe_customer_id', { length: 100 }),
+  status: subscriptionStatusEnum('status').notNull().default('active'),
+  current_period_start: timestamp('current_period_start').notNull(),
+  current_period_end: timestamp('current_period_end').notNull(),
+  cancel_at_period_end: boolean('cancel_at_period_end').default(false),
+  canceled_at: timestamp('canceled_at'),
+  trial_end: timestamp('trial_end'),
+  tests_used_today: integer('tests_used_today').default(0),
+  tests_used_total: integer('tests_used_total').default(0),
+  last_test_date: timestamp('last_test_date'),
+  metadata: json('metadata'), // Additional metadata as needed
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+}, (table) => {
+  return {
+    userIdIdx: uniqueIndex('user_subscriptions_user_id_idx').on(table.user_id)
+  };
+});
+
+// Add payment history table
+export const payment_history = pgTable('payment_history', {
+  payment_id: serial('payment_id').primaryKey(),
+  user_id: varchar('user_id', { length: 50 }).notNull(), // Clerk user ID
+  subscription_id: integer('subscription_id').references(() => user_subscriptions.subscription_id),
+  amount_inr: integer('amount_inr').notNull(),
+  stripe_payment_id: varchar('stripe_payment_id', { length: 100 }),
+  stripe_invoice_id: varchar('stripe_invoice_id', { length: 100 }),
+  payment_method: varchar('payment_method', { length: 50 }),
+  payment_status: varchar('payment_status', { length: 50 }).notNull(),
+  payment_date: timestamp('payment_date').notNull(),
+  next_billing_date: timestamp('next_billing_date'),
+  receipt_url: varchar('receipt_url', { length: 255 }),
+  gst_details: json('gst_details'), // For storing GST information
+  created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow()
+});
+
 // --- Define Relations ---
 
 export const subjectsRelations = relations(subjects, ({ many }) => ({
@@ -305,4 +385,18 @@ export const topicMasteryRelations = relations(topic_mastery, ({ one }) => ({
   topic: one(topics, { fields: [topic_mastery.topic_id], references: [topics.topic_id] }),
   session: one(practice_sessions, { fields: [topic_mastery.session_id], references: [practice_sessions.session_id] }),
   question: one(questions, { fields: [topic_mastery.question_id], references: [questions.question_id] })
+}));
+
+// Add relations related to subscription management
+export const subscriptionPlansRelations = relations(subscription_plans, ({ many }) => ({
+  userSubscriptions: many(user_subscriptions)
+}));
+
+export const userSubscriptionsRelations = relations(user_subscriptions, ({ one, many }) => ({
+  plan: one(subscription_plans, { fields: [user_subscriptions.plan_id], references: [subscription_plans.plan_id] }),
+  payments: many(payment_history)
+}));
+
+export const paymentHistoryRelations = relations(payment_history, ({ one }) => ({
+  subscription: one(user_subscriptions, { fields: [payment_history.subscription_id], references: [user_subscriptions.subscription_id] })
 }));
