@@ -88,6 +88,89 @@ export class CacheInvalidator {
       revalidateTag(`subtopic-${subtopicId}-questions`)
     }
   }
+
+  /**
+   * Invalidate caches for a user's subscription
+   */
+  static async invalidateUserSubscription(userId: string) {
+    // Invalidate basic subscription data
+    await cache.delete(`user:${userId}:subscription`);
+    await cache.delete(`user:${userId}:subscription:details`);
+    
+    // Invalidate API cache
+    await cache.delete(`api:user:${userId}:subscription`);
+    
+    // Invalidate test usage counters
+    await cache.delete(`user:${userId}:tests:today`);
+    
+    // Invalidate payment history
+    await cache.delete(`user:${userId}:payments`);
+    
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/subscription`);
+    revalidatePath(`/api/user/subscription`);
+    revalidatePath(`/api/user/${userId}/subscription`);
+    
+    // Revalidate tags
+    revalidateTag(`user-${userId}-subscription`);
+    revalidateTag(`subscription`);
+  }
+  
+  /**
+   * Invalidate all subscription plans cache
+   */
+  static async invalidateSubscriptionPlans() {
+    await cache.delete('subscription:active-plans');
+    await cache.delete('api:subscription-plans:all');
+    
+    // Revalidate paths
+    revalidatePath('/pricing');
+    revalidatePath('/api/subscription-plans');
+    
+    // Revalidate tags
+    revalidateTag('subscription-plans');
+  }
+  
+  /**
+   * Invalidate user's practice session caches
+   */
+  static async invalidateUserSessionCaches(userId: string) {
+    // Delete the main cache key for sessions list
+    await cache.delete(`api:practice-sessions:user:${userId}`);
+    
+    // Delete common pagination variants
+    await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
+    await cache.delete(`api:practice-sessions:user:${userId}:limit:20:offset:0`);
+    
+    // Invalidate recent sessions for dashboard
+    await cache.delete(`user:${userId}:recent-sessions`);
+    
+    // Revalidate paths
+    revalidatePath(`/dashboard`);
+    revalidatePath(`/practice`);
+    revalidatePath(`/sessions`);
+    revalidatePath(`/api/practice-sessions`);
+    
+    // Revalidate tags
+    revalidateTag(`user-${userId}-sessions`);
+    revalidateTag(`user-sessions`);
+  }
+  
+  /**
+   * Invalidate payment-related caches
+   */
+  static async invalidatePaymentCaches(userId: string) {
+    await cache.delete(`user:${userId}:payments`);
+    await cache.delete(`api:user:${userId}:payment-history`);
+    
+    // Revalidate paths
+    revalidatePath(`/dashboard/billing`);
+    revalidatePath(`/api/user/payment-history`);
+    
+    // Revalidate tags
+    revalidateTag(`user-${userId}-payments`);
+    revalidateTag(`payments`);
+  }
   
   /**
    * Invalidate all questions for a topic
@@ -103,5 +186,20 @@ export class CacheInvalidator {
   static async invalidateSubtopicQuestions(subtopicId: number) {
     await cache.delete(`subtopic:${subtopicId}:questions`)
     revalidateTag(`subtopic-${subtopicId}-questions`)
+  }
+  
+  /**
+   * Invalidate test limit caches when limits change
+   */
+  static async invalidateTestLimits() {
+    // This would be called when plan limits are changed globally
+    await cache.delete('subscription:limits');
+    
+    // Revalidate paths
+    revalidatePath('/pricing');
+    revalidatePath('/dashboard/subscription');
+    
+    // Revalidate tags
+    revalidateTag('subscription-limits');
   }
 }

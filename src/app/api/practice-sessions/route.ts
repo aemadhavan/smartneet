@@ -1,6 +1,7 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
+import { sql } from 'drizzle-orm';
 import { 
   practice_sessions, 
   questions, 
@@ -13,6 +14,12 @@ import { and, eq, desc } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { cache } from '@/lib/cache';
+import { 
+  checkSubscriptionLimitServerAction, 
+  incrementTestUsage 
+} from '@/lib/middleware/subscriptionMiddleware';
+// Optional - only if you're using Next.js App Router
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 // Schema for validating session creation request
 const createSessionSchema = z.object({
@@ -30,6 +37,16 @@ export async function POST(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check subscription limits before creating a new session
+    const subscriptionCheck = await checkSubscriptionLimitServerAction(userId);
+    if (!subscriptionCheck.success) {
+      return NextResponse.json({
+        error: subscriptionCheck.message,
+        limitReached: subscriptionCheck.limitReached,
+        upgradeRequired: true
+      }, { status: 403 });
     }
 
     const requestData = await request.json();
@@ -72,8 +89,11 @@ export async function POST(request: NextRequest) {
       })
     ));
 
+    // Increment test usage for subscription tracking
+    await incrementTestUsage(userId);
+
     // Invalidate user's practice sessions list cache
-    await cache.delete(`api:practice-sessions:user:${userId}`);
+    await invalidateUserSessionCaches(userId);
 
     return NextResponse.json({
       sessionId: newSession.session_id,
@@ -106,7 +126,10 @@ export async function GET(request: NextRequest) {
     // Try to get from cache first
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
-      return NextResponse.json(cachedData);
+      return NextResponse.json({
+        ...cachedData,
+        source: 'cache'
+      });
     }
 
     // Get user's practice sessions
@@ -133,13 +156,71 @@ export async function GET(request: NextRequest) {
     .limit(limit)
     .offset(offset);
     
-    // Cache the result, but with a shorter TTL since this is user-specific activity data
-    await cache.set(cacheKey, sessions, 300); // Cache for 5 minutes
+    // Get total count using SQL count function
+    const countResult = await db.select({
+      count: sql<number>`count(*)`
+    })
+    .from(practice_sessions)
+    .where(eq(practice_sessions.user_id, userId));
     
-    return NextResponse.json(sessions);
+    const total = countResult[0]?.count || 0;
+    
+    const result = {
+      sessions,
+      pagination: {
+        total,
+        limit,
+        offset
+      }
+    };
+    
+    // Cache the result, but with a shorter TTL since this is user-specific activity data
+    await cache.set(cacheKey, result, 300); // Cache for 5 minutes
+    
+    return NextResponse.json({
+      ...result,
+      source: 'database'
+    });
   } catch (error) {
     console.error('Error fetching practice sessions:', error);
     return NextResponse.json({ error: 'Failed to fetch practice sessions' }, { status: 500 });
+  }
+}
+
+// Add an endpoint to get a specific practice session with its questions
+export async function PATCH(request: NextRequest) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { sessionId, isCompleted, questionsAttempted, questionsCorrect, score } = body;
+
+    // Update session in database
+    await db.update(practice_sessions)
+      .set({
+        is_completed: isCompleted,
+        questions_attempted: questionsAttempted,
+        questions_correct: questionsCorrect,
+        score: score,
+        end_time: isCompleted ? new Date() : undefined
+      })
+      .where(
+        and(
+          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.user_id, userId)
+        )
+      );
+
+    // Invalidate all session cache keys for this user
+    await invalidateUserSessionCaches(userId);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating practice session:', error);
+    return NextResponse.json({ error: 'Failed to update practice session' }, { status: 500 });
   }
 }
 
@@ -244,52 +325,33 @@ async function getPersonalizedQuestions(
   return selectedQuestions;
 }
 
-// Add an endpoint to get a specific practice session with its questions
-export async function PATCH(request: NextRequest) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const { sessionId, isCompleted, questionsAttempted, questionsCorrect, score } = body;
-
-    // Update session in database
-    await db.update(practice_sessions)
-      .set({
-        is_completed: isCompleted,
-        questions_attempted: questionsAttempted,
-        questions_correct: questionsCorrect,
-        score: score,
-        end_time: isCompleted ? new Date() : undefined
-      })
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionId),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
-
-    // Invalidate all session cache keys for this user
-    await invalidateUserSessionCaches(userId);
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error updating practice session:', error);
-    return NextResponse.json({ error: 'Failed to update practice session' }, { status: 500 });
-  }
-}
-
 // Helper function to invalidate all session cache entries for a user
 async function invalidateUserSessionCaches(userId: string) {
-  // This is a simple approach - in a production environment with many cache keys,
-  // you might want to use Redis pattern deletion if available
+  // Delete the main cache key
   await cache.delete(`api:practice-sessions:user:${userId}`);
   
-  // If you need to be more specific with pagination parameters:
-  // You could also delete specific pagination variants
+  // Delete common pagination variants
   await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
   await cache.delete(`api:practice-sessions:user:${userId}:limit:20:offset:0`);
-  // etc.
+  
+  // Invalidate subscription-related caches
+  await cache.delete(`user:${userId}:subscription`);
+  await cache.delete(`user:${userId}:tests:today`);
+  
+  // If using Next.js App Router, use the imported functions for revalidation
+  try {
+    if (typeof revalidatePath === 'function') {
+      revalidatePath('/dashboard');
+      revalidatePath('/practice');
+      revalidatePath('/sessions');
+    }
+    
+    if (typeof revalidateTag === 'function') {
+      revalidateTag('user-sessions');
+      revalidateTag('subscription');
+    }
+  } catch (error) {
+    // Silently handle if revalidation functions are not available
+    console.log('Revalidation not available:', error);
+  }
 }
