@@ -1,11 +1,12 @@
 // src/app/pricing/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { formatAmountForDisplay, getStripe } from '@/lib/stripe';
-import { Check, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle, Loader2 } from 'lucide-react';
 
 // Types
 type SubscriptionPlan = {
@@ -25,8 +26,23 @@ type UserSubscription = {
   subscription_id: number;
   plan_id: number;
   plan?: SubscriptionPlan;
-  // Add other subscription properties as needed
+  status: string;
+  cancel_at_period_end: boolean;
 };
+
+interface SearchParamsWrapperProps {
+  children: React.ReactNode;
+  setCanceled: (canceled: boolean) => void;
+}
+
+function SearchParamsWrapper({ children, setCanceled }: SearchParamsWrapperProps) {
+  const searchParams = useSearchParams();
+  const canceled = searchParams?.get('canceled') === 'true';
+  useEffect(() => {
+    setCanceled(canceled);
+  }, [canceled, setCanceled]);
+  return children;
+}
 
 export default function PricingPage() {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -35,38 +51,10 @@ export default function PricingPage() {
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutPlanId, setCheckoutPlanId] = useState<number | null>(null);
-  const [canceled, setCanceled] = useState<string | null>(null);
+  const [canceled, setCanceled] = useState(false);
   
   const router = useRouter();
-  const { isSignedIn } = useAuth();
-
-  // Debug environment variables
-  useEffect(() => {
-    console.log('DEBUG - Stripe key available:', !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
-    if (process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-      console.log('DEBUG - Stripe key prefix:', process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.substring(0, 10));
-    } else {
-      console.log('DEBUG - Stripe key is undefined or empty');
-    }
-  }, []);
-
-  // Refresh Clerk session
-  useEffect(() => {
-    if (typeof window !== 'undefined' && typeof window.Clerk !== 'undefined' && window.Clerk.session) {
-      try {
-        // @ts-ignore
-        window.Clerk.session.refresh();
-      } catch (e) {
-        console.error("Failed to refresh Clerk session", e);
-      }
-    }
-  }, []);
-
-  // Use regular browser APIs to get query params instead of useSearchParams
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    setCanceled(searchParams.get('canceled'));
-  }, []);
+  const { isSignedIn, isLoaded } = useAuth();
 
   // Fetch plans and user subscription
   useEffect(() => {
@@ -75,10 +63,12 @@ export default function PricingPage() {
       try {
         // Fetch available plans
         const plansResponse = await fetch('/api/subscription-plans');
+        
         if (!plansResponse.ok) {
           throw new Error('Failed to fetch subscription plans');
         }
         const plansData = await plansResponse.json();
+        console.log('Plans data:', plansData);
         setPlans(plansData.plans);
         
         // Fetch user subscription if logged in
@@ -98,12 +88,15 @@ export default function PricingPage() {
       }
     };
     
-    fetchData();
-  }, [isSignedIn]);
+    // Only fetch data if Clerk auth is loaded
+    if (isLoaded) {
+      fetchData();
+    }
+  }, [isSignedIn, isLoaded]);
 
   const handleSelectPlan = async (plan: SubscriptionPlan) => {
     if (!isSignedIn) {
-      // Redirect to sign in page
+      // Redirect to sign in page with return URL
       router.push(`/sign-in?redirect_url=${encodeURIComponent('/pricing')}`);
       return;
     }
@@ -113,10 +106,6 @@ export default function PricingPage() {
       router.push('/dashboard/subscription');
       return;
     }
-    
-    // Debug Stripe availability
-    console.log('DEBUG - Attempting checkout. Stripe key available:', 
-      !!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
     
     // Start checkout process
     setIsCheckingOut(true);
@@ -140,20 +129,14 @@ export default function PricingPage() {
       }
       
       const { sessionId } = await response.json();
-      console.log('DEBUG - Got session ID:', sessionId ? 'Yes (valid ID)' : 'No');
       
       // Load Stripe.js and redirect to checkout
-      console.log('DEBUG - Loading Stripe.js...');
       const stripe = await getStripe();
-      console.log('DEBUG - Stripe loaded:', !!stripe);
-      
       if (!stripe) {
         throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
       }
       
-      console.log('DEBUG - Redirecting to checkout...');
       const result = await stripe.redirectToCheckout({ sessionId });
-      console.log('DEBUG - Redirect result:', result);
       
       if (result.error) {
         throw new Error(result.error.message || 'Error redirecting to checkout');
@@ -170,7 +153,10 @@ export default function PricingPage() {
   if (loading) {
     return (
       <div className="container mx-auto py-12 px-4">
-        <h1 className="text-3xl font-bold text-center mb-12">Loading Plans...</h1>
+        <h1 className="text-3xl font-bold text-center mb-6">Choose Your Plan</h1>
+        <div className="flex justify-center items-center mt-12">
+          <Loader2 className="h-12 w-12 text-blue-500 animate-spin" />
+        </div>
       </div>
     );
   }
@@ -195,38 +181,39 @@ export default function PricingPage() {
     );
   }
 
-  // Display a message if Stripe checkout was canceled
-  const showCanceledMessage = canceled === 'true';
-
   return (
     <div className="container mx-auto py-12 px-4">
       <h1 className="text-3xl font-bold text-center mb-4">Choose Your Plan</h1>
       <p className="text-lg text-center text-gray-600 mb-12">
         Get unlimited access to all practice tests and study materials
       </p>
-
-      {showCanceledMessage && (
-        <div className="max-w-lg mx-auto mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center">
-          <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0" />
-          <p className="text-yellow-700">
-            Your checkout session was canceled. You have not been charged.
-          </p>
-        </div>
-      )}
+      <Suspense>
+        <SearchParamsWrapper setCanceled={setCanceled}>
+          {canceled && (
+            <div className="max-w-lg mx-auto mb-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center">
+              <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0" />
+              <p className="text-yellow-700">
+                Your checkout session was canceled. You have not been charged.
+              </p>
+            </div>
+          )}
+        </SearchParamsWrapper>
+      </Suspense>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {plans.map((plan) => {
           const isUserOnThisPlan = userSubscription?.plan?.plan_id === plan.plan_id;
           const isFreePlan = plan.plan_code === 'free';
           const isCheckingOutThisPlan = isCheckingOut && checkoutPlanId === plan.plan_id;
+          const isCanceledPlan = isUserOnThisPlan && userSubscription?.cancel_at_period_end;
           
           return (
             <div 
               key={plan.plan_id}
-              className={`border rounded-lg overflow-hidden ${
+              className={`border rounded-lg overflow-hidden transition ${
                 isUserOnThisPlan 
                   ? 'border-green-500 ring-2 ring-green-500 shadow-lg' 
-                  : 'border-gray-200 hover:shadow-lg transition-shadow'
+                  : 'border-gray-200 hover:shadow-lg'
               }`}
             >
               <div className="bg-gray-50 p-6 border-b border-gray-200">
@@ -239,7 +226,11 @@ export default function PricingPage() {
                   </span>
                   {!isFreePlan && (
                     <span className="text-gray-600 ml-1">
-                      /{plan.duration_days === 30 ? 'month' : plan.duration_days === 90 ? 'quarter' : 'year'}
+                      /{plan.duration_days === 30 
+                        ? 'month' 
+                        : plan.duration_days === 90 
+                          ? 'quarter' 
+                          : 'year'}
                     </span>
                   )}
                 </div>
@@ -267,24 +258,44 @@ export default function PricingPage() {
                 <div className="mt-8">
                   <button
                     onClick={() => handleSelectPlan(plan)}
-                    disabled={isCheckingOut || isUserOnThisPlan}
-                    className={`w-full py-3 px-4 rounded font-medium ${
-                      isUserOnThisPlan
-                        ? 'bg-green-100 text-green-800 cursor-not-allowed'
-                        : isFreePlan
-                        ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    disabled={isCheckingOut}
+                    className={`w-full py-3 px-4 rounded font-medium transition ${
+                      isCheckingOut
+                        ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                        : isUserOnThisPlan
+                          ? isCanceledPlan
+                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                            : 'bg-green-100 text-green-800'
+                          : isFreePlan
+                            ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {isCheckingOutThisPlan
-                      ? 'Redirecting to checkout...'
-                      : isUserOnThisPlan
-                      ? 'Current Plan'
-                      : isFreePlan
-                      ? 'Start Free'
-                      : 'Select Plan'}
+                    {isCheckingOutThisPlan ? (
+                      <span className="flex items-center justify-center">
+                        <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                        Processing...
+                      </span>
+                    ) : isUserOnThisPlan ? (
+                      isCanceledPlan ? 'Renew Subscription' : 'Current Plan'
+                    ) : isFreePlan ? (
+                      'Start Free'
+                    ) : (
+                      'Select Plan'
+                    )}
                   </button>
                 </div>
+                
+                {isUserOnThisPlan && !isFreePlan && (
+                  <div className="mt-2 text-center">
+                    <button
+                      onClick={() => router.push('/dashboard/subscription')}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Manage Subscription
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );

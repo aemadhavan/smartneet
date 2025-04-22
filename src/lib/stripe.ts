@@ -101,6 +101,10 @@ export async function createCheckoutSession({
       payment_method_types: ['card'],
       billing_address_collection: 'required',
       customer: customerId,
+      customer_update: {
+        name: 'auto',    // Add this line to allow name updates
+        address: 'auto'  // Also allow address updates
+      },
       line_items: [
         {
           price: priceId,

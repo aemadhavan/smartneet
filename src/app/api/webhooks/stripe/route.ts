@@ -55,6 +55,11 @@ async function handleSubscriptionChange(subscription: StripeSubscription) {
       console.error('No price ID found in subscription');
       return;
     }
+
+    if (!subscription || !subscription.items || !subscription.items.data) {
+      console.error('Invalid subscription object received from Stripe');
+      return;
+    }
     
     // Find the plan by Stripe price ID
     const plans = await db
@@ -101,6 +106,11 @@ async function handleSubscriptionDeleted(subscription: StripeSubscription) {
 
 async function handlePaymentSucceeded(invoice: StripeInvoice) {
   try {
+    if (!stripe) {
+      console.error('Stripe is not configured');
+      throw new Error('Stripe is not configured');
+    }
+
     const stripeSubscriptionId = invoice.subscription;
     if (!stripeSubscriptionId) return;
     
@@ -108,6 +118,7 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
     
     // Get user ID from subscription if not in invoice metadata
     let userIdFromSubscription: string | undefined;
+    
     
     if (!userId) {
       const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
@@ -127,7 +138,10 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
       console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
       return;
     }
-    
+    if (!invoice || typeof invoice.amount_paid !== 'number') {
+      console.error('Invalid invoice object received from Stripe');
+      return;
+    }
     // Record payment
     await subscriptionService.recordPayment({
       userId: userId || userIdFromSubscription || subscription.user_id,
@@ -142,10 +156,13 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
       receiptUrl: invoice.hosted_invoice_url,
       gstDetails: {
         gstNumber: invoice.customer_tax_ids?.[0]?.value ?? null,
-        taxAmount: invoice.tax || 0,
-        taxPercentage: invoice.tax_percent || 0,
-        hasGST: !!invoice.customer_tax_ids?.length
+        taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
+        taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
+        hasGST: !!invoice.customer_tax_ids?.length,
+        hsnSacCode: "998431", // HSN code for educational services
+        placeOfSupply: "India" // Default place of supply
       }
+      
     });
   } catch (error) {
     console.error('Error handling payment success:', error);
@@ -175,6 +192,10 @@ export async function POST(req: NextRequest) {
   let event: Stripe.Event;
 
   try {
+    if (!stripe) {
+      console.error('Stripe is not configured');
+      return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
+    }
     event = stripe.webhooks.constructEvent(
       body,
       signature,

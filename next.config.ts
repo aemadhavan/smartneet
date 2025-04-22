@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   experimental: {
     // Any other experimental options can go here
   },
+  metadataBase: new URL('http://localhost:3000'),
   async headers() {
     return [
       {

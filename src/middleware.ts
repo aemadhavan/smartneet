@@ -15,7 +15,8 @@ const isPublic = createRouteMatcher([
   "/privacy(.*)",
   "/terms(.*)",
   "/unsubscribe(.*)",
-  "/api/waitlist(.*)"
+  "/api/waitlist(.*)",
+  "/api/webhooks/stripe(.*)"
 ]);
 
 /**
