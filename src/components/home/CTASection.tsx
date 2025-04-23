@@ -135,7 +135,7 @@ const fadeIn = {
                 </div>
                 <div>
                   <div className="font-medium"></div>
-                  <div className="text-sm text-indigo-200">We're just getting started — your review can help others choose smarter.​</div>
+                  <div className="text-sm text-indigo-200">We&apos;re just getting started — your review can help others choose smarter.​</div>
                 </div>
               </div>
             </motion.div>
