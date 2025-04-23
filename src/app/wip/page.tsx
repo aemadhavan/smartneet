@@ -9,6 +9,7 @@ import { FeaturesSection } from '@/components/home/FeaturesSection';
 import { QuestionPreviewSection } from '@/components/home/QuestionPreviewSection';
 import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection';
 import { CTASection } from '@/components/home/CTASection';
+import LaunchCounter from '@/components/home/LaunchCounter'; // Import the new component
 
 /**
  * Main content of the homepage
@@ -47,6 +48,9 @@ const HomePageContent = () => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="author" content="SmarterNEET Team" />
       </Head>
+
+      {/* Launch Counter */}
+      <LaunchCounter />
 
       {/* Existing Homepage Sections */}
       <HeroSection />
