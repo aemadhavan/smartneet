@@ -48,12 +48,12 @@ const Footer = () => {
             <ul className="space-y-2">
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Home</a></li>
               <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Biology</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Physics</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Chemistry</a></li>
-              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Previous Papers</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Physics (Coming soon)</a></li>
+              <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Chemistry (Coming soon)</a></li>
+              {/* <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Previous Papers</a></li> */}
             </ul>
           </div>
-          <div>
+          {/* <div>
               <h3 className="text-lg font-semibold text-white mb-4">Resources</h3>
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Study Material</a></li>
@@ -72,7 +72,7 @@ const Footer = () => {
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Careers</a></li>
                 <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact Us</a></li>
               </ul>
-            </div>
+            </div> */}
         </div>
         
         <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">

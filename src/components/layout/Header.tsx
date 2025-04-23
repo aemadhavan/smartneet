@@ -25,14 +25,14 @@ const Header = () => {
                 Biology
               </Link>
               <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Physics
+                Physics (Comming soon)
               </Link>
               <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Chemistry
+                Chemistry (Comming soon)
               </Link>
-              <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
+              {/* <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
                 Previous Papers
-              </Link>
+              </Link> */}
             </div>
           </div>
           <div className="hidden md:flex items-center space-x-4">
