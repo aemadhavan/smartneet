@@ -34,8 +34,8 @@ const fadeIn = {
                       viewport={{ once: true, margin: "-100px" }}
                       variants={fadeIn}
                     >
-                      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why Top NEET Aspirants Choose SmarterNEET</h2>
-                      <p className="text-xl text-gray-600 max-w-2xl mx-auto">Our innovative approach combines past NEET questions with advanced technology to supercharge your preparation.</p>
+                      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Why NEET Students Are Switching to SmarterNEET</h2>
+                      <p className="text-xl text-gray-600 max-w-2xl mx-auto">An intelligent, focused approach to NEET prep — powered by expert-crafted questions, real-time insights, and personalized learning.</p>
                     </motion.div>
                     
                     <motion.div 
@@ -54,8 +54,8 @@ const fadeIn = {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                           </svg>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-3">10 Years of Questions</h3>
-                        <p className="text-gray-600 mb-4">Comprehensive database of NEET questions from the past decade, organized by topic and difficulty level for targeted practice.</p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-3">500 NEET-Style Questions</h3>
+                        <p className="text-gray-600 mb-4">Kickstart your prep with a carefully curated bank of 500 high-quality questions, crafted by subject experts and designed to match NEET standards.​</p>
                         <Link href="#" className="text-indigo-600 font-medium hover:text-indigo-800 inline-flex items-center">
                           Explore Question Bank
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -74,7 +74,7 @@ const fadeIn = {
                           </svg>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-3">AI-Powered Analytics</h3>
-                        <p className="text-gray-600 mb-4">Track your progress with detailed analytics that identify your strengths and pinpoint specific areas that need improvement.</p>
+                        <p className="text-gray-600 mb-4">Track your performance with smart analytics. Get insights on accuracy, time taken, and weak areas — and receive improvement tips with every test.​</p>
                         <Link href="#" className="text-emerald-600 font-medium hover:text-emerald-800 inline-flex items-center">
                           See How It Works
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,7 +93,7 @@ const fadeIn = {
                           </svg>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-3">Personalized Learning</h3>
-                        <p className="text-gray-600 mb-4">Our smart algorithm adapts to your performance and creates customized practice sessions tailored to your learning needs.</p>
+                        <p className="text-gray-600 mb-4">Our system recommends practice topics based on your latest performance and learning trends — helping you focus where it matters most.​</p>
                         <Link href="#" className="text-purple-600 font-medium hover:text-purple-800 inline-flex items-center">
                           Try Personalized Quiz
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">

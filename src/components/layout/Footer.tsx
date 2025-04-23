@@ -14,7 +14,7 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2">
             <h3 className="text-2xl font-bold text-white mb-4">Smarter<span className="text-emerald-400">NEET</span></h3>
-            <p className="text-gray-400 mb-4 max-w-md">Your ultimate companion for NEET exam preparation. Access 10 years of previous questions, AI-powered analytics, and personalized learning paths.</p>
+            <p className="text-gray-400 mb-4 max-w-md">SmarterNEET is a smart NEET preparation platform built for aspiring medical students. Access expert-crafted NEET-style questions, daily practice sets, and AI-powered performance analytics. With adaptive learning tools and plans to expand into past NEET papers, SmarterNEET helps you focus, track, and improve faster. Start your free trial today and take your NEET prep to the next level.​</p>
             <div className="flex space-x-4">
                 <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <span className="sr-only">Facebook</span>

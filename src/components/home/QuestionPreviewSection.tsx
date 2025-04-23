@@ -39,8 +39,10 @@ const fadeIn = {
             viewport={{ once: true, margin: "-100px" }}
             variants={fadeIn}
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Practice Real NEET Questions</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Get familiar with the actual exam pattern by practicing with previous years&apos; questions.</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Practice NEET-Style Questions That Mirror the Real Exam​</h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">Get exam-ready with expert-crafted practice questions that follow the NEET format. Build familiarity with question types, difficulty levels, and time management.​
+
+More previous year questions are coming soon. Stay tuned!​</p>
           </motion.div>
           
           {/* Subject Tabs */}

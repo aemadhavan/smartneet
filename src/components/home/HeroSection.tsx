@@ -68,14 +68,13 @@ const fadeIn = {
                     className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6"
                     variants={fadeIn}
                 >
-                    Ace Your <span className="text-emerald-400">NEET</span> With Smarter Preparation
-                </motion.h1>
+                    Crack NEET with <span className="text-emerald-400">SmarterNEET</span> - Your Ultimate Practice Partnet </motion.h1>
                 
                 <motion.p 
                     className="text-lg md:text-xl text-indigo-100 mb-8 max-w-xl"
                     variants={fadeIn}
                 >
-                    Access 10 years of previous NEET questions, AI-powered practice tests, and personalized analytics to maximize your exam performance.
+                    Access high-quality NEET questions, AI-driven performance insights, and a personalized learning journey—all tailored to help you succeed.
                 </motion.p>
                 
                 <motion.div 

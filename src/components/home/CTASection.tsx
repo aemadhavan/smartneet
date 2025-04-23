@@ -84,8 +84,8 @@ const fadeIn = {
             viewport={{ once: true, margin: "-100px" }}
             variants={fadeIn}
           >
-            <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to Transform Your NEET Preparation?</h2>
-            <p className="text-xl text-indigo-100 mb-10">Join thousands of successful students who achieved their dream medical college seats with SmarterNEET.</p>
+            <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to Begin Your NEET Success Story?​</h2>
+            <p className="text-xl text-indigo-100 mb-10">Join hundreds of early learners using SmarterNEET to practice smarter, track progress, and prepare with confidence.​</p>
             
             <motion.div 
               className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-6"
@@ -120,8 +120,8 @@ const fadeIn = {
                   ))}
                 </div>
                 <div className="ml-4">
-                  <div className="font-medium">60,000+ Students</div>
-                  <div className="text-sm text-indigo-200">Trust SmarterNEET</div>
+                  <div className="font-medium"></div>
+                  <div className="text-sm text-indigo-200">Early access users are already loving it!​</div>
                 </div>
               </div>
               
@@ -134,8 +134,8 @@ const fadeIn = {
                   </svg>
                 </div>
                 <div>
-                  <div className="font-medium">4.8/5 Rating</div>
-                  <div className="text-sm text-indigo-200">Based on 2,500+ reviews</div>
+                  <div className="font-medium"></div>
+                  <div className="text-sm text-indigo-200">We're just getting started — your review can help others choose smarter.​</div>
                 </div>
               </div>
             </motion.div>

@@ -53,7 +53,7 @@ const fadeIn = {
                         variants={fadeIn}
                       >
                         <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Experience SmarterNEET in Action</h2>
-                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">Try our interactive demo to see how our platform makes NEET preparation effective and engaging.</p>
+                        <p className="text-xl text-gray-600 max-w-2xl mx-auto">Try our interactive demo and explore how SmarterNEET helps you practice smarter, track progress, and prepare with confidence.​</p>
                       </motion.div>
                       
                       <motion.div 
@@ -77,7 +77,7 @@ const fadeIn = {
                               </div>
                               <div>
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Adaptive Question Bank</h3>
-                                <p className="text-gray-600">Our intelligent system adjusts question difficulty based on your performance, ensuring optimal learning efficiency.</p>
+                                <p className="text-gray-600">Practice with 200 NEET-style questions tailored to your strengths and improvement areas. Question sets update daily to help reinforce learning.​</p>
                               </div>
                             </li>
                             
@@ -89,7 +89,7 @@ const fadeIn = {
                               </div>
                               <div>
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Performance Analytics Dashboard</h3>
-                                <p className="text-gray-600">Visual breakdown of your progress across topics, identifying strengths and suggesting improvement areas.</p>
+                                <p className="text-gray-600">Get real-time feedback on accuracy, completion, and consistency across subjects. Spot your strong and weak areas at a glance.​</p>
                               </div>
                             </li>
                             
@@ -101,7 +101,7 @@ const fadeIn = {
                               </div>
                               <div>
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Smart Concept Mapping</h3>
-                                <p className="text-gray-600">Interactive concept maps connect related topics, helping you understand relationships between different NEET concepts.</p>
+                                <p className="text-gray-600">Visualize NEET topics as interactive concept maps—coming soon to help you make better connections and revise faster.​</p>
                               </div>
                             </li>
                             
@@ -113,7 +113,7 @@ const fadeIn = {
                               </div>
                               <div>
                                 <h3 className="text-lg font-semibold text-gray-900 mb-1">Timed Mock Tests</h3>
-                                <p className="text-gray-600">Full-length NEET mock exams with realistic timing and comprehensive post-test analysis to improve your test-taking strategy.</p>
+                                <p className="text-gray-600">Full-length mock tests with time tracking and post-test feedback are on the way. Practice under pressure and analyze your performance afterward.​</p>
                               </div>
                             </li>
                           </ul>
