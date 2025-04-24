@@ -4,12 +4,13 @@
 import React, { Suspense } from 'react';
 import Head from 'next/head';
 
-import { HeroSection } from '@/components/home/HeroSection';
+//import { HeroSection } from '@/components/home/HeroSection';
 import { FeaturesSection } from '@/components/home/FeaturesSection';
 import { QuestionPreviewSection } from '@/components/home/QuestionPreviewSection';
 import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection';
 import { CTASection } from '@/components/home/CTASection';
 import LaunchCounter from '@/components/home/LaunchCounter'; // Import the new component
+import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
 
 /**
  * Main content of the homepage
@@ -53,7 +54,7 @@ const HomePageContent = () => {
       <LaunchCounter />
 
       {/* Existing Homepage Sections */}
-      <HeroSection />
+      <RedesignedHeroSection/>
       {/* Features Section */}
       <FeaturesSection />
 
