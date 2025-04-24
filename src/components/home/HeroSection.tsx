@@ -68,7 +68,7 @@ const fadeIn = {
                     className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6"
                     variants={fadeIn}
                 >
-                    Crack NEET with <span className="text-emerald-400">SmarterNEET</span> - Your Ultimate Practice Partnet </motion.h1>
+                    Crack NEET with <span className="text-emerald-400">SmarterNEET</span> - Your Ultimate Practice Partner </motion.h1>
                 
                 <motion.p 
                     className="text-lg md:text-xl text-indigo-100 mb-8 max-w-xl"
