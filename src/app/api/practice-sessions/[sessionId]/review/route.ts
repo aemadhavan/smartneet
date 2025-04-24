@@ -10,6 +10,12 @@ import {
 } from '@/db';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { getCorrectAnswer } from '@/app/practice-sessions/[sessionId]/review/components/helpers';
+import { 
+  QuestionDetails, 
+  QuestionType, 
+  FlexibleAnswerType 
+} from '@/app/practice-sessions/[sessionId]/review/components/interfaces';
 
 export async function GET(
   request: NextRequest,
@@ -17,7 +23,10 @@ export async function GET(
 ) {
   try {
     const { userId } = await auth();
-    const sessionId = parseInt((await params).sessionId);
+    
+    // Await the params and then parse the sessionId
+    const { sessionId: sessionIdParam } = await params;
+    const sessionId = parseInt(sessionIdParam);
 
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -67,19 +76,6 @@ export async function GET(
       }
     });
 
-    interface QuestionWithDetails {
-      question_id: number;
-      question_text: string;
-      question_type: string;
-      details: QuestionDetails | null;
-      explanation: string | null;
-      marks: number | null;
-      topic_id: number;
-      subtopic_id: number | null;
-      is_image_based: boolean | null;
-      image_url: string | null;
-    }
-
     if (!attempts.length) {
       return NextResponse.json({
         attempts: [],
@@ -118,47 +114,27 @@ export async function GET(
 
     // Prepare the list of attempts with all needed data
     const detailedAttempts = await Promise.all(attempts.map(async (attempt) => {
-      // Define QuestionWithDetails type
-      interface QuestionWithDetails {
-        question_id: number;
-        question_text: string;
-        question_type: string;
-        details: QuestionDetails | null;
-        explanation: string | null;
-        marks: number | null;
-        topic_id: number;
-        subtopic_id: number | null;
-        is_image_based: boolean | null;
-        image_url: string | null;
-      }
-
-      // Cast attempt.question to QuestionWithDetails
-      const question = attempt.question as QuestionWithDetails;
-
       // Get topic information
       const topic = await db.query.topics.findFirst({
-        where: eq(topics.topic_id, question.topic_id),
+        where: eq(topics.topic_id, attempt.question.topic_id),
         columns: {
           topic_id: true,
           topic_name: true
         }
       });
 
-      // Cast question.details to QuestionDetails | null
       // Get subtopic information if available
       let subtopicInfo = null;
-      if (question.subtopic_id) {
+      if (attempt.question.subtopic_id) {
         const subtopic = await db.query.subtopics.findFirst({
-          where: eq(subtopics.subtopic_id, question.subtopic_id),
+          where: eq(subtopics.subtopic_id, attempt.question.subtopic_id),
           columns: {
             subtopic_id: true,
             subtopic_name: true
           }
         });
 
-        if (!subtopic) {
-          subtopicInfo = null;
-        } else {
+        if (subtopic) {
           subtopicInfo = {
             subtopicId: subtopic.subtopic_id,
             subtopicName: subtopic.subtopic_name
@@ -175,12 +151,15 @@ export async function GET(
         questionNumber: orderInfo.order,
         timeSpentSeconds: orderInfo.timeSpent,
         questionText: attempt.question.question_text,
-        questionType: attempt.question.question_type,
+        questionType: attempt.question.question_type as QuestionType,
         details: attempt.question.details as QuestionDetails | null,
         explanation: attempt.question.explanation,
-        userAnswer: attempt.user_answer as AnswerType,
+        userAnswer: attempt.user_answer as FlexibleAnswerType,
         isCorrect: attempt.is_correct,
-        correctAnswer: getCorrectAnswer(attempt.question.details as QuestionDetails, attempt.question.question_type),
+        correctAnswer: getCorrectAnswer(
+          attempt.question.details as QuestionDetails, 
+          attempt.question.question_type as QuestionType
+        ),
         marksAwarded: attempt.marks_awarded || 0,
         maxMarks: attempt.question.marks || 0,
         topic: {
@@ -207,7 +186,7 @@ export async function GET(
 
     // Create a safe copy of the data without any non-serializable values
     const safeData = {
-      attempts: detailedAttempts.map((attempt: DetailedAttempt) => ({
+      attempts: detailedAttempts.map(attempt => ({
         ...attempt,
         // Ensure all properties are serializable
         details: attempt.details ? JSON.parse(JSON.stringify(attempt.details)) : null,
@@ -224,114 +203,5 @@ export async function GET(
       { error: error instanceof Error ? error.message : 'Failed to retrieve session review data' },
       { status: 500 }
     );
-  }
-}
-
-interface MultipleChoiceDetails {
-  options: { key: string; isCorrect: boolean }[];
-}
-
-interface MatchingDetails {
-  items: { key: string; matchesTo: string }[];
-}
-
-interface MultipleCorrectStatementsDetails {
-  statements: { key: string; isCorrect: boolean }[];
-}
-
-interface AssertionReasonDetails {
-  correctOption: string;
-}
-
-interface SequenceOrderingDetails {
-  correctSequence: string[];
-}
-
-type QuestionDetails =
-  | MultipleChoiceDetails
-  | MatchingDetails
-  | MultipleCorrectStatementsDetails
-  | AssertionReasonDetails
-  | SequenceOrderingDetails;
-
-type CorrectAnswer =
-  | { selectedOption: string | null }
-  | { matches: Record<string, string> }
-  | { selectedStatements: string[] }
-  | { selection: string }
-  | { sequence: string[] }
-  | null;
-
-type AnswerType =
-  | string
-  | number
-  | string[]
-  | number[]
-  | Record<string, string>
-  | null;
-
-interface DetailedAttempt {
-  questionId: number;
-  questionNumber: number;
-  timeSpentSeconds: number;
-  questionText: string;
-  questionType: string;
-  details: QuestionDetails | null;
-  explanation: string | null;
-  userAnswer: AnswerType;
-  isCorrect: boolean;
-  correctAnswer: CorrectAnswer;
-  marksAwarded: number | null;
-  maxMarks: number | null;
-  topic: {
-    topicId: number;
-    topicName: string;
-  };
-  subtopic: {
-    subtopicId: number;
-    subtopicName: string;
-  } | null;
-  isImageBased: boolean | null;
-  imageUrl: string | null;
-}
-
-// Helper function to extract the correct answer based on question type
-function getCorrectAnswer(details: QuestionDetails, questionType: string): CorrectAnswer {
-  try {
-    switch (questionType) {
-      case 'MultipleChoice':
-        // Find the correct option
-        const correctOption = (details as MultipleChoiceDetails).options.find((opt: { key: string; isCorrect: boolean }) => opt.isCorrect);
-        return { selectedOption: correctOption ? correctOption.key : null };
-        
-      case 'Matching':
-        // Extract the correct matches
-        const matches: Record<string, string> = {};
-        (details as MatchingDetails).items.forEach((item: { key: string; matchesTo: string }) => {
-          matches[item.key] = item.matchesTo;
-        });
-        return { matches };
-        
-      case 'MultipleCorrectStatements':
-        // Find all correct statements
-        const correctStatements = (details as MultipleCorrectStatementsDetails).statements
-          .filter((statement: { key: string; isCorrect: boolean }) => statement.isCorrect)
-          .map((statement: { key: string; isCorrect: boolean }) => statement.key);
-        return { selectedStatements: correctStatements };
-        
-      case 'AssertionReason':
-        // Return the correct selection
-        return { selection: (details as AssertionReasonDetails).correctOption };
-        
-      case 'SequenceOrdering':
-        // Return the correct sequence
-        return { sequence: (details as SequenceOrderingDetails).correctSequence };
-        
-      default:
-        return null;
-    }
-  } catch (e) {
-    console.error(`Error extracting correct answer for ${questionType}:`, e);
-    return null;
   }
 }

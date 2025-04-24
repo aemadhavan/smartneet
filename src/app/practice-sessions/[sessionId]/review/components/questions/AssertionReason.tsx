@@ -1,58 +1,78 @@
-import { QuestionAttempt } from '../interfaces';
+import { QuestionAttempt, AssertionReasonAnswer } from '../interfaces';
 import { CheckCircle, XCircle } from 'lucide-react';
+import Image from 'next/image';
 
 interface AssertionReasonProps {
   attempt: QuestionAttempt;
 }
 
 export default function AssertionReason({ attempt }: AssertionReasonProps) {
-  const userAnswer = attempt.userAnswer?.selection || '';
-  const correctAnswer = attempt.correctAnswer?.selection || '';
-  
+  // Type-safe extraction of selection
+  const userAnswer = typeof attempt.userAnswer === 'object' && 'selection' in (attempt.userAnswer as AssertionReasonAnswer)
+    ? (attempt.userAnswer as AssertionReasonAnswer).selection 
+    : '';
+  const correctAnswer = typeof attempt.correctAnswer === 'object' && 'selection' in (attempt.correctAnswer as AssertionReasonAnswer)
+    ? (attempt.correctAnswer as AssertionReasonAnswer).selection 
+    : '';
+
   const options = [
-    { key: 'A', text: 'Statement I is True, Statement II is True, Statement II is a correct explanation of Statement I' },
-    { key: 'B', text: 'Statement I is True, Statement II is True, Statement II is NOT a correct explanation of Statement I' },
+    {
+      key: 'A',
+      text: 'Statement I is True, Statement II is True, Statement II is a correct explanation of Statement I',
+    },
+    {
+      key: 'B',
+      text: 'Statement I is True, Statement II is True, Statement II is NOT a correct explanation of Statement I',
+    },
     { key: 'C', text: 'Statement I is True, Statement II is False' },
     { key: 'D', text: 'Statement I is False, Statement II is True' },
-    { key: 'E', text: 'Statement I is False, Statement II is False' }
+    { key: 'E', text: 'Statement I is False, Statement II is False' },
   ];
-  
+
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText}
-      </div>
-      
+      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{attempt.questionText}</div>
+
       {attempt.isImageBased && attempt.imageUrl && (
         <div className="my-4">
-          <img 
-            src={attempt.imageUrl} 
-            alt="Question diagram" 
+          <Image
+            src={attempt.imageUrl}
+            alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
+            width={500}
+            height={300}
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+            }}
           />
         </div>
       )}
-      
+
       <div className="mt-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
         <div className="mb-2">
           <span className="font-semibold text-gray-700 dark:text-gray-300">Statement I:</span>
-          <p className="text-gray-600 dark:text-gray-400 ml-4">{attempt.details.statement1}</p>
+          <p className="text-gray-600 dark:text-gray-400 ml-4">
+            {attempt.details?.statement1 ?? 'No statement available'}
+          </p>
         </div>
         <div>
           <span className="font-semibold text-gray-700 dark:text-gray-300">Statement II:</span>
-          <p className="text-gray-600 dark:text-gray-400 ml-4">{attempt.details.statement2}</p>
+          <p className="text-gray-600 dark:text-gray-400 ml-4">
+            {attempt.details?.statement2 ?? 'No statement available'}
+          </p>
         </div>
       </div>
-      
+
       <div className="space-y-2 mt-4">
         {options.map((option, idx) => {
           const isUserSelection = userAnswer === option.key;
           const isCorrectOption = correctAnswer === option.key;
           const isCorrectSelection = isUserSelection && isCorrectOption;
           const isIncorrectSelection = isUserSelection && !isCorrectOption;
-          
+
           return (
-            <div 
+            <div
               key={idx}
               className={`p-3 rounded-md border-2 ${
                 isCorrectSelection
@@ -66,28 +86,32 @@ export default function AssertionReason({ attempt }: AssertionReasonProps) {
             >
               <div className="flex items-start">
                 <div className="flex-shrink-0 mr-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    isCorrectSelection
-                      ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300'
-                      : isIncorrectSelection
-                      ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-300'
-                      : isCorrectOption
-                      ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}>
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      isCorrectSelection
+                        ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300'
+                        : isIncorrectSelection
+                        ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-300'
+                        : isCorrectOption
+                        ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
                     {option.key}
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className={`font-medium ${
-                    isCorrectSelection
-                      ? 'text-green-800 dark:text-green-300'
-                      : isIncorrectSelection
-                      ? 'text-red-800 dark:text-red-300'
-                      : isCorrectOption
-                      ? 'text-green-800 dark:text-green-300'
-                      : 'text-gray-700 dark:text-gray-300'
-                  }`}>
+                  <p
+                    className={`font-medium ${
+                      isCorrectSelection
+                        ? 'text-green-800 dark:text-green-300'
+                        : isIncorrectSelection
+                        ? 'text-red-800 dark:text-red-300'
+                        : isCorrectOption
+                        ? 'text-green-800 dark:text-green-300'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
                     {option.text}
                   </p>
                 </div>

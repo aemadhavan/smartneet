@@ -1,12 +1,20 @@
 import { QuestionAttempt } from '../interfaces';
 import { CheckCircle, XCircle } from 'lucide-react';
+import Image from 'next/image';
+
+// Define an interface for the item structure
+interface SequenceItem {
+  key: string;
+  text: string;
+  [key: string]: unknown; // For any additional properties
+}
 
 interface SequenceOrderingProps {
   attempt: QuestionAttempt;
 }
 
 export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
-  const items = attempt.details.items || [];
+  const items = attempt.details.items || [] as SequenceItem[];
   const userSequence = attempt.userAnswer?.sequence || [];
   const correctSequence = attempt.correctAnswer?.sequence || [];
   
@@ -18,9 +26,11 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
       
       {attempt.isImageBased && attempt.imageUrl && (
         <div className="my-4">
-          <img 
+          <Image 
             src={attempt.imageUrl} 
             alt="Question diagram" 
+            width={800}
+            height={600}
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
           />
         </div>
@@ -30,7 +40,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
         <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Your Sequence:</h3>
         <div className="flex flex-wrap gap-2 mb-6">
           {userSequence.map((itemKey: string, idx: number) => {
-            const item = items.find((i: any) => i.key === itemKey);
+            const item = items.find((i: SequenceItem) => i.key === itemKey);
             const correctPositionIndex = correctSequence.indexOf(itemKey);
             const isCorrectPosition = correctPositionIndex === idx;
             
@@ -69,7 +79,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
         <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Correct Sequence:</h3>
         <div className="flex flex-wrap gap-2">
           {correctSequence.map((itemKey: string, idx: number) => {
-            const item = items.find((i: any) => i.key === itemKey);
+            const item = items.find((i: SequenceItem) => i.key === itemKey);
             
             return (
               <div

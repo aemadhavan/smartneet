@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 
 // Custom hook
 import useSessionReview from './hooks/useSessionReview';
@@ -18,7 +18,6 @@ import NavigationControls from './components/NavigationControls';
 export default function ReviewPage() {
   const { sessionId } = useParams();
   const parsedSessionId = parseInt(sessionId as string);
-  const router = useRouter();
   
   const { 
     loading, 

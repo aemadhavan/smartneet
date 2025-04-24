@@ -1,6 +1,7 @@
 import { QuestionAttempt } from '../interfaces';
 import { normalizeStatements } from '../helpers';
 import { CheckCircle, XCircle } from 'lucide-react';
+import Image from 'next/image';
 
 interface MultipleCorrectProps {
   attempt: QuestionAttempt;
@@ -20,10 +21,16 @@ export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
       
       {attempt.isImageBased && attempt.imageUrl && (
         <div className="my-4">
-          <img 
-            src={attempt.imageUrl} 
-            alt="Question diagram" 
+          <Image
+            src={attempt.imageUrl}
+            alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
+            width={500} // Specify the width
+            height={300} // Specify the height
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+            }}
           />
         </div>
       )}
