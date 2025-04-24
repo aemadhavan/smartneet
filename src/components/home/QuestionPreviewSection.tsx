@@ -143,7 +143,7 @@ More previous year questions are coming soon. Stay tuned!​</p>
             
             {/* View More Button */}
             <div className="text-center mt-8">
-              <Link href="#" className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all transform hover:-translate-y-1">
+              <Link href="/biology" className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all transform hover:-translate-y-1">
                 View All Biology Questions
               </Link>
             </div>

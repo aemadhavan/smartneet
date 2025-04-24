@@ -256,7 +256,7 @@ export default function PricingPage() {
                 </ul>
                 
                 <div className="mt-8">
-                  <button
+                  {/* <button
                     onClick={() => handleSelectPlan(plan)}
                     disabled={isCheckingOut}
                     className={`w-full py-3 px-4 rounded font-medium transition ${
@@ -283,7 +283,7 @@ export default function PricingPage() {
                     ) : (
                       'Select Plan'
                     )}
-                  </button>
+                  </button> */}
                 </div>
                 
                 {isUserOnThisPlan && !isFreePlan && (

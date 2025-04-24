@@ -92,14 +92,14 @@ const fadeIn = {
               variants={staggerContainer}
             >
               <motion.a
-                href="#" 
+                href="/sign-up" 
                 variants={fadeIn}
                 className="px-8 py-4 bg-white text-indigo-600 font-medium rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
               >
                 Start Free Trial
               </motion.a>
               <motion.a 
-                href="#" 
+                href="/pricing" 
                 variants={fadeIn}
                 className="px-8 py-4 bg-transparent border border-white text-white font-medium rounded-xl hover:bg-white/10 transition-all"
               >
