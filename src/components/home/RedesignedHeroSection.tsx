@@ -371,10 +371,10 @@ export const RedesignedHeroSection = () => {
               variants={staggerContainer}
             >
               {[
-                { icon: "🧪", text: "500+ Expert-Crafted Biology Questions" },
+                { icon: "🧪", text: "500+ AI and Expert-Crafted Biology Questions" },
                 { icon: "📊", text: "Topic-wise Performance Analytics" },
-                { icon: "🔍", text: "In-depth Explanations with Visual Aids" },
-                { icon: "📱", text: "Mobile-Friendly Practice Experience" }
+                //{ icon: "🔍", text: "In-depth Explanations with Visual Aids" },
+                //{ icon: "📱", text: "Mobile-Friendly Practice Experience" }
               ].map((feature, idx) => (
                 <motion.div 
                   key={idx}
