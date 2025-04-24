@@ -164,7 +164,7 @@ export default function DashboardPage() {
       const responseData = await response.json();
       
       // Handle different response formats
-      let sessionsArray: any[] = [];
+      let sessionsArray: SessionSummary[] = [];
       
       if (Array.isArray(responseData)) {
         // If the response is already an array
@@ -219,7 +219,7 @@ export default function DashboardPage() {
       const responseData = await response.json();
       
       // Handle different response formats
-      let masteryArray: any[] = [];
+      let masteryArray: TopicMastery[] = [];
       
       if (Array.isArray(responseData)) {
         // If the response is already an array
@@ -348,7 +348,7 @@ export default function DashboardPage() {
       ];
       
       // Handle different response formats
-      let typesArray: any[] = [];
+      let typesArray: QuestionTypeData[] = [];
       
       if (Array.isArray(responseData)) {
         // If the response is already an array
