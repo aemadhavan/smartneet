@@ -131,14 +131,14 @@ export default function PracticeClientPage() {
     return (
       <div className="container mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">{getSessionTitle()}</h1>
-          <div className="text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{getSessionTitle()}</h1>
+          <div className="text-sm text-gray-500 dark:text-gray-300">
             Question {currentQuestionIndex + 1} of {session.questions.length}
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-6">
           <div
             className="bg-indigo-600 h-2.5 rounded-full"
             style={{ width: `${((currentQuestionIndex + 1) / session.questions.length) * 100}%` }}
@@ -170,8 +170,8 @@ export default function PracticeClientPage() {
   // Fallback if session is created but no questions
   return (
     <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">No Questions Available</h2>
-      <p className="text-gray-600 mb-8">
+      <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4">No Questions Available</h2>
+      <p className="text-gray-600 dark:text-gray-300 mb-8">
         {topicId 
           ? "No questions are available for this topic at the moment." 
           : subtopicId 

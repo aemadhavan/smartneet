@@ -16,8 +16,8 @@ export function MultipleChoiceQuestion({
   // Check if details has the expected structure
   if (!details || !Array.isArray(details.options)) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format.</p>
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
       </div>
     );
   }

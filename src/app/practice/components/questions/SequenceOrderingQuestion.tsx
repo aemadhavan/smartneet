@@ -19,21 +19,21 @@ export function SequenceOrderingQuestion({
   // Check if details has the expected structure
   if (!details || !Array.isArray(details.sequence_items) || !Array.isArray(details.options)) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format.</p>
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-6 space-y-2 border-b pb-4">
-        <p className="font-medium mb-2">Arrange in correct sequence:</p>
+      <div className="mb-6 space-y-2 border-b border-gray-200 dark:border-gray-700 pb-4">
+        <p className="font-medium mb-2 text-gray-900 dark:text-gray-100">Arrange in correct sequence:</p>
         {details.sequence_items.map((item, index) => (
-          <div key={index} className="bg-gray-50 p-3 rounded mb-2">
+          <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded mb-2">
             <div className="flex">
-              <span className="font-medium mr-2">{item.item_number}.</span>
-              <div dangerouslySetInnerHTML={{ __html: item.item_text }} />
+              <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">{item.item_number}.</span>
+              <div className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: item.item_text }} />
             </div>
           </div>
         ))}

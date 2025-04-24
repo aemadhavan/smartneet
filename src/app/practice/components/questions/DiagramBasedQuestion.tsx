@@ -54,14 +54,14 @@ export function DiagramBasedQuestion({
   // Check if normalization was successful
   if (!normalizedDetails || !normalizedDetails.diagram_url || !Array.isArray(normalizedDetails.options)) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid diagram question details format.</p>
-        <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid diagram question details format.</p>
+        <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 dark:bg-gray-800 p-2 rounded text-gray-800 dark:text-gray-200">
           {JSON.stringify(details, null, 2)}
         </pre>
-        <p className="mt-2 text-sm">Image URL: {imageUrl || 'Not provided'}</p>
-        <p className="mt-2 text-sm">Question type: Diagram-based</p>
-        <p className="mt-2 text-sm">Question text preview: {questionText?.substring(0, 100)}...</p>
+        <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">Image URL: {imageUrl || 'Not provided'}</p>
+        <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">Question type: Diagram-based</p>
+        <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">Question text preview: {questionText?.substring(0, 100)}...</p>
       </div>
     );
   }

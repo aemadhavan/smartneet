@@ -139,32 +139,32 @@ export function QuestionDisplay({
         );
       default:
         return (
-          <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-            <p className="text-yellow-700">Unsupported question type: {question.question_type}</p>
+          <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+            <p className="text-yellow-700 dark:text-yellow-200">Unsupported question type: {question.question_type}</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
       {/* Question metadata */}
       <div className="flex flex-wrap justify-between items-start mb-4">
         <div className="flex items-center mb-2 md:mb-0">
-          <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-sm font-medium mr-2">
+          <span className="bg-indigo-100 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-100 px-2 py-1 rounded text-sm font-medium mr-2">
             {question.topic_name}
           </span>
           {question.subtopic_name && (
-            <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded text-sm">
+            <span className="bg-indigo-50 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-200 px-2 py-1 rounded text-sm">
               {question.subtopic_name}
             </span>
           )}
         </div>
         <div className="flex space-x-2">
-          <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm">
+          <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-1 rounded text-sm">
             {question.difficulty_level}
           </span>
-          <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm">
+          <span className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 px-2 py-1 rounded text-sm">
             {question.marks} marks
           </span>
         </div>
@@ -173,7 +173,7 @@ export function QuestionDisplay({
       {/* Question text */}
       <div className="mb-6">
         <div 
-          className="prose prose-indigo max-w-none"
+          className="prose prose-indigo dark:prose-invert max-w-none text-gray-800 dark:text-gray-100"
           dangerouslySetInnerHTML={{ __html: question.question_text }}
         />
       </div>
@@ -190,8 +190,8 @@ export function QuestionDisplay({
           disabled={currentQuestionIndex === 0}
           className={`px-4 py-2 rounded-md ${
             currentQuestionIndex === 0
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
           }`}
         >
           Previous
@@ -199,14 +199,21 @@ export function QuestionDisplay({
 
         <button
           onClick={() => setShowExplanation(!showExplanation)}
-          className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200"
+          className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-100 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800"
         >
           {showExplanation ? 'Hide Explanation' : 'Show Explanation'}
         </button>
 
         <button
           onClick={isLastQuestion ? onCompleteSession : onNextQuestion}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+          disabled={!selectedOption}
+          className={`px-4 py-2 rounded-md ${
+            !selectedOption
+              ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              : isLastQuestion
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600'
+          }`}
         >
           {isLastQuestion ? 'Complete' : 'Next'}
         </button>
@@ -214,10 +221,10 @@ export function QuestionDisplay({
 
       {/* Explanation section */}
       {showExplanation && question.explanation && (
-        <div className="mt-6 p-4 bg-blue-50 rounded-md">
-          <h3 className="text-lg font-medium text-blue-800 mb-2">Explanation</h3>
+        <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-100 dark:border-blue-800">
+          <h3 className="text-lg font-medium text-blue-800 dark:text-blue-100 mb-2">Explanation</h3>
           <div 
-            className="prose prose-sm prose-blue max-w-none"
+            className="prose prose-sm prose-blue dark:prose-invert max-w-none text-gray-700 dark:text-gray-200"
             dangerouslySetInnerHTML={{ __html: question.explanation }}
           />
         </div>

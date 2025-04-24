@@ -19,20 +19,20 @@ export function MultipleCorrectStatementsQuestion({
   // Check if details has the expected structure
   if (!details || !Array.isArray(details.statements) || !Array.isArray(details.options)) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format.</p>
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="mb-6 space-y-3 border-b pb-4">
+      <div className="mb-6 space-y-3 border-b border-gray-200 dark:border-gray-700 pb-4">
         {details.statements.map((statement, index) => (
-          <div key={index} className="bg-gray-50 p-3 rounded">
+          <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
             <div className="flex">
-              <span className="font-medium mr-2">{statement.statement_label}:</span>
-              <div dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+              <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">{statement.statement_label}:</span>
+              <div className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
             </div>
           </div>
         ))}

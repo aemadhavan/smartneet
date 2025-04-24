@@ -28,8 +28,8 @@ export function AssertionReasonQuestion({
   
   if (!parsedDetails) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format. Unable to parse JSON.</p>
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format. Unable to parse JSON.</p>
       </div>
     );
   }
@@ -50,9 +50,9 @@ export function AssertionReasonQuestion({
   // If we don't have any options, show error
   if (!parsedDetails.options || !Array.isArray(parsedDetails.options) || parsedDetails.options.length === 0) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format. Missing options array.</p>
-        <pre className="mt-2 text-xs text-gray-600 overflow-auto max-h-40">
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format. Missing options array.</p>
+        <pre className="mt-2 text-xs text-gray-600 dark:text-gray-300 overflow-auto max-h-40">
           {JSON.stringify(parsedDetails, null, 2)}
         </pre>
       </div>
@@ -69,11 +69,11 @@ export function AssertionReasonQuestion({
     <div>
       {/* Only render the statements section if we have statements */}
       {statements.length > 0 && (
-        <div className="mb-6 space-y-4 border-b pb-4">
+        <div className="mb-6 space-y-4 border-b border-gray-200 dark:border-gray-700 pb-4">
           {statements.map((statement, index) => (
-            <div key={index} className="bg-gray-50 p-3 rounded">
-              <p className="font-medium mb-1">{statement.statement_label}:</p>
-              <p dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+            <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
+              <p className="font-medium mb-1 text-gray-900 dark:text-gray-100">{statement.statement_label}:</p>
+              <p className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
             </div>
           ))}
         </div>

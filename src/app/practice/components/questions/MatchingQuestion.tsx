@@ -22,9 +22,9 @@ export function MatchingQuestion({
   // Check if normalization was successful
   if (!normalizedDetails || !Array.isArray(normalizedDetails.items) || !Array.isArray(normalizedDetails.options)) {
     return (
-      <div className="bg-yellow-50 p-4 rounded-md border border-yellow-200">
-        <p className="text-yellow-700">Invalid question details format.</p>
-        <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 p-2 rounded">
+      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+        <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
+        <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 dark:bg-gray-800 p-2 rounded text-gray-800 dark:text-gray-200">
           {JSON.stringify(details, null, 2)}
         </pre>
       </div>
@@ -40,22 +40,22 @@ export function MatchingQuestion({
         <table className="min-w-full border-collapse">
           <thead>
             <tr>
-              <th className="border px-4 py-2 bg-gray-50">
+              <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
                 {left_column_header || 'List I'}
               </th>
-              <th className="border px-4 py-2 bg-gray-50">
+              <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
                 {right_column_header || 'List II'}
               </th>
             </tr>
           </thead>
           <tbody>
             {items.map((item, index) => (
-              <tr key={index}>
-                <td className="border px-4 py-2">
+              <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-gray-200">
                   <span className="font-medium mr-2">{item.left_item_label}.</span>
                   {item.left_item_text}
                 </td>
-                <td className="border px-4 py-2">
+                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-gray-200">
                   <span className="font-medium mr-2">{item.right_item_label}.</span>
                   {item.right_item_text}
                 </td>
