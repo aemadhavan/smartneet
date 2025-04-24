@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useState, useEffect } from "react";
 
 const fadeIn = {
@@ -202,9 +203,9 @@ const EnhancedLaunchCounter = () => {
         
         {/* Call to action */}
         <div className="px-6 pb-5 pt-2">
-          <a href="/sign-up" className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+          <Link href="/sign-up" className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:shadow-lg transition-all transform hover:-translate-y-0.5">
             Get Early Access
-          </a>
+          </Link>
           
           <div className="mt-3 text-center">
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -350,18 +351,18 @@ export const RedesignedHeroSection = () => {
               className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8"
               variants={fadeIn}
             >
-              <a 
+              <Link 
                 href="/sign-up" 
                 className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all transform hover:-translate-y-1 text-center backdrop-blur-sm"
               >
                 Join Biology Waitlist
-              </a>
-              <a 
+              </Link>
+              <Link 
                 href="/biology" 
                 className="px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all text-center"
               >
                 View Biology Topics
-              </a>
+              </Link>
             </motion.div>
             
             {/* Biology Launch Features */}
