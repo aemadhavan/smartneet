@@ -1,70 +1,69 @@
-"use client"
-
-import React from 'react';
+// src/components/layout/Header.tsx
 import Link from 'next/link';
-import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
+import GoogleTagManager from './GoogleTagManager';
 
 /**
- * This is the header component for the application.
- * It displays the logo, navigation links, and authentication buttons.
+ * Header component for the application.
+ * Contains navigation links and authentication controls.
+ * Now includes the GoogleTagManager component for analytics.
  */
 const Header = () => {
   return (
-    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-sm shadow-sm">
-      <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <Link href="/" className="flex-shrink-0 flex items-center">
-              <span className="text-2xl font-bold text-indigo-600">Smarter<span className="text-emerald-500">NEET</span></span>
+    <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
+      {/* Include Google Tag Manager */}
+      <GoogleTagManager />
+      
+      <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        {/* Logo and brand name */}
+        <Link href="/" className="flex items-center space-x-2">
+          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            SmarterNEET
+          </span>
+        </Link>
+
+        {/* Navigation Links */}
+        <nav className="hidden md:flex items-center space-x-6">
+          <Link href="/" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Home
+          </Link>
+          <Link href="/pricing" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Pricing
+          </Link>
+          <Link href="/biology" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Biology
+          </Link>
+          <SignedIn>
+            <Link href="/dashboard" className="text-gray-700 hover:text-indigo-600 transition-colors">
+              Dashboard
             </Link>
-            <div className="hidden md:ml-10 md:flex md:space-x-8">
-              <Link href="/" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Home
-              </Link>
-              <Link href="/biology" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Biology
-              </Link>
-              <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Physics (Comming soon)
-              </Link>
-              <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Chemistry (Comming soon)
-              </Link>
-              {/* <Link href="#" className="border-transparent text-gray-700 hover:text-indigo-600 inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 hover:border-indigo-600 transition-all">
-                Previous Papers
-              </Link> */}
-            </div>
-          </div>
-          <div className="hidden md:flex items-center space-x-4">
-              <SignedOut>
-                <Link 
-                  href="/sign-in" 
-                  className="rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  Log In
-                </Link>
-                <Link 
-                  href="/sign-up" 
-                  className="rounded-md px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-                >
-                  Sign Up
-                </Link>
-              </SignedOut>
-              <SignedIn>
-                <UserButton />
-              </SignedIn>
-          </div>
-          
-          {/* Mobile menu button */}
-          <div className="flex items-center md:hidden">
-            <button className="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-indigo-600 focus:outline-none">
-              <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-          </div>
+            <Link href="/practice" className="text-gray-700 hover:text-indigo-600 transition-colors">
+              Practice
+            </Link>
+          </SignedIn>
+        </nav>
+
+        {/* Authentication */}
+        <div className="flex items-center space-x-4">
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <Link 
+              href="/sign-in"
+              className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
+            >
+              Sign In
+            </Link>
+            <Link
+              href="/sign-up"
+              className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+            >
+              Sign Up
+            </Link>
+          </SignedOut>
         </div>
-      </nav>
+      </div>
     </header>
   );
 };

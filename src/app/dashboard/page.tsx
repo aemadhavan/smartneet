@@ -161,10 +161,37 @@ export default function DashboardPage() {
         throw new Error('Failed to fetch recent sessions');
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
+      
+      // Handle different response formats
+      let sessionsArray: any[] = [];
+      
+      if (Array.isArray(responseData)) {
+        // If the response is already an array
+        sessionsArray = responseData;
+      } else if (responseData && typeof responseData === 'object') {
+        // If the response is an object, look for common array properties
+        const possibleArrayProps = ['data', 'sessions', 'results', 'items'];
+        
+        for (const prop of possibleArrayProps) {
+          if (responseData[prop] && Array.isArray(responseData[prop])) {
+            sessionsArray = responseData[prop];
+            break;
+          }
+        }
+        
+        // If we still don't have an array, log the response structure
+        if (sessionsArray.length === 0) {
+          console.error('Expected array but got object with properties:', Object.keys(responseData));
+          return [];
+        }
+      } else {
+        console.error('Expected array or object but got:', typeof responseData);
+        return [];
+      }
       
       // Transform data to include calculated accuracy
-      return data.map((session: SessionSummary) => {
+      return sessionsArray.map((session: SessionSummary) => {
         const questionsAttempted = session.questions_attempted ?? 0;
         const questionsCorrect = session.questions_correct ?? 0;
         
@@ -189,7 +216,36 @@ export default function DashboardPage() {
         throw new Error('Failed to fetch topic mastery');
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Handle different response formats
+      let masteryArray: any[] = [];
+      
+      if (Array.isArray(responseData)) {
+        // If the response is already an array
+        masteryArray = responseData;
+      } else if (responseData && typeof responseData === 'object') {
+        // If the response is an object, look for common array properties
+        const possibleArrayProps = ['data', 'topics', 'mastery', 'results', 'items'];
+        
+        for (const prop of possibleArrayProps) {
+          if (responseData[prop] && Array.isArray(responseData[prop])) {
+            masteryArray = responseData[prop];
+            break;
+          }
+        }
+        
+        // If we still don't have an array, log the response structure
+        if (masteryArray.length === 0) {
+          console.error('Expected array for topic mastery but got object with properties:', Object.keys(responseData));
+          return [];
+        }
+      } else {
+        console.error('Expected array or object for topic mastery but got:', typeof responseData);
+        return [];
+      }
+      
+      return masteryArray;
     } catch (error) {
       console.error('Error fetching topic mastery:', error);
       return [];
@@ -204,7 +260,60 @@ export default function DashboardPage() {
         throw new Error('Failed to fetch user stats');
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Default stats to return if we can't find valid data
+      const defaultStats = {
+        totalSessions: 0,
+        totalQuestionsAttempted: 0,
+        totalCorrectAnswers: 0,
+        averageAccuracy: 0,
+        totalDurationMinutes: 0,
+        streakCount: 0,
+        masteredTopics: 0
+      };
+      
+      // Handle different response formats
+      let statsData = null;
+      
+      if (responseData && typeof responseData === 'object') {
+        // If the response is already the stats object
+        if ('totalSessions' in responseData || 
+            'totalQuestionsAttempted' in responseData || 
+            'averageAccuracy' in responseData) {
+          statsData = responseData;
+        } else {
+          // If the response is an object with a nested stats object
+          const possibleStatsProps = ['data', 'stats', 'userStats', 'results'];
+          
+          for (const prop of possibleStatsProps) {
+            if (responseData[prop] && typeof responseData[prop] === 'object') {
+              statsData = responseData[prop];
+              break;
+            }
+          }
+          
+          // If we still don't have stats data, log the response structure
+          if (!statsData) {
+            console.error('Expected object with stats but got object with properties:', Object.keys(responseData));
+            return defaultStats;
+          }
+        }
+      } else {
+        console.error('Expected object for user stats but got:', typeof responseData);
+        return defaultStats;
+      }
+      
+      // Return with defaults for any missing properties
+      return {
+        totalSessions: statsData.totalSessions || 0,
+        totalQuestionsAttempted: statsData.totalQuestionsAttempted || 0,
+        totalCorrectAnswers: statsData.totalCorrectAnswers || 0,
+        averageAccuracy: statsData.averageAccuracy || 0,
+        totalDurationMinutes: statsData.totalDurationMinutes || 0,
+        streakCount: statsData.streakCount || 0,
+        masteredTopics: statsData.masteredTopics || 0
+      };
     } catch (error) {
       console.error('Error fetching user stats:', error);
       return {
@@ -227,7 +336,45 @@ export default function DashboardPage() {
         throw new Error('Failed to fetch question type distribution');
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Default data to return if we can't find a valid array
+      const defaultData = [
+        { name: 'Multiple Choice', value: 65 },
+        { name: 'Multiple Correct', value: 15 },
+        { name: 'Assertion-Reason', value: 10 },
+        { name: 'Matching', value: 5 },
+        { name: 'Sequence', value: 5 }
+      ];
+      
+      // Handle different response formats
+      let typesArray: any[] = [];
+      
+      if (Array.isArray(responseData)) {
+        // If the response is already an array
+        typesArray = responseData;
+      } else if (responseData && typeof responseData === 'object') {
+        // If the response is an object, look for common array properties
+        const possibleArrayProps = ['data', 'types', 'questionTypes', 'distribution', 'results', 'items'];
+        
+        for (const prop of possibleArrayProps) {
+          if (responseData[prop] && Array.isArray(responseData[prop])) {
+            typesArray = responseData[prop];
+            break;
+          }
+        }
+        
+        // If we still don't have an array, log the response structure
+        if (typesArray.length === 0) {
+          console.error('Expected array for question types but got object with properties:', Object.keys(responseData));
+          return defaultData;
+        }
+      } else {
+        console.error('Expected array or object for question types but got:', typeof responseData);
+        return defaultData;
+      }
+      
+      return typesArray;
     } catch (error) {
       console.error('Error fetching question types:', error);
       // Return default data in case of error
@@ -346,7 +493,7 @@ export default function DashboardPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading your dashboard...</p>
+          <p className="text-lg dark:text-gray-300 text-gray-600">Loading your dashboard...</p>
         </div>
       </div>
       );
@@ -355,57 +502,57 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Your Learning Dashboard</h1>
-        <p className="text-gray-600">
+<h1 className="text-3xl font-bold dark:text-white text-gray-800 mb-2">Your Learning Dashboard</h1>
+<p className="dark:text-gray-400 text-gray-600">
           Track your progress and identify areas for improvement
         </p>
       </header>
       
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-emerald-100 text-emerald-600 mr-4">
               <BookOpen size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Total Sessions</p>
+<p className="text-sm dark:text-gray-400 text-gray-500">Total Sessions</p>
               <p className="text-2xl font-bold">{stats.totalSessions}</p>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
               <CheckCircle size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Avg. Accuracy</p>
+<p className="text-sm dark:text-gray-400 text-gray-500">Avg. Accuracy</p>
               <p className="text-2xl font-bold">{formatAccuracy(stats.averageAccuracy)}</p>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-orange-100 text-orange-600 mr-4">
               <Clock size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Study Time</p>
+<p className="text-sm dark:text-gray-400 text-gray-500">Study Time</p>
               <p className="text-2xl font-bold">{stats.totalDurationMinutes} min</p>
             </div>
           </div>
         </div>
         
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-red-100 text-red-600 mr-4">
               <Flame size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Current Streak</p>
+<p className="text-sm dark:text-gray-400 text-gray-500">Current Streak</p>
               <p className="text-2xl font-bold">{stats.streakCount} days</p>
             </div>
           </div>
@@ -416,9 +563,9 @@ export default function DashboardPage() {
       <div className="grid md:grid-cols-3 gap-6 mb-8">
         {/* Topic Mastery Column */}
         <div className="md:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-800">Topic Mastery</h2>
+<h2 className="text-xl font-semibold dark:text-white text-gray-800">Topic Mastery</h2>
               <div className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full">
                 {stats.masteredTopics} mastered
               </div>
@@ -426,7 +573,7 @@ export default function DashboardPage() {
             
             <div className="space-y-4">
               {topicMastery.length === 0 ? (
-                <p className="text-gray-500 text-center py-4">No topic mastery data available yet.</p>
+<p className="dark:text-white text-gray-500 text-center py-4">No topic mastery data available yet.</p>
               ) : (
                 topicMastery.slice(0, 5).map(topic => (
                   <div key={topic.topic_id} className="bg-gray-50 p-3 rounded-md">
@@ -460,15 +607,15 @@ export default function DashboardPage() {
             <div className="mt-6">
               <Link 
                 href="/dashboard/topics"
-                className="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center justify-center"
+                className="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 text-sm font-medium flex items-center justify-center"
               >
                 View all topics <ArrowRight size={16} className="ml-1" />
               </Link>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+<h2 className="text-xl font-semibold dark:text-white text-gray-800 mb-4">Quick Actions</h2>
             <div className="space-y-3">
               <Link 
                 href="/practice?subject=botany"
@@ -514,8 +661,8 @@ export default function DashboardPage() {
         
         {/* Charts Column */}
         <div className="md:col-span-2">
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Performance Overview</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+<h2 className="text-xl font-semibold dark:text-white text-gray-800 mb-4">Performance Overview</h2>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
@@ -535,8 +682,8 @@ export default function DashboardPage() {
           </div>
           
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Subject Performance</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold dark:text-white text-gray-800 mb-4">Subject Performance</h2>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
@@ -553,8 +700,8 @@ export default function DashboardPage() {
               </div>
             </div>
             
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Question Types</h2>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+              <h2 className="text-xl font-semibold dark:text-white text-gray-800 mb-4">Question Types</h2>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -581,8 +728,8 @@ export default function DashboardPage() {
       </div>
       
       {/* Recent Sessions */}
-      <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Sessions</h2>
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <h2 className="text-xl font-semibold dark:text-white text-gray-800 mb-4">Recent Sessions</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-gray-50">
@@ -599,23 +746,23 @@ export default function DashboardPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {recentSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-4 text-center dark:text-gray-400 text-gray-500">
                     No session history yet. Start practicing to see your progress!
                   </td>
                 </tr>
               ) : (
                 recentSessions.map((session) => (
                   <tr key={session.session_id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-400 text-gray-500">
                       {formatDate(session.start_time)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+<td className="px-6 py-4 whitespace-nowrap text-sm font-medium dark:text-white text-gray-900">
                       {session.subject_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-400 text-gray-500">
                       {session.topic_name || 'All Topics'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-400 text-gray-500">
                       {session.score ?? 0}/{session.max_score ?? 0}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -628,13 +775,13 @@ export default function DashboardPage() {
                         {formatAccuracy(session.accuracy)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm dark:text-gray-400 text-gray-500">
                       {session.duration_minutes ?? 0} min
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <Link 
                         href={`/sessions/${session.session_id}`}
-                        className="text-indigo-600 hover:text-indigo-900"
+                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
                       >
                         Review
                       </Link>
@@ -648,14 +795,14 @@ export default function DashboardPage() {
       </div>
       
       {/* AI Recommendations */}
-      <div className="bg-white rounded-lg shadow-sm p-6 mt-8">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mt-8">
         <div className="flex items-start mb-4">
           <div className="p-3 rounded-full bg-indigo-100 text-indigo-600 mr-4">
             <TrendingUp size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">AI-Powered Recommendations</h2>
-            <p className="text-gray-600">Based on your performance and learning patterns</p>
+            <h2 className="text-xl font-semibold dark:text-white text-gray-800">AI-Powered Recommendations</h2>
+            <p className="dark:text-gray-400 text-gray-600">Based on your performance and learning patterns</p>
           </div>
         </div>
         
