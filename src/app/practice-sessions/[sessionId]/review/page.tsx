@@ -1,42 +1,85 @@
-// src/app/practice-sessions/[sessionId]/review/page.tsx
-import { notFound } from 'next/navigation';
-import { db } from '@/db';
-import { practice_sessions } from '@/db';
-import { eq } from 'drizzle-orm';
-import { auth } from '@clerk/nextjs/server';
-import ReviewPage from './review';
+'use client';
 
-interface PageProps {
-  params: {
-    sessionId: string;
-  };
-}
+import { useRouter, useParams } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
+// Custom hook
+import useSessionReview from './hooks/useSessionReview';
 
-export default async function PracticeSessionReviewPage({ params }: { params: Promise<{ sessionId: string }> }) {
-  const { userId } = await auth();
-  const sessionId = parseInt((await params).sessionId);
+// Components
+import LoadingState from './components/LoadingState';
+import ErrorState from './components/ErrorState';
+import EmptyState from './components/EmptyState';
+import SessionHeader from './components/SessionHeader';
+import QuestionNavigation from './components/QuestionNavigation';
+import QuestionDisplay from './components/QuestionDisplay';
+import QuestionExplanation from './components/QuestionExplanation';
+import NavigationControls from './components/NavigationControls';
 
-  if (!userId || isNaN(sessionId)) {
-    return notFound();
+export default function ReviewPage() {
+  const { sessionId } = useParams();
+  const parsedSessionId = parseInt(sessionId as string);
+  const router = useRouter();
+  
+  const { 
+    loading, 
+    error, 
+    attempts, 
+    sessionSummary,
+    currentIndex,
+    goToNext,
+    goToPrevious,
+    goToQuestion
+  } = useSessionReview(parsedSessionId);
+
+  // Show loading state
+  if (loading) {
+    return <LoadingState />;
   }
 
-  // Check if the session exists and belongs to the user
-  // We don't need to fetch all the session data here, just check if it exists
-  const sessionExists = await db.query.practice_sessions.findFirst({
-    where: eq(practice_sessions.session_id, sessionId),
-    columns: {
-      session_id: true,
-      user_id: true
-    }
-  });
-
-  if (!sessionExists || sessionExists.user_id !== userId) {
-    return notFound();
+  // Show error state
+  if (error) {
+    return <ErrorState error={error} />;
   }
+
+  // Show empty state
+  if (!attempts.length) {
+    return <EmptyState />;
+  }
+
+  const currentAttempt = attempts[currentIndex];
 
   return (
-    <ReviewPage params={{ sessionId: (await params).sessionId }} />
+    <div className="container mx-auto py-8 px-4">
+      <SessionHeader sessionId={parsedSessionId} sessionSummary={sessionSummary} />
+
+      <div className="grid grid-cols-12 gap-6">
+        {/* Question Navigation Sidebar */}
+        <div className="col-span-12 lg:col-span-3 order-2 lg:order-1">
+          <QuestionNavigation 
+            attempts={attempts} 
+            currentIndex={currentIndex} 
+            goToQuestion={goToQuestion}
+          />
+        </div>
+        
+        {/* Main Content */}
+        <div className="col-span-12 lg:col-span-9 order-1 lg:order-2">
+          <QuestionDisplay 
+            currentAttempt={currentAttempt}
+            currentIndex={currentIndex}
+            totalQuestions={attempts.length}
+          />
+          
+          <QuestionExplanation explanation={currentAttempt.explanation} />
+          
+          <NavigationControls 
+            currentIndex={currentIndex}
+            totalQuestions={attempts.length}
+            goToPrevious={goToPrevious}
+            goToNext={goToNext}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

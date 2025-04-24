@@ -1,11 +1,10 @@
 // src/app/api/practice-sessions/[sessionId]/review/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { 
-  question_attempts, 
-  questions, 
-  topics, 
-  subtopics, 
+import {
+  question_attempts,
+  topics,
+  subtopics,
   practice_sessions,
   session_questions
 } from '@/db';
@@ -51,13 +50,39 @@ export async function GET(
       ),
       orderBy: question_attempts.attempt_timestamp,
       with: {
-        question: true
+        question: {
+          columns: {
+            question_id: true,
+            question_text: true,
+            question_type: true,
+            details: true,
+            explanation: true,
+            marks: true,
+            topic_id: true,
+            subtopic_id: true,
+            is_image_based: true,
+            image_url: true
+          }
+        }
       }
     });
 
+    interface QuestionWithDetails {
+      question_id: number;
+      question_text: string;
+      question_type: string;
+      details: QuestionDetails | null;
+      explanation: string | null;
+      marks: number | null;
+      topic_id: number;
+      subtopic_id: number | null;
+      is_image_based: boolean | null;
+      image_url: string | null;
+    }
+
     if (!attempts.length) {
-      return NextResponse.json({ 
-        attempts: [], 
+      return NextResponse.json({
+        attempts: [],
         summary: {
           totalQuestions: 0,
           questionsCorrect: 0,
@@ -93,27 +118,47 @@ export async function GET(
 
     // Prepare the list of attempts with all needed data
     const detailedAttempts = await Promise.all(attempts.map(async (attempt) => {
+      // Define QuestionWithDetails type
+      interface QuestionWithDetails {
+        question_id: number;
+        question_text: string;
+        question_type: string;
+        details: QuestionDetails | null;
+        explanation: string | null;
+        marks: number | null;
+        topic_id: number;
+        subtopic_id: number | null;
+        is_image_based: boolean | null;
+        image_url: string | null;
+      }
+
+      // Cast attempt.question to QuestionWithDetails
+      const question = attempt.question as QuestionWithDetails;
+
       // Get topic information
       const topic = await db.query.topics.findFirst({
-        where: eq(topics.topic_id, attempt.question.topic_id),
+        where: eq(topics.topic_id, question.topic_id),
         columns: {
           topic_id: true,
           topic_name: true
         }
       });
 
+      // Cast question.details to QuestionDetails | null
       // Get subtopic information if available
       let subtopicInfo = null;
-      if (attempt.question.subtopic_id) {
+      if (question.subtopic_id) {
         const subtopic = await db.query.subtopics.findFirst({
-          where: eq(subtopics.subtopic_id, attempt.question.subtopic_id),
+          where: eq(subtopics.subtopic_id, question.subtopic_id),
           columns: {
             subtopic_id: true,
             subtopic_name: true
           }
         });
-        
-        if (subtopic) {
+
+        if (!subtopic) {
+          subtopicInfo = null;
+        } else {
           subtopicInfo = {
             subtopicId: subtopic.subtopic_id,
             subtopicName: subtopic.subtopic_name
@@ -131,11 +176,11 @@ export async function GET(
         timeSpentSeconds: orderInfo.timeSpent,
         questionText: attempt.question.question_text,
         questionType: attempt.question.question_type,
-        details: attempt.question.details,
+        details: attempt.question.details as QuestionDetails | null,
         explanation: attempt.question.explanation,
-        userAnswer: attempt.user_answer,
+        userAnswer: attempt.user_answer as AnswerType,
         isCorrect: attempt.is_correct,
-        correctAnswer: getCorrectAnswer(attempt.question.details, attempt.question.question_type),
+        correctAnswer: getCorrectAnswer(attempt.question.details as QuestionDetails, attempt.question.question_type),
         marksAwarded: attempt.marks_awarded || 0,
         maxMarks: attempt.question.marks || 0,
         topic: {
@@ -162,7 +207,7 @@ export async function GET(
 
     // Create a safe copy of the data without any non-serializable values
     const safeData = {
-      attempts: detailedAttempts.map((attempt: any) => ({
+      attempts: detailedAttempts.map((attempt: DetailedAttempt) => ({
         ...attempt,
         // Ensure all properties are serializable
         details: attempt.details ? JSON.parse(JSON.stringify(attempt.details)) : null,
@@ -182,37 +227,105 @@ export async function GET(
   }
 }
 
+interface MultipleChoiceDetails {
+  options: { key: string; isCorrect: boolean }[];
+}
+
+interface MatchingDetails {
+  items: { key: string; matchesTo: string }[];
+}
+
+interface MultipleCorrectStatementsDetails {
+  statements: { key: string; isCorrect: boolean }[];
+}
+
+interface AssertionReasonDetails {
+  correctOption: string;
+}
+
+interface SequenceOrderingDetails {
+  correctSequence: string[];
+}
+
+type QuestionDetails =
+  | MultipleChoiceDetails
+  | MatchingDetails
+  | MultipleCorrectStatementsDetails
+  | AssertionReasonDetails
+  | SequenceOrderingDetails;
+
+type CorrectAnswer =
+  | { selectedOption: string | null }
+  | { matches: Record<string, string> }
+  | { selectedStatements: string[] }
+  | { selection: string }
+  | { sequence: string[] }
+  | null;
+
+type AnswerType =
+  | string
+  | number
+  | string[]
+  | number[]
+  | Record<string, string>
+  | null;
+
+interface DetailedAttempt {
+  questionId: number;
+  questionNumber: number;
+  timeSpentSeconds: number;
+  questionText: string;
+  questionType: string;
+  details: QuestionDetails | null;
+  explanation: string | null;
+  userAnswer: AnswerType;
+  isCorrect: boolean;
+  correctAnswer: CorrectAnswer;
+  marksAwarded: number | null;
+  maxMarks: number | null;
+  topic: {
+    topicId: number;
+    topicName: string;
+  };
+  subtopic: {
+    subtopicId: number;
+    subtopicName: string;
+  } | null;
+  isImageBased: boolean | null;
+  imageUrl: string | null;
+}
+
 // Helper function to extract the correct answer based on question type
-function getCorrectAnswer(details: any, questionType: string): any {
+function getCorrectAnswer(details: QuestionDetails, questionType: string): CorrectAnswer {
   try {
     switch (questionType) {
       case 'MultipleChoice':
         // Find the correct option
-        const correctOption = details.options.find((opt: any) => opt.isCorrect);
+        const correctOption = (details as MultipleChoiceDetails).options.find((opt: { key: string; isCorrect: boolean }) => opt.isCorrect);
         return { selectedOption: correctOption ? correctOption.key : null };
         
       case 'Matching':
         // Extract the correct matches
         const matches: Record<string, string> = {};
-        details.items.forEach((item: any) => {
+        (details as MatchingDetails).items.forEach((item: { key: string; matchesTo: string }) => {
           matches[item.key] = item.matchesTo;
         });
         return { matches };
         
       case 'MultipleCorrectStatements':
         // Find all correct statements
-        const correctStatements = details.statements
-          .filter((statement: any) => statement.isCorrect)
-          .map((statement: any) => statement.key);
+        const correctStatements = (details as MultipleCorrectStatementsDetails).statements
+          .filter((statement: { key: string; isCorrect: boolean }) => statement.isCorrect)
+          .map((statement: { key: string; isCorrect: boolean }) => statement.key);
         return { selectedStatements: correctStatements };
         
       case 'AssertionReason':
         // Return the correct selection
-        return { selection: details.correctOption };
+        return { selection: (details as AssertionReasonDetails).correctOption };
         
       case 'SequenceOrdering':
         // Return the correct sequence
-        return { sequence: details.correctSequence };
+        return { sequence: (details as SequenceOrderingDetails).correctSequence };
         
       default:
         return null;
