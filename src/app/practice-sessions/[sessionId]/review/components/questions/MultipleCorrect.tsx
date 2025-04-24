@@ -1,22 +1,66 @@
-import { QuestionAttempt } from '../interfaces';
-import { normalizeStatements } from '../helpers';
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+
+// Define statement interface
+interface Statement {
+  key: string;
+  text: string;
+}
+
+// Create more specific types to avoid using 'any'
+type StatementsArray = string[];
+interface StatementsAnswerObject {
+  selectedStatements?: StatementsArray;
+  [key: string]: unknown; // More type-safe than 'any'
+}
+
+// Define a more flexible QuestionAttempt interface
+interface QuestionAttempt {
+  questionText?: string;
+  details?: {
+    statements?: Statement[];
+  } | null;
+  isImageBased?: boolean | null | undefined;
+  imageUrl?: string | null | undefined;
+  userAnswer?: StatementsAnswerObject | null;
+  correctAnswer?: StatementsAnswerObject | null;
+}
 
 interface MultipleCorrectProps {
   attempt: QuestionAttempt;
 }
 
-export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
-  const rawStatements = attempt.details.statements || [];
-  const statements = normalizeStatements(rawStatements);
-  const userSelections = attempt.userAnswer?.selectedStatements || [];
-  const correctSelections = attempt.correctAnswer?.selectedStatements || [];
+// Normalize statements utility function
+function normalizeStatements(rawStatements: unknown): Statement[] {
+  // If rawStatements is already an array of objects with key and text, return it
+  if (Array.isArray(rawStatements) && rawStatements.every(s => 
+    typeof s === 'object' && s !== null && 'key' in s && 'text' in s)) {
+    return rawStatements as Statement[];
+  }
   
+  // If it's an array of strings or other types, convert to Statement
+  return (Array.isArray(rawStatements) ? rawStatements : []).map((statement, index: number) => ({
+    key: String.fromCharCode(65 + index), // A, B, C, etc.
+    text: String(statement)
+  }));
+}
+
+export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
+  // Add null checks for all potentially undefined properties
+  const rawStatements = attempt?.details?.statements ?? [];
+  const statements = normalizeStatements(rawStatements);
+  const userSelections = attempt?.userAnswer?.selectedStatements ?? [];
+  const correctSelections = attempt?.correctAnswer?.selectedStatements ?? [];
+  
+  // Render nothing if no attempt data
+  if (!attempt) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText}
+        {attempt.questionText ?? 'No question text available'}
       </div>
       
       {attempt.isImageBased && attempt.imageUrl && (
@@ -25,8 +69,8 @@ export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
             src={attempt.imageUrl}
             alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
-            width={500} // Specify the width
-            height={300} // Specify the height
+            width={500}
+            height={300}
             style={{
               maxWidth: '100%',
               height: 'auto',

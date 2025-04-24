@@ -1,11 +1,7 @@
-import { QuestionAttempt } from '../interfaces';
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
 
-interface MatchingProps {
-  attempt: QuestionAttempt;
-}
-
+// Define interfaces with more robust type checking
 interface Item {
   key: string;
   text: string;
@@ -20,16 +16,47 @@ interface Matches {
   [key: string]: string;
 }
 
+// Create a more specific answer type to avoid using 'any'
+interface MatchingAnswerObject {
+  matches?: Matches;
+  [key: string]: unknown; // More type-safe than 'any'
+}
+
+// Extend the QuestionAttempt interface to be more specific
+interface QuestionAttempt {
+  questionText?: string;
+  details?: {
+    items?: Item[];
+    options?: Option[];
+  } | null;
+  isImageBased?: boolean | null | undefined;
+  imageUrl?: string | null | undefined;
+  userAnswer?: MatchingAnswerObject | null;
+  correctAnswer?: MatchingAnswerObject | null;
+}
+
+interface MatchingProps {
+  attempt: QuestionAttempt;
+}
+
 export default function Matching({ attempt }: MatchingProps) {
-  const items: Item[] = attempt.details.items || [];
-  const options: Option[] = attempt.details.options || [];
-  const userMatches: Matches = attempt.userAnswer?.matches || {};
-  const correctMatches: Matches = attempt.correctAnswer?.matches || {};
+  // Add comprehensive null checks and default empty arrays
+  const items: Item[] = attempt?.details?.items ?? [];
+  const options: Option[] = attempt?.details?.options ?? [];
+  
+  // Add null checks for userAnswer and correctAnswer
+  const userMatches: Matches = attempt?.userAnswer?.matches ?? {};
+  const correctMatches: Matches = attempt?.correctAnswer?.matches ?? {};
+
+  // Render nothing if no attempt data
+  if (!attempt) {
+    return null;
+  }
 
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText}
+        {attempt.questionText ?? 'No question text available'}
       </div>
 
       {attempt.isImageBased && attempt.imageUrl && (
@@ -38,8 +65,8 @@ export default function Matching({ attempt }: MatchingProps) {
             src={attempt.imageUrl}
             alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
-            width={500} // Specify the width
-            height={300} // Specify the height
+            width={500}
+            height={300}
             style={{
               maxWidth: '100%',
               height: 'auto',

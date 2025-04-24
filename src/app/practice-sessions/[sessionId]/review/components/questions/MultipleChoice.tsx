@@ -1,22 +1,65 @@
-import { QuestionAttempt } from '../interfaces';
-import { normalizeOptions } from '../helpers';
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+
+// Define option interface
+interface Option {
+  key: string;
+  text: string;
+}
+
+// Create more specific types to avoid using 'any'
+interface OptionAnswerObject {
+  selectedOption?: string;
+  [key: string]: unknown; // More type-safe than 'any'
+}
+
+// Define a more flexible QuestionAttempt interface
+interface QuestionAttempt {
+  questionText?: string;
+  details?: {
+    options?: Option[];
+  } | null;
+  isImageBased?: boolean | null | undefined;
+  imageUrl?: string | null | undefined;
+  userAnswer?: OptionAnswerObject | null;
+  correctAnswer?: OptionAnswerObject | null;
+}
 
 interface MultipleChoiceProps {
   attempt: QuestionAttempt;
 }
 
-export default function MultipleChoice({ attempt }: MultipleChoiceProps) {
-  const rawOptions = attempt.details.options || [];
-  const options = normalizeOptions(rawOptions);
-  const userSelection = attempt.userAnswer?.selectedOption;
-  const correctOption = attempt.correctAnswer?.selectedOption;
+// Normalize options utility function
+function normalizeOptions(rawOptions: unknown): Option[] {
+  // If rawOptions is already an array of objects with key and text, return it
+  if (Array.isArray(rawOptions) && rawOptions.every(o => 
+    typeof o === 'object' && o !== null && 'key' in o && 'text' in o)) {
+    return rawOptions as Option[];
+  }
   
+  // If it's an array of strings or other types, convert to Option
+  return (Array.isArray(rawOptions) ? rawOptions : []).map((option, index: number) => ({
+    key: String.fromCharCode(65 + index), // A, B, C, etc.
+    text: String(option)
+  }));
+}
+
+export default function MultipleChoice({ attempt }: MultipleChoiceProps) {
+  // Add null checks for all potentially undefined properties
+  const rawOptions = attempt?.details?.options ?? [];
+  const options = normalizeOptions(rawOptions);
+  const userSelection = attempt?.userAnswer?.selectedOption ?? null;
+  const correctOption = attempt?.correctAnswer?.selectedOption ?? null;
+  
+  // Render nothing if no attempt data
+  if (!attempt) {
+    return null;
+  }
+
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText}
+        {attempt.questionText ?? 'No question text available'}
       </div>
       
       {attempt.isImageBased && attempt.imageUrl && (
@@ -25,8 +68,8 @@ export default function MultipleChoice({ attempt }: MultipleChoiceProps) {
             src={attempt.imageUrl}
             alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
-            width={500} // Specify the width
-            height={300} // Specify the height
+            width={500}
+            height={300}
             style={{
               maxWidth: '100%',
               height: 'auto',

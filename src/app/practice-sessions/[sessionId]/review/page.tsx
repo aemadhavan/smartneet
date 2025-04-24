@@ -69,7 +69,8 @@ export default function ReviewPage() {
             totalQuestions={attempts.length}
           />
           
-          <QuestionExplanation explanation={currentAttempt.explanation} />
+          {/* Fix: Handle null explanation by providing fallback empty string */}
+          <QuestionExplanation explanation={currentAttempt.explanation || ''} />
           
           <NavigationControls 
             currentIndex={currentIndex}
