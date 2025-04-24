@@ -54,7 +54,7 @@ const LaunchCounter = () => {
   return (
     <div className="fixed bottom-6 right-6 z-50 bg-white shadow-lg rounded-lg overflow-hidden">
       <div className="bg-indigo-600 text-white px-4 py-2 font-semibold text-center">
-        🚀 Full Launch Countdown
+        🚀 Biology Launch Countdown
       </div>
       <div className="p-4 flex items-center justify-center space-x-4">
         <div className="flex flex-col items-center">
