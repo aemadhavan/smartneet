@@ -68,6 +68,7 @@ function extractSelectedStatements(answer: unknown): string[] {
         return Array.isArray(selectedStatements) ? selectedStatements : [];
       }
     } catch (e) {
+      console.error('Error parsing user answer:', e);
       // Not a valid JSON string, ignore
     }
   }

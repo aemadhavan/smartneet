@@ -5,8 +5,7 @@ import {
   MatchingAnswer,
   MultipleCorrectAnswer,
   SequenceOrderingAnswer,
-  DiagramBasedAnswer,
-  QuestionType
+  DiagramBasedAnswer
 } from '../interfaces';
 
 // Option interfaces for each question type
@@ -22,18 +21,20 @@ type DetailsWithOptions<T> = {
   [key: string]: unknown; // More type-safe than 'any'
 }
 
-// Utility function to convert answer to FlexibleAnswerType
-function convertToFlexibleAnswer(answer: Record<string, unknown> | null): FlexibleAnswerType {
-  if (answer === null) return null;
+// Utility function kept for potential future use or logging
+// function convertToFlexibleAnswer(answer: Record<string, unknown> | null): FlexibleAnswerType {
+//   if (answer === null) return null;
   
-  // Create a new object that spreads the original answer
-  // This helps preserve the original structure while making it flexibly typed
-  return { ...answer };
-}
+//   // Create a new object that spreads the original answer
+//   // This helps preserve the original structure while making it flexibly typed
+//   return { ...answer };
+// }
+
 interface BaseQuestionAttemptWithAnswer extends BaseQuestionAttempt {
   userAnswer: FlexibleAnswerType;
   correctAnswer: FlexibleAnswerType;
 }
+
 // Specific typed question attempts
 interface MultipleChoiceQuestionAttempt extends BaseQuestionAttempt {
   details: DetailsWithOptions<{ options?: Option[] }>;
@@ -70,33 +71,10 @@ interface SequenceOrderingQuestionAttempt extends BaseQuestionAttempt {
   isImageBased: boolean | null | undefined;
 }
 
-// Union type for all question attempts
-type QuestionAttempt = 
-  | MultipleChoiceQuestionAttempt 
-  | MatchingQuestionAttempt 
-  | MultipleCorrectQuestionAttempt 
-  | DiagramBasedQuestionAttempt 
-  | SequenceOrderingQuestionAttempt 
-  | BaseQuestionAttempt;
-
-import MultipleChoice from './MultipleChoice';
-import Matching from './Matching';
-import MultipleCorrect from './MultipleCorrect';
-import AssertionReason from './AssertionReason';
-import DiagramBased from './DiagramBased';
-import SequenceOrdering from './SequenceOrdering';
-
-// Define the component props
-interface QuestionContentProps {
-  attempt: QuestionAttempt;
-}
-
 // Helper function to convert specific question attempt to base type
 function prepareQuestionAttempt<T extends BaseQuestionAttemptWithAnswer>(
   attempt: T
 ): T {
-    // Explicitly preserve the original structure
-    
     const processAnswer = (answer: FlexibleAnswerType): FlexibleAnswerType => {
       if (answer === null) return null;
 
@@ -104,7 +82,7 @@ function prepareQuestionAttempt<T extends BaseQuestionAttemptWithAnswer>(
       if (typeof answer === 'string') {
         try {
           return JSON.parse(answer);
-        } catch (e) {
+        } catch {
           // If parsing fails, return the original string
           return answer;
         }
@@ -126,8 +104,17 @@ function prepareQuestionAttempt<T extends BaseQuestionAttemptWithAnswer>(
   } as T;
 }
 
+import MultipleChoice from './MultipleChoice';
+import Matching from './Matching';
+import MultipleCorrect from './MultipleCorrect';
+import AssertionReason from './AssertionReason';
+import DiagramBased from './DiagramBased';
+import SequenceOrdering from './SequenceOrdering';
+
+/**
+ * Renders the appropriate question component based on question type
+ */
 export default function QuestionContent({ attempt }: { attempt: BaseQuestionAttemptWithAnswer }) {
- 
   switch (attempt.questionType) {
     case 'MultipleChoice':
       return <MultipleChoice 

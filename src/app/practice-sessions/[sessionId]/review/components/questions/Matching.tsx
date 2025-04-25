@@ -46,10 +46,10 @@ interface MatchingAnswerObject {
 interface QuestionAttempt {
   questionText?: string;
   details?: {
-    items?: Item[] | StructuredItem[] | unknown[];
-    options?: Option[] | StructuredOption[] | unknown[];
-    left_items?: Item[] | unknown[]; // Alternative name sometimes used
-    right_items?: Option[] | unknown[]; // Alternative name sometimes used
+    items?: (Item | StructuredItem)[];
+    options?: (Option | StructuredOption)[];
+    left_items?: Item[];
+    right_items?: Option[];
     correctOption?: string; // For selection-based matching questions
     left_column_header?: string; // For structured data
     right_column_header?: string; // For structured data
@@ -66,58 +66,65 @@ interface MatchingProps {
   attempt: QuestionAttempt;
 }
 
-// A more specific interface for properly type-checking options with is_correct property
-interface OptionWithIsCorrect {
-  is_correct: boolean;
-  option_number?: string;
-  key?: string;
-  [key: string]: unknown;
+// Utility type guard to check if an option is a StructuredOption
+function isStructuredOption(option: unknown): option is StructuredOption {
+  return typeof option === 'object' && option !== null && 
+         'is_correct' in option && 
+         'option_text' in option && 
+         'option_number' in option;
+}
+
+// Utility type guard to check if an option is a StructuredItem
+function isStructuredItem(item: unknown): item is StructuredItem {
+  return typeof item === 'object' && item !== null && 
+         'left_item_text' in item && 
+         'left_item_label' in item && 
+         'right_item_text' in item && 
+         'right_item_label' in item;
 }
 
 // Find the correct option letter (A, B, C, D) for the answer
-function findCorrectOptionLetter(attempt: QuestionAttempt): string | null {
-  // First check structured options if available
-  if (attempt.details?.options && Array.isArray(attempt.details.options)) {
-    for (const option of attempt.details.options) {
-      // Check if this is a structured option with is_correct flag
-      if (typeof option === 'object' && option !== null && 'is_correct' in option) {
-        const typedOption = option as OptionWithIsCorrect;
-        if (typedOption.is_correct === true) {
-          return typedOption.option_number || typedOption.key || '';
-        }
-      }
-    }
-  }
+// function findCorrectOptionLetter(attempt: QuestionAttempt): string | null {
+//   // First check structured options if available
+//   if (attempt.details?.options && Array.isArray(attempt.details.options)) {
+//     for (const option of attempt.details.options) {
+//       // Check if this is a structured option with is_correct flag
+//       if (isStructuredOption(option) && option.is_correct === true) {
+//         return option.option_number;
+//       }
+//     }
+//   }
   
-  // Check other properties if structured options didn't give a result
-  if (attempt.correctAnswer) {
-    if (typeof attempt.correctAnswer === 'object') {
-      return attempt.correctAnswer.option || 
-             attempt.correctAnswer.selection || 
-             attempt.correctAnswer.selectedOption || 
-             null;
-    }
-    if (typeof attempt.correctAnswer === 'string') {
-      return attempt.correctAnswer;
-    }
-  }
+//   // Check other properties if structured options didn't give a result
+//   if (attempt.correctAnswer) {
+//     if (typeof attempt.correctAnswer === 'object' && attempt.correctAnswer !== null) {
+//       return (attempt.correctAnswer as MatchingAnswerObject).option || 
+//              (attempt.correctAnswer as MatchingAnswerObject).selection || 
+//              (attempt.correctAnswer as MatchingAnswerObject).selectedOption || 
+//              null;
+//     }
+//     if (typeof attempt.correctAnswer === 'string') {
+//       return attempt.correctAnswer;
+//     }
+//   }
   
-  // Check explicit correctOption property
-  if (attempt.correctOption) {
-    return attempt.correctOption;
-  }
+//   // Check explicit correctOption property
+//   if (attempt.correctOption) {
+//     return attempt.correctOption;
+//   }
   
-  return null;
-}
+//   return null;
+// }
 
 // Get the user-selected option letter
 function getUserSelectedOption(attempt: QuestionAttempt): string | null {
   if (!attempt.userAnswer) return null;
   
-  if (typeof attempt.userAnswer === 'object') {
-    return attempt.userAnswer.option || 
-           attempt.userAnswer.selection || 
-           attempt.userAnswer.selectedOption || 
+  if (typeof attempt.userAnswer === 'object' && attempt.userAnswer !== null) {
+    const userAnswerObj = attempt.userAnswer as MatchingAnswerObject;
+    return userAnswerObj.option || 
+           userAnswerObj.selection || 
+           userAnswerObj.selectedOption || 
            null;
   }
   
@@ -128,6 +135,7 @@ function getUserSelectedOption(attempt: QuestionAttempt): string | null {
         const parsed = JSON.parse(attempt.userAnswer);
         return parsed.option || parsed.selection || parsed.selectedOption || null;
       } catch (e) {
+        console.error('Error parsing user answer:', e);
         // Not JSON, use as-is
       }
     }
@@ -139,38 +147,28 @@ function getUserSelectedOption(attempt: QuestionAttempt): string | null {
 }
 
 // Extract text content for options text display
-function getOptionText(option: any): string {
-  if (typeof option === 'object' && option !== null) {
-    if ('option_text' in option) {
-      return option.option_text;
-    }
-    if ('text' in option) {
-      return option.text;
-    }
+function getOptionText(option: Option | StructuredOption): string {
+  if (isStructuredOption(option)) {
+    return option.option_text;
   }
-  return String(option || '');
+  return option.text;
 }
 
 // Extract option number/key for option identifier
-function getOptionNumber(option: any): string {
-  if (typeof option === 'object' && option !== null) {
-    if ('option_number' in option) {
-      return option.option_number;
-    }
-    if ('key' in option) {
-      return option.key;
-    }
+function getOptionNumber(option: Option | StructuredOption): string {
+  if (isStructuredOption(option)) {
+    return option.option_number;
   }
-  return '';
+  return option.key;
 }
 
 // Check if this is a structured data matching question
 function hasStructuredData(attempt: QuestionAttempt): boolean {
   // Check for structured items
-  if (attempt.details?.items && Array.isArray(attempt.details.items) && 
-      attempt.details.items.length > 0 && typeof attempt.details.items[0] === 'object') {
-    const firstItem = attempt.details.items[0] as Record<string, unknown>;
-    return firstItem !== null && 'left_item_text' in firstItem && 'right_item_text' in firstItem;
+  if (attempt.details?.items && 
+      attempt.details.items.length > 0 && 
+      isStructuredItem(attempt.details.items[0])) {
+    return true;
   }
   return false;
 }
@@ -178,19 +176,11 @@ function hasStructuredData(attempt: QuestionAttempt): boolean {
 export default function Matching({ attempt }: MatchingProps) {
   // Get user selection and correct option
   const userSelection = getUserSelectedOption(attempt);
-  const correctOption = findCorrectOptionLetter(attempt);
+  //const correctOption = findCorrectOptionLetter(attempt);
   
   // Check if we have structured data in the details
   const isStructuredFormat = hasStructuredData(attempt);
   
-  // Debugging logs
-  console.log('Raw user answer:', attempt?.userAnswer);
-  console.log('User selection:', userSelection);
-  console.log('Raw correct answer:', attempt?.correctAnswer);
-  console.log('Correct option:', correctOption);
-  console.log('Is structured format:', isStructuredFormat);
-  console.log('Details:', attempt?.details);
-
   // Render nothing if no attempt data
   if (!attempt) {
     return null;
@@ -235,8 +225,8 @@ export default function Matching({ attempt }: MatchingProps) {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                {attempt.details?.items && Array.isArray(attempt.details.items) && 
-                 attempt.details.items.map((item: any, idx: number) => (
+                {attempt.details?.items && 
+                 attempt.details.items.filter(isStructuredItem).map((item, idx) => (
                   <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
                       {item.left_item_label}. {item.left_item_text}
@@ -254,8 +244,8 @@ export default function Matching({ attempt }: MatchingProps) {
           <div className="mt-6">
             <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Answer Options:</h3>
             <div className="space-y-2">
-              {attempt.details?.options && Array.isArray(attempt.details.options) && 
-               attempt.details.options.map((option: any, idx: number) => {
+              {attempt.details?.options && 
+               attempt.details.options.filter(isStructuredOption).map((option, idx) => {
                 const optionNumber = getOptionNumber(option);
                 const optionText = getOptionText(option);
                 const isCorrect = option.is_correct === true;

@@ -161,6 +161,7 @@ function extractSelectedOption(answer: unknown): string | null {
           return selection ? String(selection).toUpperCase() : null;
         }
       } catch (e) {
+        console.error('Error parsing user answer:', e);
         // Not valid JSON, continue with the string as is
       }
     }

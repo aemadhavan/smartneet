@@ -44,100 +44,100 @@ interface DiagramBasedProps {
 }
 
 // Improved normalize options utility function
-function normalizeOptions(rawOptions: unknown): Option[] {
-  // If no options, return empty array
-  if (!rawOptions) return [];
+// function normalizeOptions(rawOptions: unknown): Option[] {
+//   // If no options, return empty array
+//   if (!rawOptions) return [];
   
-  // If rawOptions is already an array of objects with key and text, return it
-  if (Array.isArray(rawOptions) && rawOptions.length > 0 && 
-      rawOptions.every(o => typeof o === 'object' && o !== null && 'key' in o && 'text' in o)) {
-    return rawOptions as Option[];
-  }
+//   // If rawOptions is already an array of objects with key and text, return it
+//   if (Array.isArray(rawOptions) && rawOptions.length > 0 && 
+//       rawOptions.every(o => typeof o === 'object' && o !== null && 'key' in o && 'text' in o)) {
+//     return rawOptions as Option[];
+//   }
   
-  // If it's an array but has different structure
-  if (Array.isArray(rawOptions) && rawOptions.length > 0) {
-    // Special case for JSON strings like {"is_correct":false,"option_text":"D","option_number":"a"}
-    if (typeof rawOptions[0] === 'string' && 
-        (rawOptions[0].includes('"option_text"') || rawOptions[0].includes('"option_number"'))) {
-      return rawOptions.map((option, index) => {
-        try {
-          // Try to parse the JSON string
-          let optionObj: Record<string, unknown>;
+//   // If it's an array but has different structure
+//   if (Array.isArray(rawOptions) && rawOptions.length > 0) {
+//     // Special case for JSON strings like {"is_correct":false,"option_text":"D","option_number":"a"}
+//     if (typeof rawOptions[0] === 'string' && 
+//         (rawOptions[0].includes('"option_text"') || rawOptions[0].includes('"option_number"'))) {
+//       return rawOptions.map((option, index) => {
+//         try {
+//           // Try to parse the JSON string
+//           let optionObj: Record<string, unknown>;
           
-          if (typeof option === 'string') {
-            optionObj = JSON.parse(option);
-          } else if (typeof option === 'object' && option !== null) {
-            optionObj = option as Record<string, unknown>;
-          } else {
-            // Fallback for unexpected formats
-            return {
-              key: String.fromCharCode(65 + index),
-              text: String(option)
-            };
-          }
+//           if (typeof option === 'string') {
+//             optionObj = JSON.parse(option);
+//           } else if (typeof option === 'object' && option !== null) {
+//             optionObj = option as Record<string, unknown>;
+//           } else {
+//             // Fallback for unexpected formats
+//             return {
+//               key: String.fromCharCode(65 + index),
+//               text: String(option)
+//             };
+//           }
           
-          // Extract option_text and option_number
-          const key = typeof optionObj.option_number === 'string' ? optionObj.option_number : 
-                      typeof optionObj.key === 'string' ? optionObj.key :
-                      String.fromCharCode(65 + index);
+//           // Extract option_text and option_number
+//           const key = typeof optionObj.option_number === 'string' ? optionObj.option_number : 
+//                       typeof optionObj.key === 'string' ? optionObj.key :
+//                       String.fromCharCode(65 + index);
                       
-          const text = typeof optionObj.option_text === 'string' ? optionObj.option_text :
-                       typeof optionObj.text === 'string' ? optionObj.text :
-                       JSON.stringify(option);
+//           const text = typeof optionObj.option_text === 'string' ? optionObj.option_text :
+//                        typeof optionObj.text === 'string' ? optionObj.text :
+//                        JSON.stringify(option);
           
-          return { key, text };
-        } catch (e) {
-          console.error('Error parsing option JSON:', e);
-          return {
-            key: String.fromCharCode(65 + index),
-            text: String(option)
-          };
-        }
-      });
-    }
+//           return { key, text };
+//         } catch (e) {
+//           console.error('Error parsing option JSON:', e);
+//           return {
+//             key: String.fromCharCode(65 + index),
+//             text: String(option)
+//           };
+//         }
+//       });
+//     }
     
-    const firstItem = rawOptions[0];
+//     const firstItem = rawOptions[0];
     
-    // Check if items might be objects with different properties
-    if (typeof firstItem === 'object' && firstItem !== null) {
-      // Try to extract text from common properties
-      if ('text' in firstItem || 'label' in firstItem || 'value' in firstItem || 'content' in firstItem || 
-          'option_text' in firstItem || 'option_number' in firstItem) {
-        return rawOptions.map((option, index) => {
-          const typedOption = option as PossibleOptionFormat;
-          return {
-            key: typedOption.option_number || 
-                 typedOption.key?.toString() || 
-                 String.fromCharCode(65 + index), // A, B, C, etc.
-            text: String(
-              typedOption.option_text ||
-              typedOption.text || 
-              typedOption.label || 
-              typedOption.value || 
-              typedOption.content || 
-              JSON.stringify(option)
-            )
-          };
-        });
-      }
+//     // Check if items might be objects with different properties
+//     if (typeof firstItem === 'object' && firstItem !== null) {
+//       // Try to extract text from common properties
+//       if ('text' in firstItem || 'label' in firstItem || 'value' in firstItem || 'content' in firstItem || 
+//           'option_text' in firstItem || 'option_number' in firstItem) {
+//         return rawOptions.map((option, index) => {
+//           const typedOption = option as PossibleOptionFormat;
+//           return {
+//             key: typedOption.option_number || 
+//                  typedOption.key?.toString() || 
+//                  String.fromCharCode(65 + index), // A, B, C, etc.
+//             text: String(
+//               typedOption.option_text ||
+//               typedOption.text || 
+//               typedOption.label || 
+//               typedOption.value || 
+//               typedOption.content || 
+//               JSON.stringify(option)
+//             )
+//           };
+//         });
+//       }
       
-      // If object but no recognizable text property, stringify it
-      return rawOptions.map((option, index) => ({
-        key: String.fromCharCode(65 + index),
-        text: JSON.stringify(option)
-      }));
-    }
+//       // If object but no recognizable text property, stringify it
+//       return rawOptions.map((option, index) => ({
+//         key: String.fromCharCode(65 + index),
+//         text: JSON.stringify(option)
+//       }));
+//     }
     
-    // Handle primitives (strings, numbers, etc.)
-    return rawOptions.map((option, index) => ({
-      key: String.fromCharCode(65 + index),
-      text: String(option)
-    }));
-  }
+//     // Handle primitives (strings, numbers, etc.)
+//     return rawOptions.map((option, index) => ({
+//       key: String.fromCharCode(65 + index),
+//       text: String(option)
+//     }));
+//   }
   
-  // Last resort - try to handle it as a single item or unknown structure
-  return [];
-}
+//   // Last resort - try to handle it as a single item or unknown structure
+//   return [];
+// }
 
 export default function DiagramBased({ attempt }: DiagramBasedProps) {
   // Add null checks for all potentially undefined properties
@@ -164,6 +164,7 @@ export default function DiagramBased({ attempt }: DiagramBasedProps) {
         };
       } catch (e) {
         // If parsing fails, return the original
+        console.error('Error parsing option text JSON:', e);
         return optionObj;
       }
     }

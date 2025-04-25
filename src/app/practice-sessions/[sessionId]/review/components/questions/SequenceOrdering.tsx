@@ -17,17 +17,19 @@ interface SequenceAnswerObject {
   [key: string]: unknown;
 }
 
+interface OptionItem {
+  option_number?: string;
+  key?: string;
+  option_text?: string;
+  text?: string;
+  is_correct?: boolean;
+  isCorrect?: boolean;
+}
+
 interface QuestionAttempt {
   questionText?: string;
   details?: {
-    options?: Array<{
-      option_number?: string;
-      option_text?: string;
-      is_correct?: boolean;
-      key?: string; 
-      text?: string;
-      isCorrect?: boolean;
-    }>;
+    options?: OptionItem[];
     sequence_items?: SequenceItem[];
     items?: SequenceItem[] | unknown[];
   } | null;
@@ -78,7 +80,7 @@ function getSequenceItems(attempt: QuestionAttempt): { key: string; text: string
 }
 
 // Get the sequence from options (e.g., "E-C-A-D-B")
-function getSequenceFromOption(options: any[], optionKey: string): string[] {
+function getSequenceFromOption(options: OptionItem[], optionKey: string): string[] {
   if (!Array.isArray(options)) return [];
   
   const option = options.find(opt => 

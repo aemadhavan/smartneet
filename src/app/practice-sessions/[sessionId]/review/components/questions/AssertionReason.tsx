@@ -63,6 +63,7 @@ function extractSelection(answer: unknown): string {
                typeof parsed.option === 'string' ? parsed.option :
                typeof parsed.selectedOption === 'string' ? parsed.selectedOption : '';
       } catch (e) {
+        console.error('Failed to parse JSON:', e);
         // Not valid JSON, return the string itself if it's a single character
         if (answer.length === 1) return answer;
         return '';
@@ -131,7 +132,7 @@ function findCorrectAnswer(details: QuestionAttempt['details']): string {
 }
 
 export default function AssertionReason({ attempt }: AssertionReasonProps) {
-  let userAnswer = extractSelection(attempt?.userAnswer)?.toLowerCase();
+  const userAnswer = extractSelection(attempt?.userAnswer)?.toLowerCase();
   
   // First try to get the correct answer from the correctAnswer property
   let correctAnswer = extractSelection(attempt?.correctAnswer)?.toLowerCase();
