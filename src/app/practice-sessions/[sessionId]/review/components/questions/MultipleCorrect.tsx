@@ -18,12 +18,12 @@ interface StatementsAnswerObject {
 interface QuestionAttempt {
   questionText?: string;
   details?: {
-    statements?: Statement[];
+    statements?: Statement[] | unknown[];
   } | null;
   isImageBased?: boolean | null | undefined;
   imageUrl?: string | null | undefined;
-  userAnswer?: StatementsAnswerObject | null;
-  correctAnswer?: StatementsAnswerObject | null;
+  userAnswer?: StatementsAnswerObject | string | null;
+  correctAnswer?: StatementsAnswerObject | string | null;
 }
 
 interface MultipleCorrectProps {
@@ -45,12 +45,42 @@ function normalizeStatements(rawStatements: unknown): Statement[] {
   }));
 }
 
+// Helper function to extract selected statements from various formats
+function extractSelectedStatements(answer: unknown): string[] {
+  if (!answer) return [];
+  
+  // If answer is already an array, return it
+  if (Array.isArray(answer)) return answer;
+  
+  // If answer is an object with a selectedStatements property
+  if (typeof answer === 'object' && answer !== null && 'selectedStatements' in answer) {
+    const selectedStatements = (answer as StatementsAnswerObject).selectedStatements;
+    return Array.isArray(selectedStatements) ? selectedStatements : [];
+  }
+  
+  // If answer is a string that might be JSON
+  if (typeof answer === 'string') {
+    try {
+      const parsed = JSON.parse(answer);
+      if (Array.isArray(parsed)) return parsed;
+      if (typeof parsed === 'object' && parsed !== null && 'selectedStatements' in parsed) {
+        const selectedStatements = parsed.selectedStatements;
+        return Array.isArray(selectedStatements) ? selectedStatements : [];
+      }
+    } catch (e) {
+      // Not a valid JSON string, ignore
+    }
+  }
+  
+  return [];
+}
+
 export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
   // Add null checks for all potentially undefined properties
   const rawStatements = attempt?.details?.statements ?? [];
   const statements = normalizeStatements(rawStatements);
-  const userSelections = attempt?.userAnswer?.selectedStatements ?? [];
-  const correctSelections = attempt?.correctAnswer?.selectedStatements ?? [];
+  const userSelections = extractSelectedStatements(attempt?.userAnswer);
+  const correctSelections = extractSelectedStatements(attempt?.correctAnswer);
   
   // Render nothing if no attempt data
   if (!attempt) {

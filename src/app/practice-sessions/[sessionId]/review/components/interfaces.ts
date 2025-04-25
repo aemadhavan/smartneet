@@ -31,9 +31,16 @@ export interface SequenceOrderingAnswer {
 
 export interface DiagramBasedAnswer {
   selectedOption?: string;
+  selection?: string; // Add this to handle both naming conventions
   [key: string]: string | number | boolean | undefined;
 }
-
+export interface DiagramBasedDetails extends QuestionDetails {
+  options: Array<{ 
+    key: string; 
+    text: string;
+    isCorrect?: boolean;
+  }>;
+}
 export interface AssertionReasonAnswer {
   selection: string;
   statement1?: string;
@@ -55,6 +62,18 @@ export type FlexibleAnswerType =
   | AssertionReasonAnswer
   | Record<string, unknown> // Replaced 'any' with 'unknown'
   | null;
+
+  export interface OptionFormat {
+    key?: string;
+    option_number?: string | number;
+    text?: string;
+    option_text?: string;
+    label?: string;
+    value?: string;
+    content?: string;
+    is_correct?: boolean;
+    isCorrect?: boolean;
+  }
 
 export interface QuestionDetails {
   options?: Array<{ key: string; text: string }>;

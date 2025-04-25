@@ -86,6 +86,7 @@ export function QuestionDisplay({
   const renderQuestionContent = () => {
     switch (question.question_type) {
       case 'MultipleChoice':
+        console.log('Multiple choice question:', question.question_id, details);
         return (
           <MultipleChoiceQuestion
             details={details as MultipleChoiceDetails}

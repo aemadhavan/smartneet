@@ -5,7 +5,8 @@ import {
   MatchingAnswer,
   MultipleCorrectAnswer,
   SequenceOrderingAnswer,
-  DiagramBasedAnswer
+  DiagramBasedAnswer,
+  QuestionType
 } from '../interfaces';
 
 // Option interfaces for each question type
@@ -23,9 +24,16 @@ type DetailsWithOptions<T> = {
 
 // Utility function to convert answer to FlexibleAnswerType
 function convertToFlexibleAnswer(answer: Record<string, unknown> | null): FlexibleAnswerType {
-  return answer;
+  if (answer === null) return null;
+  
+  // Create a new object that spreads the original answer
+  // This helps preserve the original structure while making it flexibly typed
+  return { ...answer };
 }
-
+interface BaseQuestionAttemptWithAnswer extends BaseQuestionAttempt {
+  userAnswer: FlexibleAnswerType;
+  correctAnswer: FlexibleAnswerType;
+}
 // Specific typed question attempts
 interface MultipleChoiceQuestionAttempt extends BaseQuestionAttempt {
   details: DetailsWithOptions<{ options?: Option[] }>;
@@ -84,21 +92,42 @@ interface QuestionContentProps {
 }
 
 // Helper function to convert specific question attempt to base type
-function prepareQuestionAttempt<T extends BaseQuestionAttempt>(
-  attempt: T & { 
-    userAnswer: Record<string, unknown> | null; 
-    correctAnswer: Record<string, unknown> | null 
-  }
+function prepareQuestionAttempt<T extends BaseQuestionAttemptWithAnswer>(
+  attempt: T
 ): T {
+    // Explicitly preserve the original structure
+    
+    const processAnswer = (answer: FlexibleAnswerType): FlexibleAnswerType => {
+      if (answer === null) return null;
+
+      // If it's a string, try to parse it as JSON
+      if (typeof answer === 'string') {
+        try {
+          return JSON.parse(answer);
+        } catch (e) {
+          // If parsing fails, return the original string
+          return answer;
+        }
+      }
+
+      // If it's an object, create a new object that maintains the original properties
+      if (typeof answer === 'object' && answer !== null) {
+        const newAnswer = { ...answer };
+        return newAnswer;
+      }
+
+      return answer;
+    };
+
   return {
     ...attempt,
-    userAnswer: convertToFlexibleAnswer(attempt.userAnswer),
-    correctAnswer: convertToFlexibleAnswer(attempt.correctAnswer),
-    isImageBased: attempt.isImageBased
-  };
+    userAnswer: processAnswer(attempt.userAnswer),
+    correctAnswer: processAnswer(attempt.correctAnswer),
+  } as T;
 }
 
-export default function QuestionContent({ attempt }: QuestionContentProps) {
+export default function QuestionContent({ attempt }: { attempt: BaseQuestionAttemptWithAnswer }) {
+ 
   switch (attempt.questionType) {
     case 'MultipleChoice':
       return <MultipleChoice 
@@ -113,7 +142,17 @@ export default function QuestionContent({ attempt }: QuestionContentProps) {
         attempt={prepareQuestionAttempt(attempt as MultipleCorrectQuestionAttempt)} 
       />;
     case 'AssertionReason':
-      return <AssertionReason attempt={attempt} />;
+      // Create a compatible attempt object for AssertionReason
+      const assertionAttempt = {
+        ...attempt,
+        userAnswer: typeof attempt.userAnswer === 'string' ? attempt.userAnswer : 
+                    attempt.userAnswer && typeof attempt.userAnswer === 'object' ? 
+                    { ...attempt.userAnswer } : null,
+        correctAnswer: typeof attempt.correctAnswer === 'string' ? attempt.correctAnswer : 
+                      attempt.correctAnswer && typeof attempt.correctAnswer === 'object' ? 
+                      { ...attempt.correctAnswer } : null
+      };
+      return <AssertionReason attempt={assertionAttempt} />;
     case 'DiagramBased':
       return <DiagramBased 
         attempt={prepareQuestionAttempt(attempt as DiagramBasedQuestionAttempt)} 

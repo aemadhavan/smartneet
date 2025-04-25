@@ -1,56 +1,186 @@
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
 
-// Define an interface for the item structure
+// Define interfaces for different item formats
 interface SequenceItem {
-  key: string;
-  text: string;
-  [key: string]: unknown; // For any additional properties
+  key?: string;
+  item_number?: number;
+  item_text?: string;
+  text?: string;
+  [key: string]: unknown;
 }
 
-// Create more specific types to avoid using 'any'
-type SequenceArray = string[];
 interface SequenceAnswerObject {
-  sequence?: SequenceArray;
-  [key: string]: unknown; // Still allows for flexibility but avoids ESLint errors
+  selection?: string;
+  option?: string;
+  sequence?: string[];
+  [key: string]: unknown;
 }
 
-// Define a more flexible QuestionAttempt interface
 interface QuestionAttempt {
   questionText?: string;
   details?: {
-    items?: SequenceItem[];
+    options?: Array<{
+      option_number?: string;
+      option_text?: string;
+      is_correct?: boolean;
+      key?: string; 
+      text?: string;
+      isCorrect?: boolean;
+    }>;
+    sequence_items?: SequenceItem[];
+    items?: SequenceItem[] | unknown[];
   } | null;
   isImageBased?: boolean | null | undefined;
   imageUrl?: string | null | undefined;
-  userAnswer?: SequenceAnswerObject | null;
-  correctAnswer?: SequenceAnswerObject | null;
+  userAnswer?: SequenceAnswerObject | string | null;
+  correctAnswer?: SequenceAnswerObject | string | null;
 }
 
 interface SequenceOrderingProps {
   attempt: QuestionAttempt;
 }
 
-// Utility function to normalize items
-function normalizeItems(rawItems: unknown): SequenceItem[] {
-  // If rawItems is already an array of objects with key and text, return it
-  if (Array.isArray(rawItems) && rawItems.every(item => 
-    typeof item === 'object' && item !== null && 'key' in item && 'text' in item)) {
-    return rawItems as SequenceItem[];
+// Helper function to parse sequence strings like "E-C-A-D-B"
+function parseSequenceString(sequenceStr: string | undefined): string[] {
+  if (!sequenceStr) return [];
+  return sequenceStr.split('-');
+}
+
+// Get sequence items from either sequence_items or items
+function getSequenceItems(attempt: QuestionAttempt): { key: string; text: string }[] {
+  // Check for sequence_items (from your JSON example)
+  if (attempt?.details?.sequence_items && Array.isArray(attempt.details.sequence_items)) {
+    return attempt.details.sequence_items.map(item => ({
+      key: String(item.item_number || ''),
+      text: item.item_text || ''
+    }));
   }
   
-  // If it's an array of strings or other types, convert to SequenceItem
-  return (Array.isArray(rawItems) ? rawItems : []).map((item, index: number) => ({
-    key: String.fromCharCode(65 + index), // A, B, C, etc.
-    text: String(item)
-  }));
+  // Fallback to items 
+  if (attempt?.details?.items && Array.isArray(attempt.details.items)) {
+    return attempt.details.items.map((item, index) => {
+      if (typeof item === 'object' && item !== null) {
+        const typedItem = item as Record<string, unknown>;
+        return {
+          key: String(typedItem.key || typedItem.item_number || String.fromCharCode(65 + index)),
+          text: String(typedItem.text || typedItem.item_text || `Item ${index + 1}`)
+        };
+      }
+      return {
+        key: String.fromCharCode(65 + index),
+        text: String(item)
+      };
+    });
+  }
+  
+  return [];
+}
+
+// Get the sequence from options (e.g., "E-C-A-D-B")
+function getSequenceFromOption(options: any[], optionKey: string): string[] {
+  if (!Array.isArray(options)) return [];
+  
+  const option = options.find(opt => 
+    opt.option_number === optionKey || opt.key === optionKey
+  );
+  
+  if (!option) return [];
+  
+  // Try to get the sequence string from option_text or text
+  const sequenceStr = option.option_text || option.text;
+  if (typeof sequenceStr === 'string' && sequenceStr.includes('-')) {
+    return parseSequenceString(sequenceStr);
+  }
+  
+  return [];
+}
+
+// Get user's sequence
+function getUserSequence(attempt: QuestionAttempt): string[] {
+  if (!attempt?.userAnswer) return [];
+  
+  // If userAnswer has a sequence property directly
+  if (typeof attempt.userAnswer === 'object' && 
+      attempt.userAnswer !== null && 
+      attempt.userAnswer.sequence && 
+      Array.isArray(attempt.userAnswer.sequence)) {
+    return attempt.userAnswer.sequence;
+  }
+  
+  // If userAnswer is a selection option like "a", "b", "c", etc.
+  if (typeof attempt.userAnswer === 'object' && 
+      attempt.userAnswer !== null && 
+      (attempt.userAnswer.selection || attempt.userAnswer.option)) {
+    const optionKey = attempt.userAnswer.selection || attempt.userAnswer.option;
+    if (optionKey && attempt.details?.options) {
+      return getSequenceFromOption(attempt.details.options, optionKey);
+    }
+  }
+  
+  // If userAnswer is a string option key
+  if (typeof attempt.userAnswer === 'string' && attempt.details?.options) {
+    return getSequenceFromOption(attempt.details.options, attempt.userAnswer);
+  }
+  
+  return [];
+}
+
+// Get correct sequence
+function getCorrectSequence(attempt: QuestionAttempt): string[] {
+  if (!attempt?.correctAnswer) return [];
+  
+  // If correctAnswer has a sequence property directly
+  if (typeof attempt.correctAnswer === 'object' && 
+      attempt.correctAnswer !== null && 
+      attempt.correctAnswer.sequence && 
+      Array.isArray(attempt.correctAnswer.sequence)) {
+    return attempt.correctAnswer.sequence;
+  }
+  
+  // If correctAnswer is a selection option like "a", "b", "c", etc.
+  if (typeof attempt.correctAnswer === 'object' && 
+      attempt.correctAnswer !== null && 
+      (attempt.correctAnswer.selection || attempt.correctAnswer.option)) {
+    const optionKey = attempt.correctAnswer.selection || attempt.correctAnswer.option;
+    if (optionKey && attempt.details?.options) {
+      return getSequenceFromOption(attempt.details.options, optionKey);
+    }
+  }
+  
+  // If correctAnswer is a string option key
+  if (typeof attempt.correctAnswer === 'string' && attempt.details?.options) {
+    return getSequenceFromOption(attempt.details.options, attempt.correctAnswer);
+  }
+  
+  // Try to find the correct option directly from options
+  if (attempt.details?.options) {
+    const correctOption = attempt.details.options.find(opt => 
+      opt.is_correct === true || opt.isCorrect === true
+    );
+    
+    if (correctOption) {
+      const sequenceStr = correctOption.option_text || correctOption.text;
+      if (typeof sequenceStr === 'string' && sequenceStr.includes('-')) {
+        return parseSequenceString(sequenceStr);
+      }
+    }
+  }
+  
+  return [];
+}
+
+// Find text description for a sequence item
+function getItemDescription(sequenceItems: { key: string; text: string }[], key: string): string {
+  const item = sequenceItems.find(item => item.key === key);
+  return item?.text || `Item ${key}`;
 }
 
 export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
-  // Add null checks for all potentially undefined properties
-  const items = normalizeItems(attempt?.details?.items);
-  const userSequence = attempt?.userAnswer?.sequence ?? [];
-  const correctSequence = attempt?.correctAnswer?.sequence ?? [];
+  // Get sequence items, user sequence, and correct sequence
+  const sequenceItems = getSequenceItems(attempt);
+  const userSequence = getUserSequence(attempt);
+  const correctSequence = getCorrectSequence(attempt);
   
   // Render nothing if no attempt data
   if (!attempt) {
@@ -82,8 +212,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
       <div className="mt-4">
         <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Your Sequence:</h3>
         <div className="flex flex-wrap gap-2 mb-6">
-          {userSequence.map((itemKey: string, idx: number) => {
-            const item = items.find((i: SequenceItem) => i.key === itemKey);
+          {userSequence.map((itemKey, idx) => {
             const correctPositionIndex = correctSequence.indexOf(itemKey);
             const isCorrectPosition = correctPositionIndex === idx;
             
@@ -100,7 +229,9 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
                   <div className="mr-2 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-800 dark:text-gray-200">
                     {idx + 1}
                   </div>
-                  <p className="text-gray-700 dark:text-gray-300">{item?.text || `Item ${itemKey}`}</p>
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {getItemDescription(sequenceItems, itemKey)}
+                  </p>
                   <div className="ml-2">
                     {isCorrectPosition ? (
                       <CheckCircle className="text-green-600 dark:text-green-400" size={18} />
@@ -109,7 +240,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
                     )}
                   </div>
                 </div>
-                {!isCorrectPosition && (
+                {!isCorrectPosition && correctPositionIndex !== -1 && (
                   <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                     Correct position: {correctPositionIndex + 1}
                   </div>
@@ -121,9 +252,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
         
         <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-3">Correct Sequence:</h3>
         <div className="flex flex-wrap gap-2">
-          {correctSequence.map((itemKey: string, idx: number) => {
-            const item = items.find((i: SequenceItem) => i.key === itemKey);
-            
+          {correctSequence.map((itemKey, idx) => {
             return (
               <div
                 key={idx}
@@ -133,7 +262,9 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
                   <div className="mr-2 w-6 h-6 rounded-full bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-800 dark:text-green-200">
                     {idx + 1}
                   </div>
-                  <p className="text-green-800 dark:text-green-300">{item?.text || `Item ${itemKey}`}</p>
+                  <p className="text-green-800 dark:text-green-300">
+                    {getItemDescription(sequenceItems, itemKey)}
+                  </p>
                 </div>
               </div>
             );

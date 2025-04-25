@@ -1,3 +1,4 @@
+//File: /src/app/practice-sessions/[sessionId]/review/hooks/useSessionReview.ts
 import { useState, useEffect } from 'react';
 import { QuestionAttempt, SessionSummary } from '../components/interfaces';
 import { normalizeQuestionAttempt } from '../components/helpers';
@@ -35,8 +36,8 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
           throw new Error(errorData.error || 'Failed to fetch session review data');
         }
         
-        const reviewData = await reviewResponse.json();
-        
+        const reviewData = await reviewResponse.json();      
+        console.log('Review Data:', reviewData); // Debugging line
         // Normalize the data format to handle API changes
         const normalizedAttempts = reviewData.attempts.map(normalizeQuestionAttempt);
         setAttempts(normalizedAttempts);
