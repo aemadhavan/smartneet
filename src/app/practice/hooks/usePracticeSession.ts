@@ -8,6 +8,19 @@ interface SubscriptionError {
   limitReached?: boolean;
 }
 
+interface PracticeSessionCache {
+  session: SessionResponse;
+  userAnswers: Record<number, string>;
+  timestamp: number;
+  currentIndex: number;
+}
+
+// Default number of questions per session
+const DEFAULT_QUESTION_COUNT = 20;
+
+// TTL for cached session data in milliseconds (5 minutes)
+const SESSION_CACHE_TTL = 5 * 60 * 1000;
+
 export function usePracticeSession(
   selectedSubject: Subject | null,
   onResetSubject?: (subject: Subject | null) => void, // Callback prop
@@ -22,8 +35,49 @@ export function usePracticeSession(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Session caching reference
+  const sessionCacheKey = useRef<string | null>(null);
+  
   // Use ref to break dependency cycle
   const handleCompleteSessionRef = useRef<(() => Promise<void>) | null>(null);
+
+  // Helper to get/set session data from/to localStorage cache
+  const sessionCache = {
+    getCache: useCallback((key: string): PracticeSessionCache | null => {
+      try {
+        const cachedData = localStorage.getItem(key);
+        if (!cachedData) return null;
+        
+        const parsedData = JSON.parse(cachedData) as PracticeSessionCache;
+        
+        // Check if cache is still valid (within TTL)
+        if (Date.now() - parsedData.timestamp > SESSION_CACHE_TTL) {
+          localStorage.removeItem(key);
+          return null;
+        }
+        
+        return parsedData;
+      } catch (e) {
+        console.warn('Failed to read session cache:', e);
+        return null;
+      }
+    }, []),
+    
+    setCache: useCallback((key: string, data: PracticeSessionCache): void => {
+      try {
+        localStorage.setItem(key, JSON.stringify({
+          ...data,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('Failed to save session cache:', e);
+      }
+    }, []),
+    
+    clearCache: useCallback((key: string): void => {
+      localStorage.removeItem(key);
+    }, [])
+  };
 
   // Create a session function - made into a callback so it can be called manually
   const createSession = useCallback(async (subject: Subject) => {
@@ -36,6 +90,22 @@ export function usePracticeSession(
       setUserAnswers({});
       setCurrentQuestionIndex(0);
       
+      // Generate a cache key based on subject/topic/subtopic
+      sessionCacheKey.current = `practice_session:${subject.subject_id}:${topicId || 'all'}:${subtopicId || 'all'}`;
+      
+      // Check if we have a cached session
+      const cachedSession = sessionCache.getCache(sessionCacheKey.current);
+      
+      if (cachedSession && !sessionCompleted) {
+        // Restore session from cache
+        setSession(cachedSession.session);
+        setUserAnswers(cachedSession.userAnswers);
+        setCurrentQuestionIndex(cachedSession.currentIndex);
+        console.log('Restored session from cache');
+        setLoading(false);
+        return cachedSession.session;
+      }
+      
       // Build the session request payload
       const sessionPayload: {
         subject_id: number;
@@ -46,7 +116,7 @@ export function usePracticeSession(
       } = {
         subject_id: subject.subject_id,
         session_type: 'Practice',
-        question_count: 10, // Default number of questions
+        question_count: DEFAULT_QUESTION_COUNT,
       };
       
       // Add topic_id if provided
@@ -59,12 +129,22 @@ export function usePracticeSession(
         sessionPayload.subtopic_id = subtopicId;
       }
       
-      const response = await fetch('/api/practice-sessions', {
+      // Add an offline indicator to the URL to handle network issues
+      const apiUrl = '/api/practice-sessions';
+      const queryParams = new URLSearchParams();
+      
+      // Add parameters to query string
+      Object.entries(sessionPayload).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+      
+      const response = await fetch(`${apiUrl}?${queryParams.toString()}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(sessionPayload),
+        }
       });
       
       const data = await response.json();
@@ -89,14 +169,40 @@ export function usePracticeSession(
         throw new Error(data.error || 'Failed to create practice session');
       }
       
+      // Cache the new session
+      if (sessionCacheKey.current) {
+        sessionCache.setCache(sessionCacheKey.current, {
+          session: data,
+          userAnswers: {},
+          timestamp: Date.now(),
+          currentIndex: 0
+        });
+      }
+      
       setSession(data);
+      return data;
     } catch (err) {
       console.error('Error creating session:', err);
       setError(err instanceof Error ? err.message : 'Failed to load practice session. Please try again.');
+      
+      // If we have network issues, try to recover from cached session
+      if (sessionCacheKey.current) {
+        const cachedSession = sessionCache.getCache(sessionCacheKey.current);
+        if (cachedSession) {
+          console.log('Using cached session due to network error');
+          setSession(cachedSession.session);
+          setUserAnswers(cachedSession.userAnswers);
+          setCurrentQuestionIndex(cachedSession.currentIndex);
+          setError('Using cached session due to network issues. Your progress will be saved locally.');
+          return cachedSession.session;
+        }
+      }
+      
+      return null;
     } finally {
       setLoading(false);
     }
-  }, [topicId, subtopicId, onSessionError]);
+  }, [topicId, subtopicId, onSessionError, sessionCache, sessionCompleted]);
 
   // Create a session when subject changes, but only if auto-creation is desired
   useEffect(() => {
@@ -114,14 +220,64 @@ export function usePracticeSession(
     }
   }, [currentQuestionIndex, userAnswers, session]);
 
+  // Update cache when session state changes
+  useEffect(() => {
+    if (session && sessionCacheKey.current && !sessionCompleted) {
+      sessionCache.setCache(sessionCacheKey.current, {
+        session,
+        userAnswers,
+        timestamp: Date.now(),
+        currentIndex: currentQuestionIndex
+      });
+    }
+  }, [session, userAnswers, currentQuestionIndex, sessionCompleted, sessionCache]);
+
   // Handle option selection
   const handleOptionSelect = useCallback((questionId: number, optionNumber: string) => {
     if (!session) return;
-    setUserAnswers((prev) => ({
-      ...prev,
-      [questionId]: optionNumber,
-    }));
-  }, [session]);
+    
+    setUserAnswers((prev) => {
+      const updated = {
+        ...prev,
+        [questionId]: optionNumber,
+      };
+      
+      // Update the cache with new answers
+      if (sessionCacheKey.current && session) {
+        sessionCache.setCache(sessionCacheKey.current, {
+          session,
+          userAnswers: updated,
+          timestamp: Date.now(),
+          currentIndex: currentQuestionIndex
+        });
+      }
+      
+      return updated;
+    });
+    
+    // Debounced API call to save the answer - no need to wait for response
+    const saveAnswer = () => {
+      if (!session) return;
+      
+      fetch(`/api/question-attempts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: session.sessionId,
+          questionId,
+          userAnswer: optionNumber,
+        }),
+      }).catch(err => {
+        console.warn('Failed to save answer, will retry later:', err);
+        // We don't need to handle this error - the answer is cached locally
+      });
+    };
+    
+    // Add a small delay to avoid too many API calls when user is selecting different options
+    setTimeout(saveAnswer, 500);
+  }, [session, currentQuestionIndex, sessionCache]);
 
   // Handle completion of session
   const handleCompleteSession = useCallback(async () => {
@@ -158,12 +314,19 @@ export function usePracticeSession(
 
       const responseData = await response.json();
       console.log('Submission successful:', responseData);
+      
+      // Mark session as completed in state
       setSessionCompleted(true);
+      
+      // Clear the session cache since it's completed
+      if (sessionCacheKey.current) {
+        sessionCache.clearCache(sessionCacheKey.current);
+      }
     } catch (err) {
       console.error('Error completing session:', err);
       alert('Failed to submit answers. Please try again.');
     }
-  }, [session, userAnswers]);
+  }, [session, userAnswers, sessionCache]);
   
   // Store the most recent version of handleCompleteSession in the ref
   useEffect(() => {
@@ -174,14 +337,34 @@ export function usePracticeSession(
   const handleNextQuestion = useCallback(() => {
     if (!session) return;
     if (currentQuestionIndex < session.questions.length - 1) {
-      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
+      setCurrentQuestionIndex(prevIndex => {
+        const newIndex = prevIndex + 1;
+        
+        // Update the cache with new index
+        if (sessionCacheKey.current && session) {
+          sessionCache.setCache(sessionCacheKey.current, {
+            session,
+            userAnswers,
+            timestamp: Date.now(),
+            currentIndex: newIndex
+          });
+        }
+        
+        return newIndex;
+      });
     } else {
       handleCompleteSession();
     }
-  }, [currentQuestionIndex, session, handleCompleteSession]);
+  }, [currentQuestionIndex, session, userAnswers, handleCompleteSession, sessionCache]);
 
   // Handle start of a new session
   const handleStartNewSession = useCallback(() => {
+    // Clear the session cache
+    if (sessionCacheKey.current) {
+      sessionCache.clearCache(sessionCacheKey.current);
+      sessionCacheKey.current = null;
+    }
+    
     // Clear ALL session-related state including the session object itself
     setSession(null);
     setSessionCompleted(false);
@@ -199,7 +382,14 @@ export function usePracticeSession(
         onResetSubject(tempSubject);
       }, 200);
     }
-  }, [selectedSubject, onResetSubject]); // Removed createSession as it's not used
+  }, [selectedSubject, onResetSubject, sessionCache]); 
+
+  // Handle retry when there's an error
+  const handleRetry = useCallback(() => {
+    if (selectedSubject) {
+      createSession(selectedSubject);
+    }
+  }, [selectedSubject, createSession]);
 
   return {
     session,
@@ -215,6 +405,7 @@ export function usePracticeSession(
     handleNextQuestion,
     handleCompleteSession,
     handleStartNewSession,
+    handleRetry,
     createSession // Expose the createSession function so it can be called manually
   };
 }
