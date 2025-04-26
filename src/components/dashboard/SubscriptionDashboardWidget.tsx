@@ -1,7 +1,6 @@
 // src/components/dashboard/SubscriptionDashboardWidget.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Loader2, Award, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
@@ -15,15 +14,16 @@ export default function SubscriptionDashboardWidget() {
     refetch 
   } = useSubscriptionLimits();
 
-  // Format date nicely
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    }).format(date);
-  };
+  // Function is defined but not used - removing the declaration
+  // and keeping it as a comment in case it might be needed later
+  // const formatDate = (dateString: string) => {
+  //   const date = new Date(dateString);
+  //   return new Intl.DateTimeFormat('en-US', { 
+  //     year: 'numeric', 
+  //     month: 'long', 
+  //     day: 'numeric' 
+  //   }).format(date);
+  // };
 
   if (loading) {
     return (
@@ -100,7 +100,7 @@ export default function SubscriptionDashboardWidget() {
           ) : (
             <>
               <div className="flex justify-between mb-1">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Today's tests</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Today&apos;s tests</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   {limitStatus.usedToday} / {limitStatus.limitPerDay}
                 </span>

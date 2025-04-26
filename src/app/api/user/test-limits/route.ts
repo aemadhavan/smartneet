@@ -7,7 +7,30 @@ import { subscription_plans, user_subscriptions } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { cache } from '@/lib/cache';
 
-export async function GET() {
+// Define types for the response structure
+interface LimitStatus {
+  canTake: boolean;
+  isUnlimited: boolean;
+  usedToday: number;
+  limitPerDay: number | null;
+  remainingToday: number;
+  reason: string | null;
+}
+
+interface SubscriptionInfo {
+  id: number;
+  planName: string;
+  planCode: string;
+  status: string;
+  lastTestDate: string | null;
+}
+
+interface TestLimitResponse {
+  limitStatus: LimitStatus;
+  subscription: SubscriptionInfo;
+}
+
+export async function GET(request: Request) {
   try {
     // Check authentication
     const { userId } = await auth();
@@ -17,13 +40,17 @@ export async function GET() {
         { status: 401 }
       );
     }
+    // Get URL to check for cache-busting parameter
+    const url = new URL(request.url);
+    const skipCache = url.searchParams.has('t');
 
     // Define cache key for test limit status
     const cacheKey = `user:${userId}:test-limits`;
     
     // Try to get from cache first (short TTL as this changes frequently)
-    let response = await cache.get<Record<string, any>>(cacheKey);
-    let source = 'cache';
+    // Only if skipCache is false
+    let response = skipCache ? null : await cache.get<TestLimitResponse>(cacheKey);
+    let source = skipCache ? 'forced-refresh' : 'cache';
     
     if (!response) {
       // Get user subscription
@@ -52,36 +79,45 @@ export async function GET() {
         );
       }
       
-      // Check if user can take a test
-      const { canTake, reason } = await subscriptionService.canUserTakeTest(userId);
-      
-      // Determine if unlimited tests
-      const isUnlimited = plan.test_limit_daily === null;
-      
-      // Calculate remaining tests
-      const testsUsedToday = subscription.tests_used_today || 0;
-      const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
-      const remainingToday = isUnlimited ? Infinity : Math.max(0, limitPerDay - testsUsedToday);
-      
-      // Build response
-      const limitStatus = {
-        canTake,
-        isUnlimited,
-        usedToday: testsUsedToday,
-        limitPerDay: isUnlimited ? null : limitPerDay,
-        remainingToday,
-        reason: canTake ? null : reason
-      };
-      
-      response = {
-        limitStatus,
-        subscription: {
-          id: subscription.subscription_id,
-          planName: plan.plan_name,
-          planCode: plan.plan_code,
-          status: subscription.status
-        }
-      };
+      try {
+        // Check if user can take a test
+        const { canTake, reason } = await subscriptionService.canUserTakeTest(userId);
+        
+        // Determine if unlimited tests
+        const isUnlimited = plan.test_limit_daily === null;
+        
+        // Calculate remaining tests
+        const testsUsedToday = subscription.tests_used_today || 0;
+        const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
+        const remainingToday = isUnlimited ? Infinity : Math.max(0, limitPerDay - testsUsedToday);
+        
+        // Build response
+        const limitStatus: LimitStatus = {
+          canTake,
+          isUnlimited,
+          usedToday: testsUsedToday,
+          limitPerDay: isUnlimited ? null : limitPerDay,
+          remainingToday,
+          reason: canTake ? null : (reason || null) // Ensure reason is never undefined
+        };
+        
+        response = {
+          limitStatus,
+          subscription: {
+            id: subscription.subscription_id,
+            planName: plan.plan_name,
+            planCode: plan.plan_code,
+            status: subscription.status,
+            lastTestDate: subscription.last_test_date ? new Date(subscription.last_test_date).toISOString() : null
+          }
+        };
+      } catch (error) {
+        console.error('Error checking test limits:', error);
+        return NextResponse.json(
+          { error: 'Failed to check test limits' },
+          { status: 500 }
+        );
+      }
       
       // Cache for a short time (30 seconds)
       await cache.set(cacheKey, response, 30);

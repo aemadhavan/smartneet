@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { db } from '@/db';
 import { eq } from 'drizzle-orm';
-import { subscription_plans } from '@/db/schema';
+import { subscription_plans, user_subscriptions } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
@@ -30,7 +30,7 @@ type StripeInvoice = {
   payment_method_details?: { type: string };
   status: string;
   created: number;
-  next_payment_attempt: number;
+  next_payment_attempt: number | null; // Make this nullable
   hosted_invoice_url: string;
   customer_tax_ids?: Array<{ value: string }>;
   tax?: number;
@@ -96,8 +96,31 @@ async function handleSubscriptionChange(subscription: StripeSubscription) {
 
 async function handleSubscriptionDeleted(subscription: StripeSubscription) {
   try {
-    // Update subscription status to canceled
-    await subscriptionService.updateSubscriptionFromStripe(subscription.id);
+    const stripeSubscriptionId = subscription.id;
+    
+    // Find the subscription directly in our database
+    const userSubscriptions = await db
+      .select()
+      .from(user_subscriptions)
+      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .limit(1);
+    
+    if (userSubscriptions.length === 0) {
+      console.log(`No subscription found for Stripe ID: ${stripeSubscriptionId}, it may already be deleted`);
+      return;
+    }
+    
+    // Update the subscription status to canceled directly
+    await db
+      .update(user_subscriptions)
+      .set({
+        status: 'canceled',
+        canceled_at: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId));
+    
+    console.log(`Successfully updated subscription ${stripeSubscriptionId} to canceled status`);
   } catch (error) {
     console.error('Error handling subscription deletion:', error);
     throw error;
@@ -142,6 +165,12 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
       console.error('Invalid invoice object received from Stripe');
       return;
     }
+    
+    // Handle nextBillingDate properly - make sure it's never undefined
+    const nextBillingDate = invoice.next_payment_attempt 
+      ? new Date(invoice.next_payment_attempt * 1000) 
+      : new Date(subscription.current_period_end); // Use subscription end date as fallback
+    
     // Record payment
     await subscriptionService.recordPayment({
       userId: userId || userIdFromSubscription || subscription.user_id,
@@ -152,7 +181,7 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
       paymentMethod: invoice.payment_method_details?.type || 'card',
       paymentStatus: invoice.status,
       paymentDate: new Date(invoice.created * 1000),
-      nextBillingDate: new Date(invoice.next_payment_attempt * 1000),
+      nextBillingDate: nextBillingDate, // Use our calculated value
       receiptUrl: invoice.hosted_invoice_url,
       gstDetails: {
         gstNumber: invoice.customer_tax_ids?.[0]?.value ?? null,
@@ -162,7 +191,6 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
         hsnSacCode: "998431", // HSN code for educational services
         placeOfSupply: "India" // Default place of supply
       }
-      
     });
   } catch (error) {
     console.error('Error handling payment success:', error);
@@ -186,8 +214,14 @@ async function handlePaymentFailed(invoice: StripeInvoice) {
 // Stripe webhook handler
 export async function POST(req: NextRequest) {
   const body = await req.text();
+  // Fix: In newer versions of Next.js, headers() returns a Promise
   const headerList = await headers();
-  const signature = headerList.get('stripe-signature') as string;
+  const signature =  headerList.get('stripe-signature') as string;
+
+  if (!signature) {
+    console.error('No stripe signature in request headers');
+    return NextResponse.json({ error: 'No Stripe signature found' }, { status: 400 });
+  }
 
   let event: Stripe.Event;
 
@@ -196,10 +230,16 @@ export async function POST(req: NextRequest) {
       console.error('Stripe is not configured');
       return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
     }
+    
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      console.error('STRIPE_WEBHOOK_SECRET is not configured');
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+    }
+    
     event = stripe.webhooks.constructEvent(
       body,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (error: unknown) {
     const err = error as Error;

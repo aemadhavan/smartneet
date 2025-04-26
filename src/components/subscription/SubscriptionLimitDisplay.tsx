@@ -2,7 +2,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, AlertCircle, Award, Info } from 'lucide-react';
 
@@ -15,17 +14,17 @@ interface TestLimitStatus {
   reason?: string;
 }
 
-export default function SubscriptionLimitDisplay() {
+export default function SubscriptionLimitDisplay({ refreshKey }: { refreshKey?: number }) {
   const [limitStatus, setLimitStatus] = useState<TestLimitStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchLimitStatus = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/user/test-limits');
+        // Add a cache-busting query parameter when needed
+        const response = await fetch(`/api/user/test-limits?t=${refreshKey || Date.now()}`);
         
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
@@ -44,7 +43,7 @@ export default function SubscriptionLimitDisplay() {
     };
     
     fetchLimitStatus();
-  }, []);
+  }, [refreshKey]); // Add refreshKey to the dependency array
 
   if (loading) {
     return (

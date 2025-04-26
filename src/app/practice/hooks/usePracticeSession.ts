@@ -1,5 +1,5 @@
 // File: src/app/practice/hooks/usePracticeSession.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Subject, SessionResponse } from '../types';
 
 interface SubscriptionError {
@@ -21,6 +21,9 @@ export function usePracticeSession(
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use ref to break dependency cycle
+  const handleCompleteSessionRef = useRef<(() => Promise<void>) | null>(null);
 
   // Create a session function - made into a callback so it can be called manually
   const createSession = useCallback(async (subject: Subject) => {
@@ -120,16 +123,6 @@ export function usePracticeSession(
     }));
   }, [session]);
 
-  // Handle navigation to next question
-  const handleNextQuestion = useCallback(() => {
-    if (!session) return;
-    if (currentQuestionIndex < session.questions.length - 1) {
-      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
-    } else {
-      handleCompleteSession();
-    }
-  }, [currentQuestionIndex, session]);
-
   // Handle completion of session
   const handleCompleteSession = useCallback(async () => {
     if (!session) return;
@@ -141,7 +134,7 @@ export function usePracticeSession(
       ) {
         return;
       }
-      
+
       const answersPayload: Record<number, string> = {};
       session.questions.forEach((question) => {
         const questionId = question.question_id;
@@ -149,7 +142,7 @@ export function usePracticeSession(
           answersPayload[questionId] = userAnswers[questionId];
         }
       });
-      
+
       const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
         method: 'POST',
         headers: {
@@ -157,12 +150,12 @@ export function usePracticeSession(
         },
         body: JSON.stringify({ answers: answersPayload }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to submit answers.');
       }
-      
+
       const responseData = await response.json();
       console.log('Submission successful:', responseData);
       setSessionCompleted(true);
@@ -171,9 +164,26 @@ export function usePracticeSession(
       alert('Failed to submit answers. Please try again.');
     }
   }, [session, userAnswers]);
+  
+  // Store the most recent version of handleCompleteSession in the ref
+  useEffect(() => {
+    handleCompleteSessionRef.current = handleCompleteSession;
+  }, [handleCompleteSession]);
+
+  // Handle navigation to next question
+  const handleNextQuestion = useCallback(() => {
+    if (!session) return;
+    if (currentQuestionIndex < session.questions.length - 1) {
+      setCurrentQuestionIndex(prevIndex => prevIndex + 1);
+    } else {
+      handleCompleteSession();
+    }
+  }, [currentQuestionIndex, session, handleCompleteSession]);
 
   // Handle start of a new session
   const handleStartNewSession = useCallback(() => {
+    // Clear ALL session-related state including the session object itself
+    setSession(null);
     setSessionCompleted(false);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
@@ -182,9 +192,14 @@ export function usePracticeSession(
     if (selectedSubject && onResetSubject) {
       const tempSubject = { ...selectedSubject };
       onResetSubject(null);
-      setTimeout(() => onResetSubject(tempSubject), 100);
+      
+      // Slightly longer timeout to ensure all state is properly cleared
+      setTimeout(() => {
+        // Create a new session directly instead of relying on the useEffect
+        onResetSubject(tempSubject);
+      }, 200);
     }
-  }, [selectedSubject, onResetSubject]);
+  }, [selectedSubject, onResetSubject]); // Removed createSession as it's not used
 
   return {
     session,

@@ -1,7 +1,7 @@
 // src/app/practice/client-page.tsx
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
@@ -25,7 +25,6 @@ import SubscriptionLimitDisplay from '@/components/subscription/SubscriptionLimi
 import SubscriptionLimitNotification from '@/components/subscription/SubscriptionLimitNotification';
 
 export default function PracticeClientPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const subjectParam = searchParams.get('subject')?.toLowerCase();
   const topicIdParam = searchParams.get('topicId');
@@ -42,6 +41,8 @@ export default function PracticeClientPage() {
   // Get subscription limit status
   const { limitStatus, loading: limitsLoading, error: limitsError, refetch: refetchLimits } = useSubscriptionLimits();
   
+  const [limitsRefreshKey, setLimitsRefreshKey] = useState(0);
+
   // Custom hooks for data fetching and state management
   const { 
     subjects, 
@@ -58,9 +59,7 @@ export default function PracticeClientPage() {
     currentQuestionIndex,
     setCurrentQuestionIndex,
     userAnswers,
-    setUserAnswers,
     sessionCompleted,
-    setSessionCompleted,
     handleOptionSelect,
     handleNextQuestion,
     handleCompleteSession,
@@ -92,6 +91,8 @@ export default function PracticeClientPage() {
         } else {
           // Create session if user can take more tests
           await createSession(selectedSubject);
+          // Increment the refresh key to force a re-fetch
+          setLimitsRefreshKey(prev => prev + 1);
           // Refetch limits after creating session to update the counter
           refetchLimits();
         }
@@ -124,12 +125,22 @@ export default function PracticeClientPage() {
     setSelectedSubject(subject);
   };
 
+  // Add this function to your component
+  const customHandleStartNewSession = () => {
+    handleStartNewSession();
+    // After a small delay to allow the session to be created
+    setTimeout(() => {
+      setLimitsRefreshKey(prev => prev + 1);
+      refetchLimits();
+    }, 300);
+  };
+
   // If session is completed, show the completion page
   if (sessionCompleted && session) {
     return (
       <SessionCompletePage
         sessionId={session.sessionId}
-        onStartNewSession={handleStartNewSession}
+        onStartNewSession={customHandleStartNewSession}
       />
     );
   }
@@ -225,7 +236,7 @@ export default function PracticeClientPage() {
           
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             {/* Subscription limit info component */}
-            {limitStatus && <SubscriptionLimitDisplay />}
+            {limitStatus && <SubscriptionLimitDisplay refreshKey={limitsRefreshKey}/>}
             
             <div className="text-sm text-gray-500 dark:text-gray-300">
               Question {currentQuestionIndex + 1} of {session.questions.length}

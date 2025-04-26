@@ -181,6 +181,7 @@ export default function SubscriptionDashboard() {
       await handleOpenCustomerPortal();
       // The user will be redirected to the Stripe portal to reactivate their subscription
     } catch (err) {
+      console.error('Error reactivating subscription:', err);
       setPortalLoading(false);
     }
   };

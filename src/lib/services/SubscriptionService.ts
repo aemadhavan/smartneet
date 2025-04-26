@@ -14,9 +14,6 @@ import Stripe from 'stripe';
 import { addDays } from 'date-fns';
 import { GSTDetails } from '@/types/payment';
 
-// This type is no longer needed as we're using the official Stripe.Subscription type
-// and accessing properties through the correct paths
-
 export class SubscriptionService {
   /**
    * Get user's current subscription
@@ -110,8 +107,11 @@ export class SubscriptionService {
     // Reset counter if it's a new day
     await this.resetDailyCounterIfNeeded(userId, subscription);
     
+    // Get updated subscription after potential reset
+    const updatedSubscription = await this.getUserSubscription(userId);
+    
     // Check if limit reached
-    if ((subscription.tests_used_today ?? 0) >= plan.test_limit_daily) {
+    if ((updatedSubscription.tests_used_today ?? 0) >= plan.test_limit_daily) {
       return {
         canTake: false,
         reason: `You've reached your daily limit of ${plan.test_limit_daily} tests. Upgrade to premium for unlimited tests.`
@@ -140,11 +140,22 @@ export class SubscriptionService {
 
   /**
    * Check if two dates are on the same day
+   * Safe handling for various date formats from the database
    */
-  private isSameDay(date1: Date, date2: Date): boolean {
-    return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
+  private isSameDay(date1: Date | string | number | null | undefined, date2: Date): boolean {
+    if (!date1) return false;
+    
+    try {
+      // Convert to Date object if it's not already
+      const d1 = date1 instanceof Date ? date1 : new Date(date1);
+      
+      return d1.getFullYear() === date2.getFullYear() &&
+             d1.getMonth() === date2.getMonth() &&
+             d1.getDate() === date2.getDate();
+    } catch (error) {
+      console.error('Error comparing dates:', error);
+      return false;
+    }
   }
 
   /**
