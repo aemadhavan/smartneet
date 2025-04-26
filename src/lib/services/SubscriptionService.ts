@@ -419,7 +419,7 @@ export class SubscriptionService {
     paymentStatus: string;
     paymentDate: Date;
     nextBillingDate: Date;
-    receiptUrl: string;
+    receiptUrl: string | null;
     gstDetails: GSTDetails;
   }) {
     await db.insert(payment_history)

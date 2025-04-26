@@ -129,41 +129,67 @@ async function handleSubscriptionDeleted(subscription: StripeSubscription) {
 
 async function handlePaymentSucceeded(invoice: StripeInvoice) {
   try {
+    console.log('Processing invoice payment success:', JSON.stringify(invoice, null, 2));
+    
     if (!stripe) {
       console.error('Stripe is not configured');
       throw new Error('Stripe is not configured');
     }
 
     const stripeSubscriptionId = invoice.subscription;
-    if (!stripeSubscriptionId) return;
+    if (!stripeSubscriptionId) {
+      console.log('No subscription ID in invoice, skipping');
+      return;
+    }
     
     const userId = invoice.metadata?.userId;
     
     // Get user ID from subscription if not in invoice metadata
     let userIdFromSubscription: string | undefined;
     
-    
-    if (!userId) {
-      const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-      userIdFromSubscription = subscription.metadata.userId;
-      if (!userIdFromSubscription) {
-        console.error('No userId found in subscription metadata');
-        return;
+    try {
+      if (!userId) {
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        userIdFromSubscription = subscription.metadata?.userId;
+        if (!userIdFromSubscription) {
+          console.error('No userId found in subscription metadata');
+          return;
+        }
       }
+    } catch (error) {
+      console.error('Error retrieving subscription from Stripe:', error);
+      return;
     }
     
     // Get subscription from our database
-    const subscription = await subscriptionService.updateSubscriptionFromStripe(
-      stripeSubscriptionId
-    );
-    
-    if (!subscription) {
-      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+    let subscription;
+    try {
+      subscription = await subscriptionService.updateSubscriptionFromStripe(
+        stripeSubscriptionId
+      );
+      
+      if (!subscription) {
+        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+        return;
+      }
+    } catch (error) {
+      console.error('Error updating subscription from Stripe:', error);
       return;
     }
+    
     if (!invoice || typeof invoice.amount_paid !== 'number') {
       console.error('Invalid invoice object received from Stripe');
       return;
+    }
+    
+    // Handle payment_intent safely - it might be a string or an object with id
+    let paymentIntentId = typeof invoice.payment_intent === 'string' 
+      ? invoice.payment_intent 
+      : (invoice.payment_intent as Stripe.PaymentIntent)?.id || null;
+    
+    if (!paymentIntentId) {
+      console.log('No payment intent ID found in invoice, using invoice ID instead');
+      paymentIntentId = invoice.id;
     }
     
     // Handle nextBillingDate properly - make sure it's never undefined
@@ -171,27 +197,33 @@ async function handlePaymentSucceeded(invoice: StripeInvoice) {
       ? new Date(invoice.next_payment_attempt * 1000) 
       : new Date(subscription.current_period_end); // Use subscription end date as fallback
     
-    // Record payment
-    await subscriptionService.recordPayment({
-      userId: userId || userIdFromSubscription || subscription.user_id,
-      subscriptionId: subscription.subscription_id,
-      amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
-      stripePaymentId: invoice.payment_intent,
-      stripeInvoiceId: invoice.id,
-      paymentMethod: invoice.payment_method_details?.type || 'card',
-      paymentStatus: invoice.status,
-      paymentDate: new Date(invoice.created * 1000),
-      nextBillingDate: nextBillingDate, // Use our calculated value
-      receiptUrl: invoice.hosted_invoice_url,
-      gstDetails: {
-        gstNumber: invoice.customer_tax_ids?.[0]?.value ?? null,
-        taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
-        taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
-        hasGST: !!invoice.customer_tax_ids?.length,
-        hsnSacCode: "998431", // HSN code for educational services
-        placeOfSupply: "India" // Default place of supply
-      }
-    });
+    // Record payment with careful null handling
+    try {
+      await subscriptionService.recordPayment({
+        userId: userId || userIdFromSubscription || subscription.user_id,
+        subscriptionId: subscription.subscription_id,
+        amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
+        stripePaymentId: paymentIntentId,
+        stripeInvoiceId: invoice.id,
+        paymentMethod: invoice.payment_method_details?.type || 'card',
+        paymentStatus: invoice.status,
+        paymentDate: new Date(invoice.created * 1000),
+        nextBillingDate: nextBillingDate, // Use our calculated value
+        receiptUrl: invoice.hosted_invoice_url || null,
+        gstDetails: {
+          gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
+          taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
+          taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
+          hasGST: !!invoice.customer_tax_ids?.length,
+          hsnSacCode: "998431", // HSN code for educational services
+          placeOfSupply: "India" // Default place of supply
+        }
+      });
+      console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
+    } catch (error) {
+      console.error('Error recording payment:', error);
+      throw error;
+    }
   } catch (error) {
     console.error('Error handling payment success:', error);
     throw error;

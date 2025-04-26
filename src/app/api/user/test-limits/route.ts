@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/db';
 import { eq } from 'drizzle-orm';
-import { subscription_plans, user_subscriptions } from '@/db/schema';
+import { subscription_plans } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { cache } from '@/lib/cache';
 

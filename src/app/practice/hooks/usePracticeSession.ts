@@ -1,5 +1,5 @@
 // File: src/app/practice/hooks/usePracticeSession.ts
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Subject, SessionResponse } from '../types';
 
 interface SubscriptionError {
@@ -42,8 +42,9 @@ export function usePracticeSession(
   const handleCompleteSessionRef = useRef<(() => Promise<void>) | null>(null);
 
   // Helper to get/set session data from/to localStorage cache
-  const sessionCache = {
-    getCache: useCallback((key: string): PracticeSessionCache | null => {
+  // Wrap sessionCache in useMemo to prevent it from being recreated on each render
+  const sessionCache = useMemo(() => ({
+    getCache: (key: string): PracticeSessionCache | null => {
       try {
         const cachedData = localStorage.getItem(key);
         if (!cachedData) return null;
@@ -61,9 +62,9 @@ export function usePracticeSession(
         console.warn('Failed to read session cache:', e);
         return null;
       }
-    }, []),
+    },
     
-    setCache: useCallback((key: string, data: PracticeSessionCache): void => {
+    setCache: (key: string, data: PracticeSessionCache): void => {
       try {
         localStorage.setItem(key, JSON.stringify({
           ...data,
@@ -72,12 +73,12 @@ export function usePracticeSession(
       } catch (e) {
         console.warn('Failed to save session cache:', e);
       }
-    }, []),
+    },
     
-    clearCache: useCallback((key: string): void => {
+    clearCache: (key: string): void => {
       localStorage.removeItem(key);
-    }, [])
-  };
+    }
+  }), []); // Empty dependency array means this is created only once
 
   // Create a session function - made into a callback so it can be called manually
   const createSession = useCallback(async (subject: Subject) => {

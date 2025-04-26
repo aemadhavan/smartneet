@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { formatAmountForDisplay, 
- // getStripe 
+  getStripe 
 } from '@/lib/stripe';
 import { Check, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -51,8 +51,8 @@ export default function PricingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
-  //const [isCheckingOut, setIsCheckingOut] = useState(false);
-  //const [checkoutPlanId, setCheckoutPlanId] = useState<number | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutPlanId, setCheckoutPlanId] = useState<number | null>(null);
   const [canceled, setCanceled] = useState(false);
   
   const router = useRouter();
@@ -96,61 +96,61 @@ export default function PricingPage() {
     }
   }, [isSignedIn, isLoaded]);
 
-  // const handleSelectPlan = async (plan: SubscriptionPlan) => {
-  //   if (!isSignedIn) {
-  //     // Redirect to sign in page with return URL
-  //     router.push(`/sign-in?redirect_url=${encodeURIComponent('/pricing')}`);
-  //     return;
-  //   }
+  const handleSelectPlan = async (plan: SubscriptionPlan) => {
+    if (!isSignedIn) {
+      // Redirect to sign in page with return URL
+      router.push(`/sign-in?redirect_url=${encodeURIComponent('/pricing')}`);
+      return;
+    }
     
-  //   // Check if user is already on this plan
-  //   if (userSubscription?.plan?.plan_id === plan.plan_id) {
-  //     router.push('/dashboard/subscription');
-  //     return;
-  //   }
+    // Check if user is already on this plan
+    if (userSubscription?.plan?.plan_id === plan.plan_id) {
+      router.push('/dashboard/subscription');
+      return;
+    }
     
-  //   // Start checkout process
-  //   setIsCheckingOut(true);
-  //   setCheckoutPlanId(plan.plan_id);
+    // Start checkout process
+    setIsCheckingOut(true);
+    setCheckoutPlanId(plan.plan_id);
     
-  //   try {
-  //     // Create checkout session
-  //     const response = await fetch('/api/checkout', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         planId: plan.plan_id,
-  //       }),
-  //     });
+    try {
+      // Create checkout session
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          planId: plan.plan_id,
+        }),
+      });
       
-  //     if (!response.ok) {
-  //       const errorData = await response.json().catch(() => ({}));
-  //       throw new Error(errorData.error || 'Failed to create checkout session');
-  //     }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
       
-  //     const { sessionId } = await response.json();
+      const { sessionId } = await response.json();
       
-  //     // Load Stripe.js and redirect to checkout
-  //     const stripe = await getStripe();
-  //     if (!stripe) {
-  //       throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
-  //     }
+      // Load Stripe.js and redirect to checkout
+      const stripe = await getStripe();
+      if (!stripe) {
+        throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
+      }
       
-  //     const result = await stripe.redirectToCheckout({ sessionId });
+      const result = await stripe.redirectToCheckout({ sessionId });
       
-  //     if (result.error) {
-  //       throw new Error(result.error.message || 'Error redirecting to checkout');
-  //     }
-  //   } catch (err: unknown) {
-  //     const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during checkout';
-  //     setError(errorMessage);
-  //     console.error('Checkout error:', err);
-  //     setIsCheckingOut(false);
-  //     setCheckoutPlanId(null);
-  //   }
-  // };
+      if (result.error) {
+        throw new Error(result.error.message || 'Error redirecting to checkout');
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during checkout';
+      setError(errorMessage);
+      console.error('Checkout error:', err);
+      setIsCheckingOut(false);
+      setCheckoutPlanId(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -206,8 +206,8 @@ export default function PricingPage() {
         {plans.map((plan) => {
           const isUserOnThisPlan = userSubscription?.plan?.plan_id === plan.plan_id;
           const isFreePlan = plan.plan_code === 'free';
-          //const isCheckingOutThisPlan = isCheckingOut && checkoutPlanId === plan.plan_id;
-          //const isCanceledPlan = isUserOnThisPlan && userSubscription?.cancel_at_period_end;
+          const isCheckingOutThisPlan = isCheckingOut && checkoutPlanId === plan.plan_id;
+          const isCanceledPlan = isUserOnThisPlan && userSubscription?.cancel_at_period_end;
           
           return (
             <div 
@@ -258,7 +258,7 @@ export default function PricingPage() {
                 </ul>
                 
                 <div className="mt-8">
-                  {/* <button
+                   <button
                     onClick={() => handleSelectPlan(plan)}
                     disabled={isCheckingOut}
                     className={`w-full py-3 px-4 rounded font-medium transition ${
@@ -285,7 +285,7 @@ export default function PricingPage() {
                     ) : (
                       'Select Plan'
                     )}
-                  </button> */}
+                  </button> 
                 </div>
                 
                 {isUserOnThisPlan && !isFreePlan && (
