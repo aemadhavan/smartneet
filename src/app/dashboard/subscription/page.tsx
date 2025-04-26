@@ -4,7 +4,17 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, CreditCard, Calendar, CheckCircle, AlertTriangle, ExternalLink } from 'lucide-react';
+import { 
+  Clock, 
+  CreditCard, 
+  Calendar, 
+  CheckCircle, 
+  AlertTriangle, 
+  ExternalLink,
+  XCircle,
+  AlertCircle,
+  Calendar as CalendarFull
+} from 'lucide-react';
 import { formatAmountForDisplay } from '@/lib/stripe';
 
 interface SearchParamsWrapperProps {
@@ -63,6 +73,7 @@ type UserSubscription = {
     currentPeriodStart: string | null;
     currentPeriodEnd: string | null;
     trialEnd: string | null;
+    canceledAt: string | null;
   };
   stripeDetails: {
     status: string;
@@ -102,6 +113,18 @@ export default function SubscriptionDashboard() {
           throw new Error('Failed to fetch subscription details');
         }
         const data = await response.json();
+        // Add detailed logging
+        console.log('Subscription Data:', {
+          fullSubscription: data.subscription,
+          status: data.subscription.status,
+          cancelAtPeriodEnd: data.subscription.cancel_at_period_end,
+          derived: {
+            isPremium: data.subscription.plan.plan_code !== 'free',
+            isActive: data.subscription.status === 'active' || data.subscription.status === 'trialing',
+            isCancelled: data.subscription.cancel_at_period_end,
+            isTrialing: data.subscription.status === 'trialing'
+          }
+        });
         setSubscription(data.subscription);
         
         // Fetch payment history
@@ -147,6 +170,17 @@ export default function SubscriptionDashboard() {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       console.error('Error opening customer portal:', err);
+      setPortalLoading(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    setPortalLoading(true);
+    try {
+      // First, open the customer portal
+      await handleOpenCustomerPortal();
+      // The user will be redirected to the Stripe portal to reactivate their subscription
+    } catch (err) {
       setPortalLoading(false);
     }
   };
@@ -248,9 +282,13 @@ export default function SubscriptionDashboard() {
                     <div className="flex items-start">
                       <div className="h-6 w-6 mr-2 flex-shrink-0">
                         {isActive ? (
-                          <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400" />
+                          isCancelled ? (
+                            <AlertCircle className="h-6 w-6 text-yellow-500 dark:text-yellow-400" />
+                          ) : (
+                            <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400" />
+                          )
                         ) : (
-                          <AlertTriangle className="h-6 w-6 text-yellow-500 dark:text-yellow-400" />
+                          <XCircle className="h-6 w-6 text-red-500 dark:text-red-400" />
                         )}
                       </div>
                       <div>
@@ -259,18 +297,18 @@ export default function SubscriptionDashboard() {
                             ? isTrialing 
                               ? 'Trial Active' 
                               : isCancelled 
-                                ? 'Active (Cancels Soon)' 
+                                ? 'Active (Cancelled)' 
                                 : 'Active' 
                             : subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
                         </p>
                         {isCancelled && (
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
-                            Your subscription will end on {endDate}.
+                          <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                            Your subscription will end on {endDate}
                           </p>
                         )}
                         {isTrialing && (
                           <p className="text-sm text-gray-600 dark:text-gray-300">
-                            Your trial ends on {subscription.formattedDates?.trialEnd}.
+                            Your trial ends on {subscription.formattedDates?.trialEnd}
                           </p>
                         )}
                       </div>
@@ -330,6 +368,58 @@ export default function SubscriptionDashboard() {
                   </ul>
                 </div>
               </div>
+
+              {/* Cancellation Details Section */}
+              {isPremium && isCancelled && (
+                <div className="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-3 text-yellow-800 dark:text-yellow-300 flex items-center">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    Subscription Cancellation
+                  </h3>
+                  
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="flex items-start">
+                      <CalendarFull className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-200">Cancellation Date</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {subscription.formattedDates?.canceledAt || 'Not available'}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <Calendar className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800 dark:text-gray-200">Service Until</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">{endDate}</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
+                      Your subscription has been cancelled but will remain active until the end of the current billing period.
+                      You will continue to have full access to all premium features until {endDate}.
+                    </p>
+                    
+                    <button
+                      onClick={handleReactivateSubscription}
+                      disabled={portalLoading}
+                      className="py-2 px-4 bg-yellow-600 text-white rounded font-medium hover:bg-yellow-700 dark:bg-yellow-700 dark:hover:bg-yellow-600 flex items-center"
+                    >
+                      {portalLoading ? (
+                        <span>Loading...</span>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          <span>Reactivate Subscription</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
               
               {/* Actions */}
               <div className="mt-8">

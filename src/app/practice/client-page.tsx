@@ -1,7 +1,10 @@
-// File: src/app/practice/client-page.tsx
+// src/app/practice/client-page.tsx
 'use client';
+
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
+import { AlertCircle } from 'lucide-react';
 import SessionCompletePage from './complete';
 import { 
   SubjectSelector, 
@@ -16,7 +19,10 @@ import {
   useSubjects, 
   usePracticeSession 
 } from './hooks';
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { Subject } from './types';
+import SubscriptionLimitDisplay from '@/components/subscription/SubscriptionLimitDisplay';
+import SubscriptionLimitNotification from '@/components/subscription/SubscriptionLimitNotification';
 
 export default function PracticeClientPage() {
   const router = useRouter();
@@ -25,9 +31,16 @@ export default function PracticeClientPage() {
   const topicIdParam = searchParams.get('topicId');
   const subtopicIdParam = searchParams.get('subtopicId');
   
+  // State for subscription limit notification
+  const [showLimitNotification, setShowLimitNotification] = useState(false);
+  const [limitMessage, setLimitMessage] = useState('');
+  
   // Parse topic and subtopic IDs if they exist
   const topicId = topicIdParam ? parseInt(topicIdParam) : null;
   const subtopicId = subtopicIdParam ? parseInt(subtopicIdParam) : null;
+  
+  // Get subscription limit status
+  const { limitStatus, loading: limitsLoading, error: limitsError, refetch: refetchLimits } = useSubscriptionLimits();
   
   // Custom hooks for data fetching and state management
   const { 
@@ -45,19 +58,58 @@ export default function PracticeClientPage() {
     currentQuestionIndex,
     setCurrentQuestionIndex,
     userAnswers,
+    setUserAnswers,
+    sessionCompleted,
+    setSessionCompleted,
     handleOptionSelect,
     handleNextQuestion,
     handleCompleteSession,
     handleStartNewSession,
-    sessionCompleted
-  } = usePracticeSession(selectedSubject, setSelectedSubject, topicId, subtopicId); // Pass topic and subtopic IDs
+    createSession
+  } = usePracticeSession(
+    // Don't automatically create session until we check limits
+    null, 
+    setSelectedSubject, 
+    topicId, 
+    subtopicId,
+    // Handle subscription limit errors
+    (error) => {
+      if (error.limitReached) {
+        setLimitMessage(error.message);
+        setShowLimitNotification(true);
+      }
+    }
+  );
+
+  // Initialize session with selected subject after checking limits
+  useEffect(() => {
+    const initSession = async () => {
+      if (selectedSubject && limitStatus && !sessionLoading && !session) {
+        if (!limitStatus.canTake) {
+          // Show limit notification if user can't take more tests
+          setLimitMessage(limitStatus.reason || "You've reached your daily practice limit");
+          setShowLimitNotification(true);
+        } else {
+          // Create session if user can take more tests
+          await createSession(selectedSubject);
+          // Refetch limits after creating session to update the counter
+          refetchLimits();
+        }
+      }
+    };
+    
+    initSession();
+  }, [selectedSubject, limitStatus, sessionLoading, session, createSession, refetchLimits]);
 
   // Derived loading and error states
-  const loading = subjectsLoading || sessionLoading;
-  const error = subjectsError || sessionError;
+  const loading = subjectsLoading || sessionLoading || limitsLoading;
+  const error = subjectsError || sessionError || limitsError;
 
   // Handle retry button click
   const handleRetry = () => {
+    setShowLimitNotification(false);
+    refetchLimits();
+    
     if (selectedSubject) {
       const tempSubject = { ...selectedSubject };
       setSelectedSubject(null);
@@ -67,11 +119,9 @@ export default function PracticeClientPage() {
 
   // Handle subject selection
   const handleSubjectSelect = (subject: Subject) => {
-    // Preserve topic and subtopic IDs when changing subject if they were specified
-    let url = `/practice?subject=${subject.subject_name.toLowerCase()}`;
-    if (topicId) url += `&topicId=${topicId}`;
-    if (subtopicId) url += `&subtopicId=${subtopicId}`;
-    router.push(url);
+    // Clear any previous notifications
+    setShowLimitNotification(false);
+    setSelectedSubject(subject);
   };
 
   // If session is completed, show the completion page
@@ -97,6 +147,46 @@ export default function PracticeClientPage() {
   // Render subject selection if no subject is selected
   if (!selectedSubject) {
     return <SubjectSelector subjects={subjects} onSelect={handleSubjectSelect} />;
+  }
+  
+  // Render limit reached screen if user has hit their daily limit
+  if (limitStatus && !limitStatus.canTake && !session) {
+    return (
+      <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+          <div className="bg-red-50 dark:bg-red-900/30 p-4 border-b border-red-100 dark:border-red-800">
+            <div className="flex items-center">
+              <AlertCircle className="h-6 w-6 text-red-500 dark:text-red-400 mr-2" />
+              <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">
+                Daily Test Limit Reached
+              </h2>
+            </div>
+          </div>
+          
+          <div className="p-6">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              {limitStatus.reason || "You've reached your daily practice test limit. Upgrade to Premium for unlimited practice tests."}
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <Link
+                href="/pricing"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md text-center transition-colors"
+              >
+                Upgrade to Premium
+              </Link>
+              
+              <button
+                onClick={handleRetry}
+                className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-center transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Create session title based on filtering parameters
@@ -130,10 +220,16 @@ export default function PracticeClientPage() {
     
     return (
       <div className="container mx-auto py-8 px-4">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-2">
           <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{getSessionTitle()}</h1>
-          <div className="text-sm text-gray-500 dark:text-gray-300">
-            Question {currentQuestionIndex + 1} of {session.questions.length}
+          
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            {/* Subscription limit info component */}
+            {limitStatus && <SubscriptionLimitDisplay />}
+            
+            <div className="text-sm text-gray-500 dark:text-gray-300">
+              Question {currentQuestionIndex + 1} of {session.questions.length}
+            </div>
           </div>
         </div>
 
@@ -163,6 +259,14 @@ export default function PracticeClientPage() {
           userAnswers={userAnswers}
           onQuestionSelect={setCurrentQuestionIndex}
         />
+        
+        {/* Subscription limit notification - only shown when triggered */}
+        {showLimitNotification && (
+          <SubscriptionLimitNotification 
+            message={limitMessage} 
+            onDismiss={() => setShowLimitNotification(false)} 
+          />
+        )}
       </div>
     );
   }

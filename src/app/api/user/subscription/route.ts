@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import { subscription_plans } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { cache } from '@/lib/cache';
+import { format } from 'date-fns';
 
 export async function GET() {
   try {
@@ -46,10 +47,25 @@ export async function GET() {
       
       const plan = plans.length > 0 ? plans[0] : null;
       
-      // Combine subscription with plan details
+      // Combine subscription with plan details and format dates
       subscriptionData = {
         ...subscription,
-        plan
+        plan,
+        formattedDates: {
+          currentPeriodStart: subscription.current_period_start 
+            ? format(new Date(subscription.current_period_start), 'dd MMMM yyyy')
+            : null,
+          currentPeriodEnd: subscription.current_period_end 
+            ? format(new Date(subscription.current_period_end), 'dd MMMM yyyy')
+            : null,
+          trialEnd: subscription.trial_end 
+            ? format(new Date(subscription.trial_end), 'dd MMMM yyyy')
+            : null,
+          // Format canceled_at date when available
+          canceledAt: subscription.canceled_at 
+            ? format(new Date(subscription.canceled_at), 'dd MMMM yyyy')
+            : null
+        }
       };
       
       // Cache for 5 minutes (300 seconds)
