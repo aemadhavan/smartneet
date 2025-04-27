@@ -150,14 +150,13 @@ Users may NOT:
 ## 13. Dispute Resolution
 
 - Governed by laws of India
-- Disputes subject to jurisdiction of courts in [Specific City/State]
+- Disputes subject to jurisdiction of courts in [Chennai/Tamil Nadu]
 - Arbitration clause may apply for unresolved disputes
 
 ## 14. Contact Information
 
 For queries or concerns:
-- Email: support@smarterneet.com
-- Address: [Your Registered Business Address]
+- Email: smarterneet@gmail.com
 
 ## 15. Acknowledgment
 

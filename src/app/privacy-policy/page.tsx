@@ -157,13 +157,12 @@ As a user, you have the right to:
 ## 14. Contact Information
 
 For privacy-related inquiries:
-- Email: privacy@smarterneet.com
-- Address: [Your Company Address]
+- Email: smarterneet@gmail.com
 
 ## 15. Jurisdiction and Governing Law
 
 - This policy is governed by Indian laws
-- Any disputes subject to jurisdiction of courts in [Specific City/State]
+- Any disputes subject to jurisdiction of courts in [Chennai/Tamil Nadu]
 
 ## 16. Consent
 

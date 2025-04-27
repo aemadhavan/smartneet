@@ -137,8 +137,7 @@ You can manage cookies through your browser settings:
 ## 12. Contact Information
 
 For cookie-related queries:
-- Email: privacy@smarterneet.com
-- Address: [Your Registered Business Address]
+- Email: smarterneet@gmail.com
 
 ## 13. Consent
 
