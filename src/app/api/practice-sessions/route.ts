@@ -1,6 +1,6 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { sql } from 'drizzle-orm';
 import { 
   practice_sessions, 
@@ -99,41 +99,47 @@ export async function POST(request: NextRequest) {
       const validatedData = createSessionSchema.parse(requestData);
       
       // Create new session in database
-      const [newSession] = await db.insert(practice_sessions).values({
-        user_id: userId,
-        subject_id: validatedData.subject_id,
-        topic_id: validatedData.topic_id,
-        subtopic_id: validatedData.subtopic_id,
-        session_type: validatedData.session_type,
-        duration_minutes: validatedData.duration_minutes,
-        total_questions: validatedData.question_count,
-        questions_attempted: 0,
-        questions_correct: 0,
-        is_completed: false,
-        start_time: new Date()
-      }).returning();
+      const [newSession] = await withRetry(async () => {
+        return db.insert(practice_sessions).values({
+          user_id: userId,
+          subject_id: validatedData.subject_id,
+          topic_id: validatedData.topic_id,
+          subtopic_id: validatedData.subtopic_id,
+          session_type: validatedData.session_type,
+          duration_minutes: validatedData.duration_minutes,
+          total_questions: validatedData.question_count,
+          questions_attempted: 0,
+          questions_correct: 0,
+          is_completed: false,
+          start_time: new Date()
+        }).returning();
+      });
 
       // Get personalized questions based on user's history and chosen parameters
-      const sessionQuestions = await getPersonalizedQuestions(
-        userId, 
-        validatedData.subject_id, 
-        validatedData.topic_id, 
-        validatedData.subtopic_id, 
-        validatedData.question_count
-      );
+      const sessionQuestions = await withRetry(async () => {
+        return getPersonalizedQuestions(
+          userId, 
+          validatedData.subject_id, 
+          validatedData.topic_id, 
+          validatedData.subtopic_id, 
+          validatedData.question_count
+        );
+      });
 
       // Add questions to the session
-      await Promise.all(sessionQuestions.map((question, index) => 
-        db.insert(session_questions).values({
-          session_id: newSession.session_id,
-          question_id: question.question_id,
-          question_order: index + 1,
-          is_bookmarked: false,
-          time_spent_seconds: 0,
-          user_id: userId,
-          topic_id: question.topic_id
-        })
-      ));
+      await withRetry(async () => {
+        return Promise.all(sessionQuestions.map((question, index) => 
+          db.insert(session_questions).values({
+            session_id: newSession.session_id,
+            question_id: question.question_id,
+            question_order: index + 1,
+            is_bookmarked: false,
+            time_spent_seconds: 0,
+            user_id: userId,
+            topic_id: question.topic_id
+          })
+        ));
+      });
 
       // Increment test usage for subscription tracking
       await incrementTestUsage(userId);
