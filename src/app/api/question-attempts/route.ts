@@ -46,86 +46,156 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const requestData = await request.json();
-    const validatedData = attemptSchema.parse(requestData);
+    // Try to get data from request body
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (error) {
+      // If JSON parsing fails, try to get from URL parameters
+      console.log('Error parsing JSON in question-attempts, trying URL parameters...',error);
+      const searchParams = request.nextUrl.searchParams;
+      
+      // Extract parameters from URL
+      const session_id = searchParams.has('session_id') ? 
+        parseInt(searchParams.get('session_id') || '0') : undefined;
+      
+      const session_question_id = searchParams.has('session_question_id') ? 
+        parseInt(searchParams.get('session_question_id') || '0') : undefined;
+      
+      const question_id = searchParams.has('question_id') ? 
+        parseInt(searchParams.get('question_id') || '0') : undefined;
+      
+      // Parse user_answer from URL parameter if present
+      let user_answer;
+      try {
+        user_answer = searchParams.has('user_answer') ? 
+          JSON.parse(searchParams.get('user_answer') || '{}') : undefined;
+      } catch (parseError) {
+        console.error('Error parsing user_answer JSON:', parseError);
+        return NextResponse.json({ 
+          error: 'Invalid JSON format for user_answer parameter' 
+        }, { status: 400 });
+      }
+      
+      const time_taken_seconds = searchParams.has('time_taken_seconds') ? 
+        parseInt(searchParams.get('time_taken_seconds') || '0') : undefined;
+      
+      const user_notes = searchParams.get('user_notes') || undefined;
 
-    // Get question details to evaluate the answer
-    const [questionDetails] = await db
-      .select({
-        question_id: questions.question_id,
-        question_type: questions.question_type,
-        details: questions.details,
-        marks: questions.marks,
-        negative_marks: questions.negative_marks,
-        topic_id: questions.topic_id
-      })
-      .from(questions)
-      .where(eq(questions.question_id, validatedData.question_id));
-
-    if (!questionDetails) {
-      return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      // Check if we have the required fields
+      if (!session_id || !session_question_id || !question_id || !user_answer) {
+        return NextResponse.json({ 
+          error: 'Missing required parameters: session_id, session_question_id, question_id, and user_answer are required' 
+        }, { status: 400 });
+      }
+      
+      requestData = {
+        session_id,
+        session_question_id,
+        question_id,
+        user_answer,
+        time_taken_seconds,
+        user_notes
+      };
+      
+      console.log('Using URL parameters for question attempt:', requestData);
     }
 
-    // Evaluate if the answer is correct (implementation depends on question type)
-    const isCorrect = evaluateAnswer(questionDetails.question_type, questionDetails.details, validatedData.user_answer);
-    
-    // Calculate marks awarded
-    const marksAwarded = isCorrect ? (questionDetails.marks ?? 4) : -(questionDetails.negative_marks ?? 1);
-
-    // Check if the session question exists
-    const [sessionQuestion] = await db
-      .select()
-      .from(session_questions)
-      .where(
-        and(
-          eq(session_questions.session_question_id, validatedData.session_question_id),
-          eq(session_questions.session_id, validatedData.session_id)
-        )
-      );
-
-    if (!sessionQuestion) {
-      return NextResponse.json({ error: 'Session question not found' }, { status: 404 });
-    }
-
-    // Create the attempt record
-    const [newAttempt] = await db.insert(question_attempts).values({
-      user_id: userId,
-      question_id: validatedData.question_id,
-      session_id: validatedData.session_id,
-      session_question_id: validatedData.session_question_id,
-      user_answer: validatedData.user_answer,
-      is_correct: isCorrect,
-      time_taken_seconds: validatedData.time_taken_seconds,
-      marks_awarded: marksAwarded,
-      user_notes: validatedData.user_notes,
-      attempt_timestamp: new Date()
-    }).returning();
-
-    // Update session statistics
-    await updateSessionStats(validatedData.session_id, isCorrect, marksAwarded);
-
-    // Update topic mastery
-    await updateTopicMastery(userId, questionDetails.topic_id, isCorrect);
-
-    // Update session question time spent
-    if (validatedData.time_taken_seconds) {
-      await db.update(session_questions)
-        .set({ 
-          time_spent_seconds: validatedData.time_taken_seconds 
+    // Validate the data using the schema
+    try {
+      const validatedData = attemptSchema.parse(requestData);
+      
+      // Get question details to evaluate the answer
+      const [questionDetails] = await db
+        .select({
+          question_id: questions.question_id,
+          question_type: questions.question_type,
+          details: questions.details,
+          marks: questions.marks,
+          negative_marks: questions.negative_marks,
+          topic_id: questions.topic_id
         })
-        .where(eq(session_questions.session_question_id, validatedData.session_question_id));
-    }
+        .from(questions)
+        .where(eq(questions.question_id, validatedData.question_id));
 
-    return NextResponse.json({
-      attempt_id: newAttempt.attempt_id,
-      is_correct: isCorrect,
-      marks_awarded: marksAwarded
-    });
+      if (!questionDetails) {
+        return NextResponse.json({ error: 'Question not found' }, { status: 404 });
+      }
+
+      // Evaluate if the answer is correct (implementation depends on question type)
+      const isCorrect = evaluateAnswer(questionDetails.question_type, questionDetails.details, validatedData.user_answer);
+      
+      // Calculate marks awarded
+      const marksAwarded = isCorrect ? (questionDetails.marks ?? 4) : -(questionDetails.negative_marks ?? 1);
+
+      // Check if the session question exists
+      const [sessionQuestion] = await db
+        .select()
+        .from(session_questions)
+        .where(
+          and(
+            eq(session_questions.session_question_id, validatedData.session_question_id),
+            eq(session_questions.session_id, validatedData.session_id)
+          )
+        );
+
+      if (!sessionQuestion) {
+        return NextResponse.json({ error: 'Session question not found' }, { status: 404 });
+      }
+
+      // Create the attempt record
+      const [newAttempt] = await db.insert(question_attempts).values({
+        user_id: userId,
+        question_id: validatedData.question_id,
+        session_id: validatedData.session_id,
+        session_question_id: validatedData.session_question_id,
+        user_answer: validatedData.user_answer,
+        is_correct: isCorrect,
+        time_taken_seconds: validatedData.time_taken_seconds,
+        marks_awarded: marksAwarded,
+        user_notes: validatedData.user_notes,
+        attempt_timestamp: new Date()
+      }).returning();
+
+      // Update session statistics
+      await updateSessionStats(validatedData.session_id, isCorrect, marksAwarded);
+
+      // Update topic mastery
+      await updateTopicMastery(userId, questionDetails.topic_id, isCorrect);
+
+      // Update session question time spent
+      if (validatedData.time_taken_seconds) {
+        await db.update(session_questions)
+          .set({ 
+            time_spent_seconds: validatedData.time_taken_seconds 
+          })
+          .where(eq(session_questions.session_question_id, validatedData.session_question_id));
+      }
+
+      return NextResponse.json({
+        attempt_id: newAttempt.attempt_id,
+        is_correct: isCorrect,
+        marks_awarded: marksAwarded
+      });
+    } catch (validationError) {
+      console.error('Validation error:', validationError);
+      return NextResponse.json(
+        { 
+          error: validationError instanceof z.ZodError ? 
+            validationError.errors : 
+            'Invalid attempt parameters',
+          details: validationError instanceof z.ZodError ? 
+            validationError.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') : 
+            'Unknown validation error'
+        }, 
+        { status: 400 }
+      );
+    }
   } catch (error) {
     console.error('Error recording question attempt:', error);
     return NextResponse.json(
-      { error: error instanceof z.ZodError ? error.errors : 'Failed to record question attempt' },
-      { status: 400 }
+      { error: 'Failed to record question attempt. Please try again.' },
+      { status: 500 }
     );
   }
 }

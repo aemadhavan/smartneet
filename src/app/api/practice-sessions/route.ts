@@ -49,63 +49,121 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    const requestData = await request.json();
-    const validatedData = createSessionSchema.parse(requestData);
+    // Try to get data from request body
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (e) {
+      // If JSON parsing fails, try to get from URL parameters
+      console.log('Error parsing JSON, trying URL parameters...',e);
+      const searchParams = request.nextUrl.searchParams;
+      
+      const subject_id = searchParams.has('subject_id') ? 
+        parseInt(searchParams.get('subject_id') || '0') : undefined;
+      
+      const topic_id = searchParams.has('topic_id') ? 
+        parseInt(searchParams.get('topic_id') || '0') : undefined;
+      
+      const subtopic_id = searchParams.has('subtopic_id') ? 
+        parseInt(searchParams.get('subtopic_id') || '0') : undefined;
+      
+      const session_type = searchParams.get('session_type') || 'Practice';
+      
+      const duration_minutes = searchParams.has('duration_minutes') ? 
+        parseInt(searchParams.get('duration_minutes') || '0') : undefined;
+      
+      const question_count = searchParams.has('question_count') ? 
+        parseInt(searchParams.get('question_count') || '20') : 20;
 
-    // Create new session in database
-    const [newSession] = await db.insert(practice_sessions).values({
-      user_id: userId,
-      subject_id: validatedData.subject_id,
-      topic_id: validatedData.topic_id,
-      subtopic_id: validatedData.subtopic_id,
-      session_type: validatedData.session_type,
-      duration_minutes: validatedData.duration_minutes,
-      total_questions: validatedData.question_count,
-      questions_attempted: 0,
-      questions_correct: 0,
-      is_completed: false,
-      start_time: new Date()
-    }).returning();
+      // Check if we have the required subject_id
+      if (!subject_id) {
+        return NextResponse.json({ 
+          error: 'Missing required parameter: subject_id' 
+        }, { status: 400 });
+      }
+      
+      requestData = {
+        subject_id,
+        topic_id,
+        subtopic_id,
+        session_type,
+        duration_minutes,
+        question_count
+      };
+      
+      console.log('Using URL parameters:', requestData);
+    }
 
-    // Get personalized questions based on user's history and chosen parameters
-    const sessionQuestions = await getPersonalizedQuestions(
-      userId, 
-      validatedData.subject_id, 
-      validatedData.topic_id, 
-      validatedData.subtopic_id, 
-      validatedData.question_count
-    );
-
-    // Add questions to the session
-    await Promise.all(sessionQuestions.map((question, index) => 
-      db.insert(session_questions).values({
-        session_id: newSession.session_id,
-        question_id: question.question_id,
-        question_order: index + 1,
-        is_bookmarked: false,
-        time_spent_seconds: 0,
+    // Validate the data using the schema
+    try {
+      const validatedData = createSessionSchema.parse(requestData);
+      
+      // Create new session in database
+      const [newSession] = await db.insert(practice_sessions).values({
         user_id: userId,
-        topic_id: question.topic_id
-      })
-    ));
+        subject_id: validatedData.subject_id,
+        topic_id: validatedData.topic_id,
+        subtopic_id: validatedData.subtopic_id,
+        session_type: validatedData.session_type,
+        duration_minutes: validatedData.duration_minutes,
+        total_questions: validatedData.question_count,
+        questions_attempted: 0,
+        questions_correct: 0,
+        is_completed: false,
+        start_time: new Date()
+      }).returning();
 
-    // Increment test usage for subscription tracking
-    await incrementTestUsage(userId);
+      // Get personalized questions based on user's history and chosen parameters
+      const sessionQuestions = await getPersonalizedQuestions(
+        userId, 
+        validatedData.subject_id, 
+        validatedData.topic_id, 
+        validatedData.subtopic_id, 
+        validatedData.question_count
+      );
 
-    // Invalidate user's practice sessions list cache
-    await invalidateUserSessionCaches(userId);
+      // Add questions to the session
+      await Promise.all(sessionQuestions.map((question, index) => 
+        db.insert(session_questions).values({
+          session_id: newSession.session_id,
+          question_id: question.question_id,
+          question_order: index + 1,
+          is_bookmarked: false,
+          time_spent_seconds: 0,
+          user_id: userId,
+          topic_id: question.topic_id
+        })
+      ));
 
-    return NextResponse.json({
-      sessionId: newSession.session_id,
-      questions: sessionQuestions
-    });
-  } catch (error) {
-    console.error('Error creating practice session:', error);
-    return NextResponse.json(
-      { error: error instanceof z.ZodError ? error.errors : 'Failed to create practice session' },
-      { status: 400 }
-    );
-  }
+      // Increment test usage for subscription tracking
+      await incrementTestUsage(userId);
+
+      // Invalidate user's practice sessions list cache
+      await invalidateUserSessionCaches(userId);
+
+      return NextResponse.json({
+        sessionId: newSession.session_id,
+        questions: sessionQuestions
+      });
+      
+    } catch (e) {
+      console.error('Validation error:', e);
+      return NextResponse.json(
+        { 
+          error: e instanceof z.ZodError ? 
+            e.errors : 
+            'Invalid session parameters' 
+        }, 
+        { status: 400 }
+      );
+    }
+    } catch (e) {
+      console.error(e);
+      return NextResponse.json(
+        { message: "Failed to create practice session" },
+        { status: 500 },
+      );
+    }
 }
 
 // Get all practice sessions for a user
@@ -196,7 +254,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      console.error('Error parsing JSON:', e);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+    
     const { sessionId, isCompleted, questionsAttempted, questionsCorrect, score } = body;
 
     // Update session in database
@@ -215,7 +280,7 @@ export async function PATCH(request: NextRequest) {
         )
       );
 
-    // Invalidate all session cache keys for this user
+    // Invalidate all session cache entries for a user
     await invalidateUserSessionCaches(userId);
 
     return NextResponse.json({ success: true });

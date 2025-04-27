@@ -16,7 +16,7 @@ interface PracticeSessionCache {
 }
 
 // Default number of questions per session
-const DEFAULT_QUESTION_COUNT = 20;
+const DEFAULT_QUESTION_COUNT = 10;
 
 // TTL for cached session data in milliseconds (5 minutes)
 const SESSION_CACHE_TTL = 5 * 60 * 1000;
@@ -260,19 +260,47 @@ export function usePracticeSession(
     const saveAnswer = () => {
       if (!session) return;
       
-      fetch(`/api/question-attempts`, {
+      const currentQuestion = session.questions[currentQuestionIndex];
+      if (!currentQuestion) return;
+      
+      // First, look up the correct session_question_id
+      fetch(`/api/session-questions/lookup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sessionId: session.sessionId,
-          questionId,
-          userAnswer: optionNumber,
+          session_id: session.sessionId,
+          question_id: currentQuestion.question_id
         }),
-      }).catch(err => {
-        console.warn('Failed to save answer, will retry later:', err);
-        // We don't need to handle this error - the answer is cached locally
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Now submit the attempt with the correct session_question_id
+        if (data.session_question_id) {
+          fetch(`/api/question-attempts`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              session_id: session.sessionId,
+              session_question_id: data.session_question_id,
+              question_id: currentQuestion.question_id,
+              user_answer: {
+                selectedOption: optionNumber
+              },
+              time_taken_seconds: 30
+            }),
+          }).catch(err => {
+            console.warn('Failed to save answer, will retry later:', err);
+          });
+        } else {
+          console.warn('Could not find session_question_id for question', currentQuestion.question_id);
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to look up session_question_id:', err);
       });
     };
     
