@@ -9,7 +9,7 @@ import { FeaturesSection } from '@/components/home/FeaturesSection';
 import { QuestionPreviewSection } from '@/components/home/QuestionPreviewSection';
 import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection';
 import { CTASection } from '@/components/home/CTASection';
-import LaunchCounter from '@/components/home/LaunchCounter'; // Import the new component
+//import LaunchCounter from '@/components/home/LaunchCounter'; // Import the new component
 import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
 
 /**
@@ -51,7 +51,7 @@ const HomePageContent = () => {
       </Head>
 
       {/* Launch Counter */}
-      <LaunchCounter />
+      {/* <LaunchCounter /> */}
 
       {/* Existing Homepage Sections */}
       <RedesignedHeroSection/>

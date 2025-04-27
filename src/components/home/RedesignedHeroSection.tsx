@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
+//import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+//import { useState, useEffect } from "react";
+import HeroCarousel from "./HeroCarousel";
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -39,189 +41,189 @@ const heroImageAnimate = {
 };
 
 // Enhanced Launch Counter Component (Inline implementation)
-const EnhancedLaunchCounter = () => {
-  // Set the launch date to 2 days from now
-  const calculateLaunchDate = () => {
-    const now = new Date();
-    const launchDate = new Date(now);
-    launchDate.setDate(now.getDate() + 2);
-    // Set time to midnight
-    launchDate.setHours(0, 0, 0, 0);
-    return launchDate;
-  };
+// const EnhancedLaunchCounter = () => {
+//   // Set the launch date to 2 days from now
+//   const calculateLaunchDate = () => {
+//     const now = new Date();
+//     const launchDate = new Date(now);
+//     launchDate.setDate(now.getDate() + 2);
+//     // Set time to midnight
+//     launchDate.setHours(0, 0, 0, 0);
+//     return launchDate;
+//   };
 
-  const [timeLeft, setTimeLeft] = useState({
-    days: 0,
-    hours: 0,
-    minutes: 0,
-    seconds: 0
-  });
+//   const [timeLeft, setTimeLeft] = useState({
+//     days: 0,
+//     hours: 0,
+//     minutes: 0,
+//     seconds: 0
+//   });
   
-  const [isVisible, setIsVisible] = useState(true);
+//   const [isVisible, setIsVisible] = useState(true);
 
-  useEffect(() => {
-    const launchDate = calculateLaunchDate();
+//   useEffect(() => {
+//     const launchDate = calculateLaunchDate();
     
-    const timer = setInterval(() => {
-      const now = new Date();
-      const difference = launchDate.getTime() - now.getTime();
+//     const timer = setInterval(() => {
+//       const now = new Date();
+//       const difference = launchDate.getTime() - now.getTime();
       
-      if (difference <= 0) {
-        // Launch time has passed
-        clearInterval(timer);
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        return;
-      }
+//       if (difference <= 0) {
+//         // Launch time has passed
+//         clearInterval(timer);
+//         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+//         return;
+//       }
       
-      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+//       const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+//       const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+//       const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+//       const seconds = Math.floor((difference % (1000 * 60)) / 1000);
       
-      setTimeLeft({ days, hours, minutes, seconds });
-    }, 1000);
+//       setTimeLeft({ days, hours, minutes, seconds });
+//     }, 1000);
     
-    // Cleanup
-    return () => clearInterval(timer);
-  }, []);
+//     // Cleanup
+//     return () => clearInterval(timer);
+//   }, []);
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0, scale: 0.9 },
-    visible: { 
-      opacity: 1, 
-      scale: 1,
-      transition: { 
-        duration: 0.5,
-        staggerChildren: 0.1
-      }
-    }
-  };
+//   // Animation variants
+//   const containerVariants = {
+//     hidden: { opacity: 0, scale: 0.9 },
+//     visible: { 
+//       opacity: 1, 
+//       scale: 1,
+//       transition: { 
+//         duration: 0.5,
+//         staggerChildren: 0.1
+//       }
+//     }
+//   };
   
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { 
-      y: 0, 
-      opacity: 1,
-      transition: { type: "spring", stiffness: 100 }
-    }
-  };
+//   const itemVariants = {
+//     hidden: { y: 20, opacity: 0 },
+//     visible: { 
+//       y: 0, 
+//       opacity: 1,
+//       transition: { type: "spring", stiffness: 100 }
+//     }
+//   };
 
-  // DNA animation elements
-  const DNAElements = () => {
-    return (
-      <div className="absolute inset-0 overflow-hidden opacity-20">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div 
-            key={i}
-            className={`absolute h-3 w-3 rounded-full bg-indigo-600 ${i % 2 === 0 ? 'left-1/4' : 'left-3/4'}`}
-            style={{
-              top: `${(i * 8) % 100}%`,
-              animationDelay: `${i * 0.2}s`,
-              animation: `pulse 3s infinite ${i % 2 ? 'ease-in' : 'ease-out'}`
-            }}
-          />
-        ))}
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div 
-            key={i}
-            className="absolute left-1/2 w-px bg-gradient-to-b from-indigo-300 to-purple-300"
-            style={{
-              height: '100%',
-              transform: `translateX(${i * 4 - 10}px)`,
-              opacity: 0.3
-            }}
-          />
-        ))}
-      </div>
-    );
-  };
+//   // DNA animation elements
+//   const DNAElements = () => {
+//     return (
+//       <div className="absolute inset-0 overflow-hidden opacity-20">
+//         {Array.from({ length: 12 }).map((_, i) => (
+//           <div 
+//             key={i}
+//             className={`absolute h-3 w-3 rounded-full bg-indigo-600 ${i % 2 === 0 ? 'left-1/4' : 'left-3/4'}`}
+//             style={{
+//               top: `${(i * 8) % 100}%`,
+//               animationDelay: `${i * 0.2}s`,
+//               animation: `pulse 3s infinite ${i % 2 ? 'ease-in' : 'ease-out'}`
+//             }}
+//           />
+//         ))}
+//         {Array.from({ length: 6 }).map((_, i) => (
+//           <div 
+//             key={i}
+//             className="absolute left-1/2 w-px bg-gradient-to-b from-indigo-300 to-purple-300"
+//             style={{
+//               height: '100%',
+//               transform: `translateX(${i * 4 - 10}px)`,
+//               opacity: 0.3
+//             }}
+//           />
+//         ))}
+//       </div>
+//     );
+//   };
 
-  return isVisible ? (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-      className="fixed z-50 bottom-10 right-10 w-80 rounded-2xl overflow-hidden shadow-2xl"
-    >
-      {/* Glassmorphism effect background */}
-      <div className="absolute inset-0 backdrop-blur-xl bg-white/30 dark:bg-gray-900/50 border border-white/30 dark:border-gray-800/30 rounded-2xl z-0"></div>
+//   return isVisible ? (
+//     <motion.div
+//       initial="hidden"
+//       animate="visible"
+//       variants={containerVariants}
+//       className="fixed z-50 bottom-10 right-10 w-80 rounded-2xl overflow-hidden shadow-2xl"
+//     >
+//       {/* Glassmorphism effect background */}
+//       <div className="absolute inset-0 backdrop-blur-xl bg-white/30 dark:bg-gray-900/50 border border-white/30 dark:border-gray-800/30 rounded-2xl z-0"></div>
       
-      {/* DNA-inspired background elements */}
-      <DNAElements />
+//       {/* DNA-inspired background elements */}
+//       <DNAElements />
       
-      {/* Content container */}
-      <div className="relative z-10">
-        {/* Header */}
-        <div className="px-6 pt-5 pb-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-              <h3 className="font-bold text-lg bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Biology Launch Countdown
-              </h3>
-            </div>
-            <button 
-              onClick={() => setIsVisible(false)}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
-          </div>
+//       {/* Content container */}
+//       <div className="relative z-10">
+//         {/* Header */}
+//         <div className="px-6 pt-5 pb-4">
+//           <div className="flex justify-between items-center">
+//             <div className="flex items-center space-x-2">
+//               <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+//               <h3 className="font-bold text-lg bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+//                 Biology Launch Countdown
+//               </h3>
+//             </div>
+//             <button 
+//               onClick={() => setIsVisible(false)}
+//               className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100"
+//             >
+//               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+//                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+//               </svg>
+//             </button>
+//           </div>
           
-          <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-            Get ready to explore our comprehensive biology module with expert-crafted content and practice questions!
-          </p>
-        </div>
+//           <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+//             Get ready to explore our comprehensive biology module with expert-crafted content and practice questions!
+//           </p>
+//         </div>
         
-        {/* Counter */}
-        <div className="px-6 py-4">
-          <div className="grid grid-cols-4 gap-2">
-            {[
-              {label: "DAYS", value: timeLeft.days},
-              {label: "HOURS", value: timeLeft.hours.toString().padStart(2, '0')},
-              {label: "MINS", value: timeLeft.minutes.toString().padStart(2, '0')},
-              {label: "SECS", value: timeLeft.seconds.toString().padStart(2, '0')}
-            ].map((unit) => (
-              <motion.div 
-                key={unit.label}
-                variants={itemVariants}
-                className="flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600/10 to-purple-600/10 rounded-lg py-3 backdrop-blur-sm"
-              >
-                <div className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  {unit.value}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {unit.label}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+//         {/* Counter */}
+//         <div className="px-6 py-4">
+//           <div className="grid grid-cols-4 gap-2">
+//             {[
+//               {label: "DAYS", value: timeLeft.days},
+//               {label: "HOURS", value: timeLeft.hours.toString().padStart(2, '0')},
+//               {label: "MINS", value: timeLeft.minutes.toString().padStart(2, '0')},
+//               {label: "SECS", value: timeLeft.seconds.toString().padStart(2, '0')}
+//             ].map((unit) => (
+//               <motion.div 
+//                 key={unit.label}
+//                 variants={itemVariants}
+//                 className="flex flex-col items-center justify-center bg-gradient-to-br from-indigo-600/10 to-purple-600/10 rounded-lg py-3 backdrop-blur-sm"
+//               >
+//                 <div className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+//                   {unit.value}
+//                 </div>
+//                 <div className="text-xs text-gray-500 dark:text-gray-400">
+//                   {unit.label}
+//                 </div>
+//               </motion.div>
+//             ))}
+//           </div>
+//         </div>
         
-        {/* Call to action */}
-        <div className="px-6 pb-5 pt-2">
-          <Link href="/sign-up" className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-            Get Early Access
-          </Link>
+//         {/* Call to action */}
+//         <div className="px-6 pb-5 pt-2">
+//           <Link href="/sign-up" className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+//             Get Early Access
+//           </Link>
           
-          <div className="mt-3 text-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Join <span className="font-medium text-indigo-600 dark:text-indigo-400">238 students</span> already on the waitlist
-            </span>
-          </div>
-        </div>
-      </div>
+//           <div className="mt-3 text-center">
+//             <span className="text-xs text-gray-500 dark:text-gray-400">
+//               Join <span className="font-medium text-indigo-600 dark:text-indigo-400">238 students</span> already on the waitlist
+//             </span>
+//           </div>
+//         </div>
+//       </div>
       
-      {/* Decorative badge */}
-      <div className="absolute -top-3 -right-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12">
-        Coming Soon!
-      </div>
-    </motion.div>
-  ) : null;
-};
+//       {/* Decorative badge */}
+//       <div className="absolute -top-3 -right-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12">
+//         Coming Soon!
+//       </div>
+//     </motion.div>
+//   ) : null;
+// };
 
 // DNA Helix Background Component
 const DNAHelixBackground = () => {
@@ -304,7 +306,7 @@ export const RedesignedHeroSection = () => {
   // Define stats directly in the component
   const stats = [
     { number: "500+", label: "Biology Questions" },
-    { number: "48", label: "Hours to Launch" },
+   // { number: "48", label: "Hours to Launch" },
     { number: "25+", label: "Topics Covered" },
     { number: "100%", label: "NEET Aligned" }
   ];
@@ -330,7 +332,7 @@ export const RedesignedHeroSection = () => {
               variants={fadeIn}
             >
               <span className="mr-2 text-emerald-400">🧬</span>
-              <span className="font-medium">Biology Module Launch in 2 Days!</span>
+              <span className="font-medium">Biology Module is now live!</span>
             </motion.div>
             
             <motion.h1 
@@ -344,7 +346,7 @@ export const RedesignedHeroSection = () => {
               className="text-lg md:text-xl text-indigo-100 mb-8 max-w-xl"
               variants={fadeIn}
             >
-              Our comprehensive biology module launches in just 48 hours! Get access to expert-crafted questions, AI-driven insights, and a personalized learning journey focused on NEET biology topics.
+              Our comprehensive biology module is now live! Get access to expert-crafted questions, AI-driven insights, and a personalized learning journey focused on NEET biology topics.
             </motion.p>
             
             <motion.div 
@@ -416,89 +418,7 @@ export const RedesignedHeroSection = () => {
             initial="hidden"
             animate="visible"
           >
-            <div className="relative w-full max-w-md">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-300 rounded-lg blur opacity-50"></div>
-              <div className="relative bg-white/10 backdrop-blur-xl rounded-lg shadow-xl overflow-hidden border border-white/20">
-                <div className="p-3 bg-gradient-to-r from-indigo-900/50 to-purple-900/50 backdrop-blur-sm">
-                  <div className="flex items-center space-x-1 mb-2">
-                    <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                    <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                  </div>
-                  
-                  {/* Biology Dashboard Preview */}
-                  <div className="bg-white/10 backdrop-blur-sm rounded-md p-4">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-white font-semibold">Biology Module Preview</h3>
-                      <div className="px-2 py-1 bg-emerald-400/20 text-emerald-300 rounded-full text-xs font-medium backdrop-blur-sm">
-                        Coming in 48 hours
-                      </div>
-                    </div>
-                    
-                    {/* Topics Preview */}
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                      {[
-                        "Cell Biology", "Genetics", "Human Physiology", 
-                        "Plant Biology", "Ecology", "Evolution"
-                      ].map((topic, i) => (
-                        <div key={i} className="bg-white/5 p-2 rounded-md backdrop-blur-sm border border-white/10 text-center">
-                          <div className="text-xs text-white/90">{topic}</div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Biology Progress Visualization */}
-                    <div className="mb-4 h-32 bg-gradient-to-r from-indigo-900/30 to-purple-900/30 backdrop-blur-sm rounded-lg p-2 flex items-end border border-white/10">
-                      {["Cell Structure", "Mitosis", "Meiosis", "DNA", "Proteins", "Enzymes", "Respiration", "Photosynthesis"].map((topic, i) => (
-                        <div key={i} className="relative flex-1 mx-0.5 group">
-                          <div 
-                            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-emerald-500 to-teal-400 rounded-t-sm transition-all duration-500" 
-                            style={{height: `${30 + Math.random() * 60}%`}}
-                          ></div>
-                          <div className="opacity-0 group-hover:opacity-100 absolute -top-5 left-1/2 transform -translate-x-1/2 bg-black/70 text-white text-xs px-1 py-0.5 rounded whitespace-nowrap transition-opacity">
-                            {topic}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    {/* Analytics Summary */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className="bg-purple-500/10 backdrop-blur-sm p-2 rounded-md border border-purple-500/30">
-                        <div className="text-2xl font-bold text-purple-300">87%</div>
-                        <div className="text-xs text-white/70">Biology Questions</div>
-                      </div>
-                      <div className="bg-emerald-500/10 backdrop-blur-sm p-2 rounded-md border border-emerald-500/30">
-                        <div className="text-2xl font-bold text-emerald-300">94%</div>
-                        <div className="text-xs text-white/70">NEET-Aligned</div>
-                      </div>
-                    </div>
-                    
-                    {/* Recommendation */}
-                    <div className="bg-indigo-500/10 backdrop-blur-sm p-3 rounded-lg border border-indigo-500/30">
-                      <div className="flex items-start">
-                        <div className="text-yellow-400 mr-2 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zm4.657 2.757a1 1 0 10-1.414-1.414l-.707.707a1 1 0 101.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zm3 6v-1h4v1a2 2 0 11-4 0z" />
-                          </svg>
-                        </div>
-                        <div>
-                          <p className="text-xs font-medium text-white/90">Join the waitlist now to get priority access when we launch in 48 hours!</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Floating badges */}
-              <div className="absolute -right-4 top-4 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform rotate-12">
-                2-Day Countdown
-              </div>
-              <div className="absolute -left-4 bottom-20 bg-gradient-to-r from-indigo-400 to-purple-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform -rotate-12">
-                NEET Biology Focus
-              </div>
-            </div>
+            <HeroCarousel />
           </motion.div>
         </div>
       </div>
@@ -511,7 +431,7 @@ export const RedesignedHeroSection = () => {
       </div>
       
       {/* Enhanced Launch Counter (now defined inline in this file) */}
-      <EnhancedLaunchCounter />
+      {/* <EnhancedLaunchCounter /> */}
     </section>
   );
 };
