@@ -23,12 +23,26 @@ import { revalidatePath, revalidateTag } from 'next/cache';
 
 // Schema for validating session creation request
 const createSessionSchema = z.object({
-  subject_id: z.number(),
-  topic_id: z.number().optional(),
-  subtopic_id: z.number().optional(),
-  session_type: z.enum(['Practice', 'Test', 'Review', 'Custom']),
-  duration_minutes: z.number().optional(),
-  question_count: z.number().default(20)
+  subject_id: z.number({
+    invalid_type_error: "subject_id must be a number",
+    required_error: "subject_id is required"
+  }),
+  topic_id: z.number({
+    invalid_type_error: "topic_id must be a number" 
+  }).optional(),
+  subtopic_id: z.number({
+    invalid_type_error: "subtopic_id must be a number"
+  }).optional(),
+  session_type: z.enum(['Practice', 'Test', 'Review', 'Custom'], {
+    invalid_type_error: "session_type must be one of: Practice, Test, Review, Custom",
+    required_error: "session_type is required"
+  }),
+  duration_minutes: z.number({
+    invalid_type_error: "duration_minutes must be a number"
+  }).optional(),
+  question_count: z.number({
+    invalid_type_error: "question_count must be a number"
+  }).default(20)
 });
 
 // Create a new practice session
@@ -49,36 +63,73 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Try to get data from request body
+    // Try to get data from request body or URL parameters
     let requestData;
     try {
       requestData = await request.json();
+      console.log('Using JSON body:', requestData);
     } catch (e) {
       // If JSON parsing fails, try to get from URL parameters
-      console.log('Error parsing JSON, trying URL parameters...',e);
+      console.log('Error parsing JSON, trying URL parameters:', e);
       const searchParams = request.nextUrl.searchParams;
       
+      // Parse and validate numeric parameters
       const subject_id = searchParams.has('subject_id') ? 
-        parseInt(searchParams.get('subject_id') || '0') : undefined;
+        Number(searchParams.get('subject_id')) : undefined;
       
-      const topic_id = searchParams.has('topic_id') ? 
-        parseInt(searchParams.get('topic_id') || '0') : undefined;
+      // Check if subject_id is a valid number
+      if (subject_id === undefined || isNaN(subject_id)) {
+        return NextResponse.json({ 
+          error: 'Invalid subject_id parameter: must be a valid number' 
+        }, { status: 400 });
+      }
       
-      const subtopic_id = searchParams.has('subtopic_id') ? 
-        parseInt(searchParams.get('subtopic_id') || '0') : undefined;
+      // Parse and validate other numeric parameters
+      let topic_id, subtopic_id, duration_minutes, question_count;
+      
+      if (searchParams.has('topic_id')) {
+        topic_id = Number(searchParams.get('topic_id'));
+        if (isNaN(topic_id)) {
+          return NextResponse.json({ 
+            error: 'Invalid topic_id parameter: must be a valid number' 
+          }, { status: 400 });
+        }
+      }
+      
+      if (searchParams.has('subtopic_id')) {
+        subtopic_id = Number(searchParams.get('subtopic_id'));
+        if (isNaN(subtopic_id)) {
+          return NextResponse.json({ 
+            error: 'Invalid subtopic_id parameter: must be a valid number' 
+          }, { status: 400 });
+        }
+      }
+      
+      if (searchParams.has('duration_minutes')) {
+        duration_minutes = Number(searchParams.get('duration_minutes'));
+        if (isNaN(duration_minutes)) {
+          return NextResponse.json({ 
+            error: 'Invalid duration_minutes parameter: must be a valid number' 
+          }, { status: 400 });
+        }
+      }
+      
+      if (searchParams.has('question_count')) {
+        question_count = Number(searchParams.get('question_count'));
+        if (isNaN(question_count)) {
+          return NextResponse.json({ 
+            error: 'Invalid question_count parameter: must be a valid number' 
+          }, { status: 400 });
+        }
+      } else {
+        question_count = 20; // Default value
+      }
       
       const session_type = searchParams.get('session_type') || 'Practice';
-      
-      const duration_minutes = searchParams.has('duration_minutes') ? 
-        parseInt(searchParams.get('duration_minutes') || '0') : undefined;
-      
-      const question_count = searchParams.has('question_count') ? 
-        parseInt(searchParams.get('question_count') || '20') : 20;
-
-      // Check if we have the required subject_id
-      if (!subject_id) {
+      // Validate session_type
+      if (!['Practice', 'Test', 'Review', 'Custom'].includes(session_type)) {
         return NextResponse.json({ 
-          error: 'Missing required parameter: subject_id' 
+          error: 'Invalid session_type parameter: must be one of Practice, Test, Review, Custom' 
         }, { status: 400 });
       }
       
@@ -97,6 +148,7 @@ export async function POST(request: NextRequest) {
     // Validate the data using the schema
     try {
       const validatedData = createSessionSchema.parse(requestData);
+      console.log('Validated data:', validatedData);
       
       // Create new session in database
       const [newSession] = await withRetry(async () => {
@@ -126,6 +178,17 @@ export async function POST(request: NextRequest) {
         );
       });
 
+      // Check if we have enough questions
+      if (sessionQuestions.length === 0) {
+        // Clean up the created session since we don't have questions
+        await db.delete(practice_sessions)
+          .where(eq(practice_sessions.session_id, newSession.session_id));
+        
+        return NextResponse.json({ 
+          error: 'No questions available for the selected criteria' 
+        }, { status: 404 });
+      }
+
       // Add questions to the session
       await withRetry(async () => {
         return Promise.all(sessionQuestions.map((question, index) => 
@@ -154,22 +217,45 @@ export async function POST(request: NextRequest) {
       
     } catch (e) {
       console.error('Validation error:', e);
+      
+      // If it's a Zod error, provide more detailed information
+      if (e instanceof z.ZodError) {
+        console.error('Failed fields:', e.errors.map(err => ({
+          path: err.path.join('.'),
+          message: err.message
+        })));
+        
+        return NextResponse.json(
+          { 
+            error: 'Invalid session parameters',
+            details: e.errors.map(err => ({
+              field: err.path.join('.'),
+              message: err.message
+            })),
+            requestData: requestData // Include this for debugging
+          }, 
+          { status: 400 }
+        );
+      }
+      
       return NextResponse.json(
         { 
-          error: e instanceof z.ZodError ? 
-            e.errors : 
-            'Invalid session parameters' 
+          error: 'Invalid session parameters',
+          message: e instanceof Error ? e.message : String(e)
         }, 
         { status: 400 }
       );
     }
-    } catch (e) {
-      console.error(e);
-      return NextResponse.json(
-        { message: "Failed to create practice session" },
-        { status: 500 },
-      );
-    }
+  } catch (e) {
+    console.error('Unexpected error in practice session creation:', e);
+    return NextResponse.json(
+      { 
+        message: "Failed to create practice session",
+        error: e instanceof Error ? e.message : "Unknown error"
+      },
+      { status: 500 },
+    );
+  }
 }
 
 // Get all practice sessions for a user
