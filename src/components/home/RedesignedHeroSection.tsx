@@ -224,9 +224,28 @@ const heroImageAnimate = {
 //     </motion.div>
 //   ) : null;
 // };
+// Seeded random number generator function
+// This ensures the same sequence of random numbers on both server and client
+const seededRandom = (seed: number): number => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
 
+// Function to format percentage with fixed precision
+const formatPercentage = (value: number): string => {
+  return `${(value * 100).toFixed(4)}%`;
+};
 // DNA Helix Background Component
 const DNAHelixBackground = () => {
+  // Generate deterministic positions using the seeded random function
+  const nucleotides = Array.from({length: 20}).map((_, i) => ({
+    left: formatPercentage(seededRandom(i)),
+    top: formatPercentage(seededRandom(i + 100)),
+    opacity: 0.3,
+    animationDelay: `${(seededRandom(i + 200) * 5).toFixed(4)}s`,
+    animationDuration: `${(3 + seededRandom(i + 300) * 5).toFixed(4)}s`
+  }));
+
   return (
     <div className="absolute inset-0 overflow-hidden z-0">
       {/* Abstract DNA strands */}
@@ -279,18 +298,12 @@ const DNAHelixBackground = () => {
         ))}
       </svg>
       
-      {/* Glowing orbs (nucleotides) */}
-      {Array.from({length: 20}).map((_, i) => (
+      {/* Glowing orbs (nucleotides) with fixed positions */}
+      {nucleotides.map((style, i) => (
         <div 
           key={`nucleotide-${i}`}
           className="absolute w-4 h-4 rounded-full bg-purple-400 blur-sm animate-pulse"
-          style={{
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
-            opacity: 0.3,
-            animationDelay: `${Math.random() * 5}s`,
-            animationDuration: `${3 + Math.random() * 5}s`
-          }}
+          style={style}
         />
       ))}
       
