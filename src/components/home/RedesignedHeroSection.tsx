@@ -370,7 +370,7 @@ export const RedesignedHeroSection = () => {
                 href="/sign-up" 
                 className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg hover:shadow-emerald-500/30 transition-all transform hover:-translate-y-1 text-center backdrop-blur-sm"
               >
-                Join Biology Waitlist
+                Sign up for Biology
               </Link>
               <Link 
                 href="/biology" 
