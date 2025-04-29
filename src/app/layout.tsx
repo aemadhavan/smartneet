@@ -4,6 +4,7 @@ import Footer from '@/components/layout/Footer';
 import './globals.css';
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 /**
  * This is the root layout for the application.
@@ -80,6 +81,7 @@ export default function RootLayout({
           <Header />
           <main>{children}</main>
           <Footer />
+          <SpeedInsights />
         </ClerkProvider>
       </body>
     </html>
