@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic';
 // Import hero section normally since it's critical for LCP
 import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
 
-// Fix dynamic imports to work with named exports
+// Fix dynamic imports to work with default export from FeaturesSection
 const FeaturesSection = dynamic(
   () => import('@/components/home/FeaturesSection').then(mod => mod.default), 
   {
