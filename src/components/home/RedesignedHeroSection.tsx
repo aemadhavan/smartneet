@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 //import Image from "next/image";
 import Link from "next/link";
 //import { useState, useEffect } from "react";
-import dynamic from 'next/dynamic';
 import HeroCarousel from "./HeroCarousel";
 
 const fadeIn = {
@@ -316,9 +315,6 @@ const DNAHelixBackground = () => {
   );
 };
 
-// Dynamically import the background component with SSR disabled
-const DynamicDNAHelixBackground = dynamic(() => Promise.resolve(DNAHelixBackground), { ssr: false });
-
 export const RedesignedHeroSection = () => {
   // Define stats directly in the component
   const stats = [
@@ -330,8 +326,8 @@ export const RedesignedHeroSection = () => {
 
   return (
     <section className="relative min-h-screen overflow-hidden bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white">
-      {/* DNA-inspired animated background (Dynamically loaded) */}
-      <DynamicDNAHelixBackground />
+      {/* DNA-inspired animated background */}
+      <DNAHelixBackground />
       
       {/* Semi-transparent overlay to improve text readability */}
       <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px] z-0"></div>
