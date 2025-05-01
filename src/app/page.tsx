@@ -1,93 +1,119 @@
-//File: src/app/page.tsx
-"use client";
+// File: src/app/page.tsx
+// This is a server component (no "use client" directive)
 
-import React, { Suspense } from 'react';
-import Head from 'next/head';
-//import Link from 'next/link';
-//import { motion, AnimatePresence } from 'framer-motion';
-//import { useAuth, useUser } from '@clerk/nextjs';
+import { Suspense } from 'react';
+import { Metadata } from 'next';
+import dynamic from 'next/dynamic';
 
-//import { HeroSection } from '@/components/home/HeroSection';
-import { FeaturesSection } from '@/components/home/FeaturesSection';
-import { QuestionPreviewSection } from '@/components/home/QuestionPreviewSection';
-import { InteractiveDemoSection } from '@/components/home/InteractiveDemoSection';
-import { CTASection } from '@/components/home/CTASection';
+// Import hero section normally since it's critical for LCP
 import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
 
-/**
- * Main content of the homepage that uses Clerk authentication
- */
-const HomePageContent = () => {
-  
+// Fix dynamic imports to work with named exports
+const FeaturesSection = dynamic(
+  () => import('@/components/home/FeaturesSection').then(mod => mod.default), 
+  {
+    loading: () => <SectionSkeleton />,
+    ssr: true
+  }
+);
 
+// For client components, we shouldn't use ssr: false in a server component
+const QuestionPreviewSection = dynamic(
+  () => import('@/components/home/QuestionPreviewSection').then(mod => mod.QuestionPreviewSection),
+  {
+    loading: () => <SectionSkeleton />
+    // Removed ssr: false
+  }
+);
+
+const InteractiveDemoSection = dynamic(
+  () => import('@/components/home/InteractiveDemoSection').then(mod => mod.InteractiveDemoSection),
+  {
+    loading: () => <SectionSkeleton />
+    // Removed ssr: false
+  }
+);
+
+const CTASection = dynamic(
+  () => import('@/components/home/CTASection').then(mod => mod.CTASection),
+  {
+    loading: () => <SectionSkeleton />,
+    ssr: true
+  }
+);
+
+// Define metadata for better SEO
+export const metadata: Metadata = {
+  title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
+  description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
+  keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation',
+  openGraph: {
+    title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
+    description: 'Master your NEET preparation with AI-powered practice tests and personalized analytics for NEET medical entrance exams.',
+    url: 'https://smarterneet.com/',
+    siteName: 'SmarterNEET',
+    images: [
+      {
+        url: 'https://smarterneet.com/images/smarterneet-og-image.jpg',
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
+    description: 'Master your NEET preparation with AI-powered practice tests and personalized analytics for NEET medical entrance exams.',
+    images: ['https://smarterneet.com/images/smarterneet-twitter-image.jpg'],
+  },
+};
+
+// Simple skeleton loader
+function SectionSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white font-poppins relative overflow-x-hidden">
-      <Head>
-        <title>SmarterNEET - Advanced NEET Exam Preparation Platform</title>
-        <meta name="description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking." />
-        <meta name="keywords" content="NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation" />
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="canonical" href="https://smarterneet.com/" />
-        
-        {/* Open Graph Tags for better social sharing */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://smarterneet.com/" />
-        <meta property="og:title" content="SmarterNEET - Advanced NEET Exam Preparation Platform" />
-        <meta property="og:description" content="Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking." />
-        <meta property="og:image" content="https://smarterneet.com/images/smarterneet-og-image.jpg" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:site_name" content="SmarterNEET" />
-        <meta property="og:locale" content="en_US" />
-        
-        {/* Twitter Card Tags */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@smarterneet" />
-        <meta name="twitter:creator" content="@smarterneet" />
-        <meta name="twitter:title" content="SmarterNEET - Advanced NEET Exam Preparation Platform" />
-        <meta name="twitter:description" content="Master your NEET preparation with AI-powered practice tests and personalized analytics for NEET medical entrance exams." />
-        <meta name="twitter:image" content="https://smarterneet.com/images/smarterneet-twitter-image.jpg" />
-        
-        {/* Additional meta tags for improved SEO */}
-        <meta name="robots" content="index, follow" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="author" content="SmarterNEET Team" />
-      </Head>
-
-      
-
-      {/* Existing Homepage Sections */}
-      <RedesignedHeroSection />
-      {/* Features Section */}
-      <FeaturesSection />
-
-      {/* Question Preview Section */}
-      <QuestionPreviewSection />
-
-      {/* Interactive Demo Section */}
-      <InteractiveDemoSection />
-
-      {/* CTA Section */}
-      <CTASection />
+    <div className="w-full py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-1/3 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
     </div>
   );
-};
+}
 
-/**
- * This is the home page of the application.
- * It displays the hero section, features sections, and other content.
- * Now includes overlay for all users with different messages based on status.
- */
-const HomePage = () => {
+// Performance optimization notes:
+// 1. This is a Server Component (no "use client" directive)
+// 2. Only the hero section is loaded initially (critical for LCP)
+// 3. Other sections are loaded dynamically with Suspense boundaries
+// 4. Proper metadata is configured for SEO
+
+export default function HomePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-2xl text-gray-600">Loading...</div>
-      </div>
-    }>
-      <HomePageContent />
-    </Suspense>
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 font-poppins relative overflow-x-hidden">
+      {/* Render hero immediately for best LCP */}
+      <RedesignedHeroSection />
+      
+      {/* Use Suspense for other sections to improve FCP and LCP */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <FeaturesSection />
+      </Suspense>
+      
+      <Suspense fallback={<SectionSkeleton />}>
+        <QuestionPreviewSection />
+      </Suspense>
+      
+      <Suspense fallback={<SectionSkeleton />}>
+        <InteractiveDemoSection />
+      </Suspense>
+      
+      <Suspense fallback={<SectionSkeleton />}>
+        <CTASection />
+      </Suspense>
+    </div>
   );
-};
-
-export default HomePage;
+}
