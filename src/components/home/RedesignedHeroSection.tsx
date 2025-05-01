@@ -352,15 +352,15 @@ export const RedesignedHeroSection = () => {
               className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-100 to-indigo-200"
               variants={fadeIn}
             >
-              Master NEET Biology with <span className="text-emerald-400">SmarterNEET</span>
+               Master NEET Biology with <span className="text-emerald-400">SmarterNEET</span>
             </motion.h1>
             
-            <motion.p 
+            {/* Removed motion wrapper and variants from this paragraph to improve LCP */}
+            <p 
               className="text-lg md:text-xl text-indigo-100 mb-8 max-w-xl"
-              variants={fadeIn}
             >
               Our comprehensive biology module is now live! Get access to expert-crafted questions, AI-driven insights, and a personalized learning journey focused on NEET biology topics.
-            </motion.p>
+            </p>
             
             <motion.div 
               className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8"

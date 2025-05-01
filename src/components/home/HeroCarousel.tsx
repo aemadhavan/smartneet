@@ -64,8 +64,8 @@ const HeroCarousel = () => {
                       <div className="relative w-full h-full transform transition-transform duration-500 hover:scale-105">
                         <Image 
                           src={image.src} 
-                          width={1200}  // Further increased image size
-                          height={800}
+                          width={1200}  // Reverted image size
+                          height={800} // Reverted image size
                           alt={image.alt}
                           className="w-full h-auto object-contain"
                           priority={index === 0} // Only prioritize the first image
