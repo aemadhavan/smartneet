@@ -68,7 +68,7 @@ const HeroCarousel = () => {
                           height={800}
                           alt={image.alt}
                           className="w-full h-auto object-contain"
-                          priority
+                          priority={index === 0} // Only prioritize the first image
                         />
                         {/* Optional subtle overlay gradient */}
                         <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/5 to-transparent pointer-events-none"></div>
