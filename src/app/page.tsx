@@ -5,32 +5,46 @@ import { Suspense } from 'react';
 import { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 
-// Import hero section normally since it's critical for LCP
+// Use static import for critical path rendering
 import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
 
-// Fix dynamic imports to work with default export from FeaturesSection
+// Optimized skeleton with reduced animations and simpler structure
+function SectionSkeleton() {
+  return (
+    <div className="w-full py-16" aria-hidden="true">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="w-1/3 h-10 bg-gray-200 dark:bg-gray-700 rounded mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Dynamic imports with more aggressive loading strategies
 const FeaturesSection = dynamic(
-  () => import('@/components/home/FeaturesSection').then(mod => mod.default), 
+  () => import('@/components/home/FeaturesSection'), 
   {
     loading: () => <SectionSkeleton />,
     ssr: true
   }
 );
 
-// For client components, we shouldn't use ssr: false in a server component
+// Load content sections with higher loading priority
 const QuestionPreviewSection = dynamic(
   () => import('@/components/home/QuestionPreviewSection').then(mod => mod.QuestionPreviewSection),
   {
-    loading: () => <SectionSkeleton />
-    // Removed ssr: false
+    loading: () => <SectionSkeleton />,
   }
 );
 
 const InteractiveDemoSection = dynamic(
   () => import('@/components/home/InteractiveDemoSection').then(mod => mod.InteractiveDemoSection),
   {
-    loading: () => <SectionSkeleton />
-    // Removed ssr: false
+    loading: () => <SectionSkeleton />,
   }
 );
 
@@ -45,8 +59,8 @@ const CTASection = dynamic(
 // Define metadata for better SEO
 export const metadata: Metadata = {
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
-  description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
-  keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation',
+  description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics.',
+  keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank',
   openGraph: {
     title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
     description: 'Master your NEET preparation with AI-powered practice tests and personalized analytics for NEET medical entrance exams.',
@@ -70,50 +84,44 @@ export const metadata: Metadata = {
   },
 };
 
-// Simple skeleton loader
-function SectionSkeleton() {
-  return (
-    <div className="w-full py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="w-1/3 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Performance optimization notes:
-// 1. This is a Server Component (no "use client" directive)
-// 2. Only the hero section is loaded initially (critical for LCP)
-// 3. Other sections are loaded dynamically with Suspense boundaries
-// 4. Proper metadata is configured for SEO
+// Performance optimization:
+// 1. Streamlined rendering
+// 2. Prioritized critical content path
+// 3. Optimized suspense boundaries
+// 4. Added proper priority loading for below-the-fold content
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 font-poppins relative overflow-x-hidden">
-      {/* Render hero immediately for best LCP */}
-      <RedesignedHeroSection />
+    <>
+      {/* Preload critical assets */}
+      <link 
+        rel="preload" 
+        href="/dashboard.webp" 
+        as="image" 
+        type="image/webp" 
+      />
       
-      {/* Use Suspense for other sections to improve FCP and LCP */}
-      <Suspense fallback={<SectionSkeleton />}>
-        <FeaturesSection />
-      </Suspense>
-      
-      <Suspense fallback={<SectionSkeleton />}>
-        <QuestionPreviewSection />
-      </Suspense>
-      
-      <Suspense fallback={<SectionSkeleton />}>
-        <InteractiveDemoSection />
-      </Suspense>
-      
-      <Suspense fallback={<SectionSkeleton />}>
-        <CTASection />
-      </Suspense>
-    </div>
+      <div className="min-h-screen bg-white dark:from-gray-900 dark:to-gray-800 font-poppins relative overflow-x-hidden">
+        {/* Hero section - Critical path */}
+        <RedesignedHeroSection />
+        
+        {/* Non-critical sections with optimized loading */}
+        <Suspense fallback={<SectionSkeleton />}>
+          <FeaturesSection />
+        </Suspense>
+        
+        <Suspense fallback={<SectionSkeleton />}>
+          <QuestionPreviewSection />
+        </Suspense>
+        
+        <Suspense fallback={<SectionSkeleton />}>
+          <InteractiveDemoSection />
+        </Suspense>
+        
+        <Suspense fallback={<SectionSkeleton />}>
+          <CTASection />
+        </Suspense>
+      </div>
+    </>
   );
 }

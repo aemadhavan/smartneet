@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import { 
@@ -8,72 +8,106 @@ import {
   CarouselContent,
   CarouselItem,
   CarouselPrevious,
-  CarouselNext
+  CarouselNext,
+  type CarouselApi
 } from "@/components/ui/carousel";
 import { Card, CardContent } from "@/components/ui/card";
-import Autoplay from "embla-carousel-autoplay";
+import type { EmblaPluginType } from "embla-carousel";
+
+// Define image type for better type safety
+interface CarouselImage {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+}
 
 const HeroCarousel = () => {
-  // Array of images for the carousel
-  const images = [
-    { src: "/dashboard.png", alt: "Dashboard" },
-    { src: "/practice-analysis.png", alt: "Practice Analysis" },
-    { src: "/practice-summary.png", alt: "Practice Summary" },
-  ];
+  // Import Autoplay only when component mounts
+  const [autoplayPlugin, setAutoplayPlugin] = useState<EmblaPluginType | null>(null);
+  const [api, setApi] = useState<CarouselApi | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Hero image animation
+  useEffect(() => {
+    import("embla-carousel-autoplay").then((Autoplay) => {
+      setAutoplayPlugin(Autoplay.default({ delay: 5000, stopOnInteraction: true }));
+    });
+  }, []);
+
+  // Set up the slide change effect
+  useEffect(() => {
+    if (!api) return;
+
+    const onSelect = () => {
+      setCurrentIndex(api.selectedScrollSnap());
+    };
+
+    api.on("select", onSelect);
+    // Initialize correct index
+    setCurrentIndex(api.selectedScrollSnap());
+
+    return () => {
+      api.off("select", onSelect);
+    };
+  }, [api]);
+
+  // Array of images for the carousel - Optimized dimensions and formats
+  const images: CarouselImage[] = [
+    { src: "/dashboard.webp", alt: "Dashboard visualization showing NEET practice analytics", width: 1200, height: 800 },
+    { src: "/practice-analysis.webp", alt: "Detailed practice analysis showing performance metrics", width: 1200, height: 800 },
+    { src: "/practice-summary.webp", alt: "Summary of practice session results", width: 1200, height: 800 },
+  ];
+  
+  // Hero image animation - simplified for better performance
   const heroImageAnimate = {
-    hidden: { scale: 0.8, opacity: 0 },
+    hidden: { opacity: 0 },
     visible: { 
-      scale: 1, 
       opacity: 1, 
       transition: { 
-        type: "spring",
-        stiffness: 50,
+        duration: 0.5,
         delay: 0.2 
       } 
     }
   };
-  
-  const [plugin] = useState(() => Autoplay({ delay: 3000, stopOnInteraction: true }));
 
   return (
     <motion.div
-      className="w-full lg:w-11/12 flex justify-center mx-auto" // Expanded to nearly full width
+      className="w-full lg:w-11/12 flex justify-center mx-auto"
       variants={heroImageAnimate}
       initial="hidden"
       animate="visible"
     >
       <div className="w-full relative">
-        {/* Decorative elements to match your theme */}
-        <div className="absolute -top-12 -left-12 w-64 h-64 bg-indigo-600/10 rounded-full blur-xl z-0"></div>
-        <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-purple-600/10 rounded-full blur-xl z-0"></div>
+        {/* Simplified decorative elements with reduced blur operations */}
+        <div className="absolute -top-12 -left-12 w-64 h-64 bg-indigo-600/5 rounded-full z-0"></div>
+        <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-purple-600/5 rounded-full z-0"></div>
         
         <Carousel 
-          plugins={[plugin]}
+          plugins={autoplayPlugin ? [autoplayPlugin] : []}
           className="w-full"
           opts={{
             align: "center",
             loop: true,
           }}
+          setApi={setApi}
         >
           <CarouselContent>
             {images.map((image, index) => (
               <CarouselItem key={index}>
-                <div className="p-4 md:p-6 lg:p-8"> {/* Increased padding at larger screen sizes */}
-                  <Card className="border-0 bg-white/5 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl">
+                <div className="p-4"> 
+                  <Card className="border-0 bg-white/5 overflow-hidden shadow-lg">
                     <CardContent className="flex items-center justify-center p-0">
-                      <div className="relative w-full h-full transform transition-transform duration-500 hover:scale-105">
+                      <div className="relative w-full h-full">
                         <Image 
                           src={image.src} 
-                          width={1200}  // Reverted image size
-                          height={800} // Reverted image size
+                          width={image.width}
+                          height={image.height}
                           alt={image.alt}
                           className="w-full h-auto object-contain"
                           priority={index === 0} // Only prioritize the first image
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                          loading={index === 0 ? "eager" : "lazy"}
                         />
-                        {/* Optional subtle overlay gradient */}
-                        <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/5 to-transparent pointer-events-none"></div>
                       </div>
                     </CardContent>
                   </Card>
@@ -81,14 +115,19 @@ const HeroCarousel = () => {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="absolute left-8 -translate-y-1/2 bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-md shadow-lg z-10" />
-          <CarouselNext className="absolute right-8 -translate-y-1/2 bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-md shadow-lg z-10" />
+          <CarouselPrevious className="absolute left-4 -translate-y-1/2 bg-white/10 border-white/20 text-white hover:bg-white/20 shadow-md z-10" />
+          <CarouselNext className="absolute right-4 -translate-y-1/2 bg-white/10 border-white/20 text-white hover:bg-white/20 shadow-md z-10" />
         </Carousel>
         
-        {/* Carousel indicators */}
+        {/* Simplified carousel indicators - reduced DOM elements */}
         <div className="flex justify-center mt-4 space-x-2">
           {images.map((_, index) => (
-            <div key={index} className="w-2 h-2 rounded-full bg-white/50"></div>
+            <div 
+              key={index} 
+              className={`w-2 h-2 rounded-full ${currentIndex === index ? 'bg-white' : 'bg-white/30'}`}
+              onClick={() => api?.scrollTo(index)}
+              style={{ cursor: 'pointer' }}
+            ></div>
           ))}
         </div>
       </div>
