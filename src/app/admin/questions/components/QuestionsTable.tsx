@@ -1,6 +1,6 @@
 // src/app/admin/questions/components/QuestionsTable.tsx
 import React from 'react';
-import Image from 'next/image';
+//import Image from 'next/image';
 
 type Question = {
     question_id: number;

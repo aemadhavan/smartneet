@@ -1,7 +1,7 @@
 // File: src/app/practice/components/ui/OptionButton.tsx
 interface OptionButtonProps {
   option: {
-    option_number: string;
+    option_number?: string | number; // Make option_number optional and allow number
     option_text: string;
   };
   isSelected: boolean;
@@ -9,6 +9,11 @@ interface OptionButtonProps {
 }
 
 export function OptionButton({ option, isSelected, onClick }: OptionButtonProps) {
+  // Convert option_number to string and uppercase, with fallback
+  const optionLabel = option.option_number != null 
+    ? String(option.option_number).toUpperCase() 
+    : '';
+
   return (
     <div
       className={`border rounded-md p-4 cursor-pointer ${
@@ -19,9 +24,11 @@ export function OptionButton({ option, isSelected, onClick }: OptionButtonProps)
       onClick={onClick}
     >
       <div className="flex items-start">
-        <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">
-          {option.option_number.toUpperCase()}.
-        </span>
+        {optionLabel && (
+          <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">
+            {optionLabel}.
+          </span>
+        )}
         <div 
           className="text-gray-800 dark:text-gray-100"
           dangerouslySetInnerHTML={{ __html: option.option_text }} 

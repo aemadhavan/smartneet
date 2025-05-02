@@ -1,5 +1,5 @@
 // src/app/admin/questions/components/QuestionForm.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Question, QuestionPaper, Subtopic, Topic } from './types';
 
 type QuestionFormProps = {
@@ -18,10 +18,6 @@ type QuestionFormProps = {
 export const QuestionForm: React.FC<QuestionFormProps> = ({
   currentQuestion,
   topics,
-  subtopics,
-  papers,
-  questionTypes,
-  difficultyLevels,
   formMode,
   onInputChange,
   onSubmit,
