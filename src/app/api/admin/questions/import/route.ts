@@ -99,6 +99,7 @@ interface BaseQuestionData {
 interface QuestionData extends BaseQuestionData {
   options?: MultipleChoiceOption[];
   statements?: Statement[];
+  question_number: number;
   assertion_reason?: AssertionReasonData;
   match_columns?: MatchColumnsData;
   statement_based?: StatementBasedData;
@@ -200,6 +201,9 @@ function processQuestionData(questionData: QuestionData): QuestionData {
   // Create a processed version of the question data with properly structured details
   const processedQuestion: QuestionData = {
     ...questionData,
+    question_number: typeof questionData.question_number === 'string' 
+    ? parseFloat(questionData.question_number) 
+    : questionData.question_number,
     details: questionData.details || {}
   };
 

@@ -893,7 +893,8 @@ const handlePaperChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
                     type="number"
                     id="question_number"
                     name="question_number"
-                    min="1"
+                    min="0.1"
+                    step="0.1"
                     value={currentQuestion.question_number || 1.0}
                     onChange={handleInputChange}
                     className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
