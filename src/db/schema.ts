@@ -10,7 +10,8 @@ import {
   pgEnum,
   jsonb,
   json,
-  uniqueIndex
+  uniqueIndex,
+  real
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -133,7 +134,7 @@ export const questions = pgTable('questions', {
   subject_id: integer('subject_id').notNull().references(() => subjects.subject_id),
   topic_id: integer('topic_id').notNull().references(() => topics.topic_id),
   subtopic_id: integer('subtopic_id').references(() => subtopics.subtopic_id),
-  question_number: integer('question_number'),
+  question_number: real('question_number'),
   question_type: questionTypeEnum('question_type').notNull(),
   source_type: questionSourceTypeEnum('source_type').notNull(),
   question_text: text('question_text').notNull(),

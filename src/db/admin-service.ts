@@ -179,7 +179,7 @@ export async function createQuestion(data: Partial<QuestionCreate> & {
   const questionData = {
     subject_id: data.subject_id,
     topic_id: data.topic_id,
-    question_number: data.question_number || 1,
+    question_number: data.question_number || 1.0,
     question_text: data.question_text,
     // Validate and cast enum types
     question_type: validateQuestionType(data.question_type),

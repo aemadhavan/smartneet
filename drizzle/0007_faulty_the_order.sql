@@ -1,0 +1,1 @@
+ALTER TABLE "questions" ALTER COLUMN "question_number" SET DATA TYPE real;
