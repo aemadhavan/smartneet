@@ -1,9 +1,10 @@
 // src/app/admin/biology/review/components/BiologyQuestionReview.tsx
 "use client";
 
-import { useState, useEffect } from 'react';
-import { 
-  Card, 
+import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
+import {
+  Card,
   CardContent,
   CardHeader,
   CardTitle,
@@ -21,17 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pagination } from "@/components/ui/pagination";
-import { Separator } from "@/components/ui/separator";
 import React from 'react';
 
 // Type definitions based on your database schema
-interface Subject {
-  subject_id: number;
-  subject_name: string;
-  subject_code: string;
-}
-
 interface Topic {
   topic_id: number;
   subject_id: number;
@@ -155,8 +148,37 @@ export default function BiologyQuestionReview() {
     };
     
     fetchInitialData();
-  }, []);
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // fetchQuestions dependency is handled within fetchInitialData
+
+  // Fetch questions with current filters and pagination
+  const fetchQuestions = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Build query params
+      const params = new URLSearchParams();
+      params.append('subject_id', '1'); // Biology
+      params.append('page', currentPage.toString());
+      params.append('pageSize', pageSize.toString());
+
+      if (filters.topic_id) params.append('topic_id', filters.topic_id.toString());
+      if (filters.subtopic_id) params.append('subtopic_id', filters.subtopic_id.toString());
+      if (filters.difficulty_level) params.append('difficulty_level', filters.difficulty_level);
+      if (filters.question_type) params.append('question_type', filters.question_type);
+      if (filters.searchTerm) params.append('search', filters.searchTerm);
+
+      const response = await fetch(`/api/admin/questions?${params.toString()}`);
+      const data = await response.json();
+
+      setQuestions(data.questions);
+      setTotalPages(Math.ceil(data.total / pageSize));
+    } catch (error) {
+      console.error('Error fetching questions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentPage, pageSize, filters]); // Include dependencies for useCallback
+
   // Update filtered subtopics when topic changes
   useEffect(() => {
     if (filters.topic_id) {
@@ -170,37 +192,9 @@ export default function BiologyQuestionReview() {
     // Reset subtopic selection when topic changes
     setFilters(prev => ({ ...prev, subtopic_id: null }));
   }, [filters.topic_id, subtopics]);
-  
-  // Fetch questions with current filters and pagination
-  const fetchQuestions = async () => {
-    setIsLoading(true);
-    try {
-      // Build query params
-      const params = new URLSearchParams();
-      params.append('subject_id', '1'); // Biology
-      params.append('page', currentPage.toString());
-      params.append('pageSize', pageSize.toString());
-      
-      if (filters.topic_id) params.append('topic_id', filters.topic_id.toString());
-      if (filters.subtopic_id) params.append('subtopic_id', filters.subtopic_id.toString());
-      if (filters.difficulty_level) params.append('difficulty_level', filters.difficulty_level);
-      if (filters.question_type) params.append('question_type', filters.question_type);
-      if (filters.searchTerm) params.append('search', filters.searchTerm);
-      
-      const response = await fetch(`/api/admin/questions?${params.toString()}`);
-      const data = await response.json();
-      
-      setQuestions(data.questions);
-      setTotalPages(Math.ceil(data.total / pageSize));
-    } catch (error) {
-      console.error('Error fetching questions:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
+
   // Handle filter changes
-  const handleFilterChange = (key: keyof Filters, value: any) => {
+  const handleFilterChange = (key: keyof Filters, value: string | number | null) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filters change
   };
@@ -211,11 +205,11 @@ export default function BiologyQuestionReview() {
     fetchQuestions();
   };
   
-  // Apply filters when they change
+  // Apply filters when they change (fetchQuestions is called when filters, page, or pageSize change)
   useEffect(() => {
     fetchQuestions();
-  }, [currentPage, pageSize, filters]);
-  
+  }, [fetchQuestions]); // Now depends on the memoized fetchQuestions
+
   // Render question content based on type
   const renderQuestionContent = (question: Question) => {
     switch (question.question_type) {
@@ -481,11 +475,13 @@ export default function BiologyQuestionReview() {
                   
                   <TabsContent value="question" className="pt-4">
                     {question.is_image_based && question.image_url && (
-                      <div className="mb-4">
-                        <img 
-                          src={question.image_url} 
-                          alt="Question Image" 
-                          className="max-h-64 object-contain mx-auto"
+                      <div className="mb-4 relative h-64 w-full"> {/* Added relative positioning and height */}
+                        <Image
+                          src={question.image_url}
+                          alt="Question Image"
+                          fill // Use fill to cover the container
+                          style={{ objectFit: 'contain' }} // Maintain aspect ratio
+                          className="mx-auto" // Keep centering if needed
                         />
                       </div>
                     )}
