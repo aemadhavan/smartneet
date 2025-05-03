@@ -130,12 +130,12 @@ export default function QuestionForm({ questionId, isEdit = false }: QuestionFor
     const fetchTopicsAndSubtopics = async () => {
       try {
         // Fetch topics for Biology (subject_id = 1)
-        const topicsResponse = await fetch('/api/admin/topics?subject_id=1');
+        const topicsResponse = await fetch('/api/admin/topics?subjectId=3');
         const topicsData = await topicsResponse.json();
         setTopics(topicsData);
         
         // Fetch all subtopics for Biology
-        const subtopicsResponse = await fetch('/api/admin/subtopics?subject_id=1');
+        const subtopicsResponse = await fetch('/api/admin/subtopics?subjectId=3');
         const subtopicsData = await subtopicsResponse.json();
         setSubtopics(subtopicsData);
       } catch (error) {

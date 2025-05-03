@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
     const subjectId = url.searchParams.get('subjectId');
+    const subject_id = url.searchParams.get('subject_id'); // Add support for subject_id parameter
     
     if (id) {
       const topic = await getTopicById(Number(id));
@@ -25,8 +26,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(topic[0]);
     }
     
-    if (subjectId) {
-      const topics = await getTopicsBySubject(Number(subjectId));
+    // Check for either subjectId or subject_id parameter
+    const effectiveSubjectId = subjectId || subject_id;
+    
+    if (effectiveSubjectId) {
+      const topics = await getTopicsBySubject(Number(effectiveSubjectId));
       return NextResponse.json(topics);
     }
     

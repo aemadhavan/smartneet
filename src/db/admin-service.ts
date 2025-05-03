@@ -1,7 +1,7 @@
 // src/app/db/admin-service.ts
 import { db } from './index'; // Assuming this is how your db connection is exported
 import { subjects, topics, subtopics, questions, question_papers, exam_years } from '@/db/schema';
-import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
+import { eq, and, sql, asc, desc, inArray, or, SQLWrapper } from 'drizzle-orm';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
 // Subjects
@@ -489,4 +489,88 @@ export async function getSubtopicsBySubject(subjectId: number) {
     console.error('Error getting subtopics by subject:', error);
     throw error;
   }
+}
+
+export async function getQuestionsBySubject(
+  subjectId: number, 
+  filters: {
+    topicId?: number;
+    subtopicId?: number;
+    paperId?: number;
+    difficultyLevel?: typeof difficultyLevelEnum.enumValues[number];
+    questionType?: typeof questionTypeEnum.enumValues[number];
+    searchTerm?: string;
+    limit?: number;
+    offset?: number;
+  } = {}
+) {
+// Start building conditions
+const conditions: SQLWrapper[] = [
+  eq(questions.subject_id, subjectId),
+  eq(questions.is_active, true)
+];
+
+  // Type-safe optional filters
+  const addCondition = (condition: SQLWrapper) => {
+    conditions.push(condition);
+  };
+
+  if (filters.topicId) {
+    addCondition(eq(questions.topic_id, filters.topicId));
+  }
+
+  if (filters.subtopicId) {
+    addCondition(eq(questions.subtopic_id, filters.subtopicId));
+  }
+
+  if (filters.paperId) {
+    addCondition(eq(questions.paper_id, filters.paperId));
+  }
+
+  if (filters.difficultyLevel) {
+    addCondition(eq(questions.difficulty_level, filters.difficultyLevel));
+  }
+
+  if (filters.questionType) {
+    addCondition(eq(questions.question_type, filters.questionType));
+  }
+
+  // Search condition with careful type handling
+  if (filters.searchTerm) {
+    const searchCondition = or(
+      sql`LOWER(${questions.question_text}) LIKE LOWER('%' || ${filters.searchTerm} || '%')`,
+      sql`LOWER(COALESCE(${questions.explanation}, '')) LIKE LOWER('%' || ${filters.searchTerm} || '%')`
+    );
+    if (searchCondition) {
+      addCondition(searchCondition);
+  }
+  
+  }
+
+  // Construct final where condition
+  const whereCondition = and(...conditions);
+
+  // Perform total count query
+  const totalQuery = db.select({ count: sql`count(*)` })
+    .from(questions)
+    .where(whereCondition);
+
+  // Perform questions query with pagination
+  const questionsQuery = db.select()
+    .from(questions)
+    .where(whereCondition)
+    .limit(filters.limit ?? 10)
+    .offset(filters.offset ?? 0)
+    .orderBy(asc(questions.question_id));
+
+  // Execute both queries concurrently
+  const [totalResult, questionsResult] = await Promise.all([
+    totalQuery,
+    questionsQuery
+  ]);
+
+  return {
+    questions: questionsResult,
+    total: Number(totalResult[0].count)
+  };
 }

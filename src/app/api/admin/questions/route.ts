@@ -1,27 +1,50 @@
 // src/app/api/admin/questions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  getAllQuestions, 
+  // getAllQuestions, // Removed unused import
   getQuestionById,
-  getQuestionsByTopic,
-  getQuestionsBySubtopic,
-  getQuestionsByPaperId,
+  // getQuestionsByTopic, // Removed unused import
+  // getQuestionsBySubtopic, // Removed unused import
+  // getQuestionsByPaperId, // Removed unused import
+  getQuestionsBySubject,
   createQuestion,
   updateQuestion,
   deleteQuestion,
   updateQuestionPaperCount
 } from '@/db/admin-service';
+import { 
+  difficultyLevelEnum, 
+  questionTypeEnum 
+} from '@/db/schema';
+import { getAuth } from "@clerk/nextjs/server";
 
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    const id = url.searchParams.get('id');
-    const topicId = url.searchParams.get('topicId');
-    const subtopicId = url.searchParams.get('subtopicId');
-    const paperId = url.searchParams.get('paperId');
-    const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 100;
-    const offset = url.searchParams.get('offset') ? Number(url.searchParams.get('offset')) : 0;
     
+    // Extract all possible filter parameters
+    const id = url.searchParams.get('id');
+    const subjectId = url.searchParams.get('subject_id') || url.searchParams.get('subjectId');
+    const topicId = url.searchParams.get('topic_id') || url.searchParams.get('topicId');
+    const subtopicId = url.searchParams.get('subtopic_id') || url.searchParams.get('subtopicId');
+    const paperId = url.searchParams.get('paper_id') || url.searchParams.get('paperId');
+    
+    // Pagination parameters
+    const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1;
+    const pageSize = url.searchParams.get('pageSize') ? Number(url.searchParams.get('pageSize')) : 10;
+    const offset = (page - 1) * pageSize;
+    
+    // Additional filter parameters with type-safe casting
+    const difficultyLevel = url.searchParams.get('difficulty_level') || url.searchParams.get('difficultyLevel');
+    const questionType = url.searchParams.get('question_type') || url.searchParams.get('questionType');
+    const searchTerm = url.searchParams.get('search') || url.searchParams.get('searchTerm');
+
+    const { userId } = getAuth(req);
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Direct ID lookup
     if (id) {
       const question = await getQuestionById(Number(id));
       
@@ -31,27 +54,46 @@ export async function GET(req: NextRequest) {
       
       return NextResponse.json(question[0]);
     }
-    
-    if (paperId) {
-      const questions = await getQuestionsByPaperId(Number(paperId));
-      return NextResponse.json(questions);
-    }
-    
-    if (topicId) {
-      const questions = await getQuestionsByTopic(Number(topicId));
-      return NextResponse.json(questions);
-    }
-    
-    if (subtopicId) {
-      const questions = await getQuestionsBySubtopic(Number(subtopicId));
-      return NextResponse.json(questions);
-    }
-    
-    const questions = await getAllQuestions(limit, offset);
-    return NextResponse.json(questions);
+
+    // Build comprehensive query
+    let questions = [];
+    let total = 0;
+
+    // Type-safe filtering
+    const filters: Parameters<typeof getQuestionsBySubject>[1] = {
+      topicId: topicId ? Number(topicId) : undefined,
+      subtopicId: subtopicId ? Number(subtopicId) : undefined,
+      paperId: paperId ? Number(paperId) : undefined,
+      difficultyLevel: difficultyLevel as typeof difficultyLevelEnum.enumValues[number] | undefined,
+      questionType: questionType as typeof questionTypeEnum.enumValues[number] | undefined,
+      searchTerm: searchTerm || undefined,
+      limit: pageSize,
+      offset: offset
+    };
+
+    // New function in admin-service to handle complex filtering
+    const { questions: fetchedQuestions, total: totalQuestions } = await getQuestionsBySubject(
+      Number(subjectId || 3), 
+      filters
+    );
+
+    questions = fetchedQuestions;
+    total = totalQuestions;
+
+    // Return paginated results
+    return NextResponse.json({
+      questions,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    });
   } catch (error) {
     console.error('Error fetching questions:', error);
-    return NextResponse.json({ error: 'Failed to fetch questions' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to fetch questions', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 });
   }
 }
 

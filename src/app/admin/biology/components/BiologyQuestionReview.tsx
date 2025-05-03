@@ -1,8 +1,10 @@
 // src/app/admin/biology/components/BiologyQuestionReview.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
+import { useAuth } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -23,6 +25,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import React from 'react';
+import EditQuestionModal from './EditQuestionModal';
+import { toast } from "@/components/ui/use-toast";
 
 // Type definitions based on your database schema
 interface Topic {
@@ -113,6 +117,9 @@ export default function BiologyQuestionReview() {
   const [totalItems, setTotalItems] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+
   // State for filters
   const [filters, setFilters] = useState<Filters>({
     topic_id: null,
@@ -125,54 +132,38 @@ export default function BiologyQuestionReview() {
   // State for loading
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Fetch initial data
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        // Fetch biology topics
-        const topicsResponse = await fetch('/api/admin/topics?subject_id=1');
-        if (!topicsResponse.ok) {
-          throw new Error('Failed to fetch topics');
-        }
-        const topicsData = await topicsResponse.json();
-        setTopics(topicsData);
-        
-        // Fetch all subtopics for biology
-        const subtopicsResponse = await fetch('/api/admin/subtopics?subject_id=1');
-        if (!subtopicsResponse.ok) {
-          throw new Error('Failed to fetch subtopics');
-        }
-        const subtopicsData = await subtopicsResponse.json();
-        setSubtopics(subtopicsData);
-        
-        // Fetch questions (first page)
-        await fetchQuestions();
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
-        setError(error instanceof Error ? error.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchInitialData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // fetchQuestions dependency is handled within fetchInitialData
+  const { isLoaded, isSignedIn } = useAuth();
+  const router = useRouter();
 
+  // References to prevent multiple fetches
+  const initialDataFetched = useRef(false);
+  const isFetchingQuestions = useRef(false);
+  
   // Fetch questions with current filters and pagination
   const fetchQuestions = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    if (isFetchingQuestions.current) {
+      return;
+    }
+    
+    // Skip if not authenticated
+    if (!isSignedIn) {
+      return;
+    }
+    
+    isFetchingQuestions.current = true;
     setIsLoading(true);
     setError(null);
+    
     try {
       // Build query params
       const params = new URLSearchParams();
-      params.append('subject_id', '1'); // Biology
+      params.append('subjectId', '3'); // Biology
       params.append('page', currentPage.toString());
       params.append('pageSize', pageSize.toString());
 
-      if (filters.topic_id) params.append('topic_id', filters.topic_id.toString());
-      if (filters.subtopic_id) params.append('subtopic_id', filters.subtopic_id.toString());
+      if (filters.topic_id) params.append('topicId', filters.topic_id.toString());
+      if (filters.subtopic_id) params.append('subtopicId', filters.subtopic_id.toString());
       if (filters.difficulty_level) params.append('difficulty_level', filters.difficulty_level);
       if (filters.question_type) params.append('question_type', filters.question_type);
       if (filters.searchTerm) params.append('search', filters.searchTerm);
@@ -213,9 +204,72 @@ export default function BiologyQuestionReview() {
       setTotalPages(1);
     } finally {
       setIsLoading(false);
+      isFetchingQuestions.current = false;
     }
-  }, [currentPage, pageSize, filters]); // Include dependencies for useCallback
+  }, [currentPage, pageSize, filters, isSignedIn]);
 
+  // Fetch initial data (topics and subtopics)
+  const fetchInitialData = useCallback(async () => {
+    if (!isSignedIn || initialDataFetched.current) {
+      return;
+    }
+    
+    setIsLoading(true);
+    initialDataFetched.current = true;
+    
+    try {
+      // Fetch biology topics
+      const topicsResponse = await fetch('/api/admin/topics?subjectId=3');
+      if (!topicsResponse.ok) {
+        throw new Error('Failed to fetch topics');
+      }
+      const topicsData = await topicsResponse.json();
+      setTopics(topicsData);
+      
+      // Fetch all subtopics for biology
+      const subtopicsResponse = await fetch('/api/admin/subtopics?subjectId=3');
+      if (!subtopicsResponse.ok) {
+        throw new Error('Failed to fetch subtopics');
+      }
+      const subtopicsData = await subtopicsResponse.json();
+      setSubtopics(subtopicsData);
+      
+      // Now fetch questions
+      await fetchQuestions();
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+      setError(error instanceof Error ? error.message : 'An error occurred');
+      setIsLoading(false);
+    }
+  }, [fetchQuestions, isSignedIn]);
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.push("/sign-in");
+    }
+  }, [isLoaded, isSignedIn, router]);
+  
+  // Fetch initial data once when auth loads
+  useEffect(() => {
+    if (isLoaded && isSignedIn && !initialDataFetched.current) {
+      fetchInitialData();
+    }
+  }, [isLoaded, isSignedIn, fetchInitialData]);
+
+  // This effect controls when to fetch questions due to filter/pagination changes
+  useEffect(() => {
+    // Only run if we're authenticated and initial data is already loaded
+    if (isLoaded && isSignedIn && initialDataFetched.current && !isFetchingQuestions.current) {
+      // Use a short timeout to debounce multiple rapid changes
+      const timeoutId = setTimeout(() => {
+        fetchQuestions();
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [currentPage, pageSize, filters, isLoaded, isSignedIn, fetchQuestions]);
+  
   // Update filtered subtopics when topic changes
   useEffect(() => {
     if (filters.topic_id) {
@@ -223,30 +277,75 @@ export default function BiologyQuestionReview() {
         (subtopic) => subtopic.topic_id === filters.topic_id
       );
       setFilteredSubtopics(filtered);
+      // Reset subtopic selection when topic changes
+      if (filters.subtopic_id) {
+        setFilters(prev => ({ ...prev, subtopic_id: null }));
+      }
     } else {
       setFilteredSubtopics([]);
     }
-    // Reset subtopic selection when topic changes
-    setFilters(prev => ({ ...prev, subtopic_id: null }));
-  }, [filters.topic_id, subtopics]);
+  }, [filters.topic_id, filters.subtopic_id, subtopics]);
 
   // Handle filter changes
   const handleFilterChange = (key: keyof Filters, value: string | number | null) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filters change
   };
-  
-  // Handle search
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchQuestions();
+  const handleEditClick = (question: Question) => {
+    setSelectedQuestion(question);
+    setIsEditModalOpen(true);
+  };
+  // Handle save question
+  const handleSaveQuestion = async (updatedQuestion: Question) => {
+    try {
+      const response = await fetch(`/api/admin/questions/${updatedQuestion.question_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedQuestion),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update question');
+      }
+      
+      // Update the question in the local state
+      setQuestions(prevQuestions => 
+        prevQuestions.map(q => 
+          q.question_id === updatedQuestion.question_id ? updatedQuestion : q
+        )
+      );
+      
+      // Show success toast
+      toast({
+        title: "Question Updated",
+        description: "The question has been successfully updated.",
+      });
+      
+    } catch (error) {
+      console.error('Error updating question:', error);
+      throw error; // Re-throw to be handled by the modal
+    }
   };
   
-  // Apply filters when they change (fetchQuestions is called when filters, page, or pageSize change)
-  useEffect(() => {
-    fetchQuestions();
-  }, [fetchQuestions]); // Now depends on the memoized fetchQuestions
+  // Handle search - with explicit user action to prevent automatic refetching
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isFetchingQuestions.current) {
+      fetchQuestions();
+    }
+  };
 
+  // If auth is still loading, show a loading state
+  if (!isLoaded) {
+    return (
+      <div className="container mx-auto py-6 flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+  
   // Render question content based on type
   const renderQuestionContent = (question: Question) => {
     if (!question) return null;
@@ -464,10 +563,23 @@ export default function BiologyQuestionReview() {
                   value={filters.searchTerm}
                   onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
                 />
-                <Button type="submit">Search</Button>
+                <Button type="submit" disabled={isFetchingQuestions.current}>Search</Button>
               </div>
             </div>
           </form>
+        </CardContent>
+      </Card>
+      
+      {/* Status Card - Only visible during development, can be removed for production */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p><strong>Authentication:</strong> {isSignedIn ? 'Signed In' : 'Not Signed In'}</p>
+          <p><strong>Loading:</strong> {isLoading ? 'Loading data...' : 'Data loaded'}</p>
+          <p><strong>Data Counts:</strong> Topics: {topics.length}, Subtopics: {subtopics.length}, Questions: {questions.length}</p>
+          {error && <p className="text-red-600"><strong>Error:</strong> {error}</p>}
         </CardContent>
       </Card>
       
@@ -481,7 +593,7 @@ export default function BiologyQuestionReview() {
       )}
       
       {/* Questions List */}
-      {isLoading ? (
+      {isLoading && questions.length === 0 ? (
         <div className="flex justify-center p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         </div>
@@ -550,93 +662,110 @@ export default function BiologyQuestionReview() {
                 </Tabs>
                 
                 <div className="mt-4 flex justify-end gap-2">
-                  <Button variant="outline" size="sm">
-                    Edit
-                  </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditClick(question)}
+                >
+                  Edit
+                </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
           
           {/* Pagination */}
-          <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
-              {totalItems > 0 ? (
-                <>
-                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} questions
-                </>
-              ) : (
-                'No questions found'
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
-                  // Calculate the page number to display
-                  let pageNum = currentPage;
-                  if (totalPages <= 5) {
-                    pageNum = idx + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = idx + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - (4 - idx);
-                  } else {
-                    pageNum = currentPage - 2 + idx;
-                  }
-                  
-                  return (
-                    <Button
-                      key={idx}
-                      variant={pageNum === currentPage ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
+          {!isLoading && (
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-gray-500">
+                {totalItems > 0 ? (
+                  <>
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} questions
+                  </>
+                ) : (
+                  'No questions found'
+                )}
               </div>
               
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-              
-              <Select
-                value={pageSize.toString()}
-                onValueChange={(value) => {
-                  setPageSize(parseInt(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="5">5</SelectItem>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="20">20</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1 || isLoading}
+                >
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
+                    // Calculate the page number to display
+                    let pageNum = currentPage;
+                    if (totalPages <= 5) {
+                      pageNum = idx + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = idx + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - (4 - idx);
+                    } else {
+                      pageNum = currentPage - 2 + idx;
+                    }
+                    
+                    return (
+                      <Button
+                        key={idx}
+                        variant={pageNum === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(pageNum)}
+                        disabled={isLoading}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages || isLoading}
+                >
+                  Next
+                </Button>
+                
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    setPageSize(parseInt(value));
+                    setCurrentPage(1);
+                  }}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5</SelectItem>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="20">20</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
-    </div>
+      {/* Edit Question Modal */}
+      <EditQuestionModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        question={selectedQuestion}
+        topics={topics}
+        subtopics={subtopics}
+        onSave={handleSaveQuestion}
+      />
+    </div>  
   );
 }

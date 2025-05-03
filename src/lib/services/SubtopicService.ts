@@ -1,4 +1,3 @@
-// lib/services/SubtopicService.ts
 import { db } from '@/db'
 import { subtopics, topics } from '@/db/schema'
 import { eq, and, inArray } from 'drizzle-orm'
@@ -86,6 +85,7 @@ export class SubtopicService {
     
     return subtopic
   }
+
   
   /**
    * Invalidate subtopic cache when data changes
