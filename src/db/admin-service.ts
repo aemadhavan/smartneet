@@ -1,7 +1,7 @@
 // src/app/db/admin-service.ts
 import { db } from './index'; // Assuming this is how your db connection is exported
 import { subjects, topics, subtopics, questions, question_papers, exam_years } from '@/db/schema';
-import { eq, and, sql, asc, desc } from 'drizzle-orm';
+import { eq, and, sql, asc, desc, inArray } from 'drizzle-orm';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
 // Subjects
@@ -463,4 +463,30 @@ interface QuestionUpdate {
   image_url?: string;
   is_active?: boolean;
   updated_at?: Date;
+}
+
+export async function getSubtopicsBySubject(subjectId: number) {
+  try {
+    // First, get all topic IDs for the given subject
+    const topicsForSubject = await db.select({ topic_id: topics.topic_id })
+      .from(topics)
+      .where(eq(topics.subject_id, subjectId));
+    
+    // Extract topic IDs from the result
+    const topicIds = topicsForSubject.map(topic => topic.topic_id);
+    
+    if (topicIds.length === 0) {
+      return [];
+    }
+    
+    // Then, get all subtopics for these topics
+    const subtopicsResult = await db.select()
+      .from(subtopics)
+      .where(inArray(subtopics.topic_id, topicIds));
+    
+    return subtopicsResult;
+  } catch (error) {
+    console.error('Error getting subtopics by subject:', error);
+    throw error;
+  }
 }
