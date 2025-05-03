@@ -1,4 +1,4 @@
-// src/app/admin/biology/review/components/BiologyQuestionReview.tsx
+// src/app/admin/biology/components/BiologyQuestionReview.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -110,6 +110,7 @@ export default function BiologyQuestionReview() {
   // State for pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   
   // State for filters
@@ -123,6 +124,7 @@ export default function BiologyQuestionReview() {
   
   // State for loading
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Fetch initial data
   useEffect(() => {
@@ -130,11 +132,17 @@ export default function BiologyQuestionReview() {
       try {
         // Fetch biology topics
         const topicsResponse = await fetch('/api/admin/topics?subject_id=1');
+        if (!topicsResponse.ok) {
+          throw new Error('Failed to fetch topics');
+        }
         const topicsData = await topicsResponse.json();
         setTopics(topicsData);
         
         // Fetch all subtopics for biology
         const subtopicsResponse = await fetch('/api/admin/subtopics?subject_id=1');
+        if (!subtopicsResponse.ok) {
+          throw new Error('Failed to fetch subtopics');
+        }
         const subtopicsData = await subtopicsResponse.json();
         setSubtopics(subtopicsData);
         
@@ -142,6 +150,7 @@ export default function BiologyQuestionReview() {
         await fetchQuestions();
       } catch (error) {
         console.error('Error fetching initial data:', error);
+        setError(error instanceof Error ? error.message : 'An error occurred');
       } finally {
         setIsLoading(false);
       }
@@ -154,6 +163,7 @@ export default function BiologyQuestionReview() {
   // Fetch questions with current filters and pagination
   const fetchQuestions = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       // Build query params
       const params = new URLSearchParams();
@@ -168,12 +178,39 @@ export default function BiologyQuestionReview() {
       if (filters.searchTerm) params.append('search', filters.searchTerm);
 
       const response = await fetch(`/api/admin/questions?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch questions');
+      }
+      
       const data = await response.json();
 
-      setQuestions(data.questions);
-      setTotalPages(Math.ceil(data.total / pageSize));
+      // Check if the response has the expected structure
+      if (!data || !Array.isArray(data.questions)) {
+        // Handle case where the API doesn't return the expected data structure
+        if (Array.isArray(data)) {
+          // If data is an array directly, use it as questions
+          setQuestions(data);
+          setTotalItems(data.length);
+          setTotalPages(Math.ceil(data.length / pageSize));
+        } else {
+          // If data has unexpected structure or is empty
+          setQuestions([]);
+          setTotalItems(0);
+          setTotalPages(1);
+          console.warn('Unexpected data structure returned from API', data);
+        }
+      } else {
+        // Normal case where API returns expected structure
+        setQuestions(data.questions);
+        setTotalItems(data.total || data.questions.length);
+        setTotalPages(Math.ceil((data.total || data.questions.length) / pageSize));
+      }
     } catch (error) {
       console.error('Error fetching questions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch questions');
+      setQuestions([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
@@ -212,14 +249,18 @@ export default function BiologyQuestionReview() {
 
   // Render question content based on type
   const renderQuestionContent = (question: Question) => {
+    if (!question) return null;
+    
+    const details = question.details || {};
+    
     switch (question.question_type) {
       case 'MultipleChoice':
         return (
           <div className="space-y-4">
             <div className="font-medium">{question.question_text}</div>
-            {question.details.options && (
+            {details.options && details.options.length > 0 && (
               <div className="grid gap-2">
-                {question.details.options.map((option, idx) => (
+                {details.options.map((option, idx) => (
                   <div key={idx} className={`flex items-start p-2 rounded-md ${option.is_correct ? 'bg-green-50 border border-green-200' : ''}`}>
                     <div className="font-semibold mr-2">{option.option_number}.</div>
                     <div>{option.option_text}</div>
@@ -235,9 +276,9 @@ export default function BiologyQuestionReview() {
         return (
           <div className="space-y-4">
             <div className="font-medium">{question.question_text}</div>
-            {question.details.statements && (
+            {details.statements && details.statements.length > 0 && (
               <div className="grid gap-2">
-                {question.details.statements.map((statement, idx) => (
+                {details.statements.map((statement, idx) => (
                   <div key={idx} className={`flex items-start p-2 rounded-md ${statement.is_correct ? 'bg-green-50 border border-green-200' : ''}`}>
                     <div className="font-semibold mr-2">{statement.statement_label}.</div>
                     <div>{statement.statement_text}</div>
@@ -253,16 +294,16 @@ export default function BiologyQuestionReview() {
         return (
           <div className="space-y-4">
             <div className="font-medium">{question.question_text}</div>
-            {question.details.assertion_text && (
+            {details.assertion_text && (
               <div className="p-2 rounded-md bg-blue-50">
                 <span className="font-semibold">Assertion: </span>
-                {question.details.assertion_text}
+                {details.assertion_text}
               </div>
             )}
-            {question.details.reason_text && (
+            {details.reason_text && (
               <div className="p-2 rounded-md bg-purple-50">
                 <span className="font-semibold">Reason: </span>
-                {question.details.reason_text}
+                {details.reason_text}
               </div>
             )}
           </div>
@@ -272,11 +313,11 @@ export default function BiologyQuestionReview() {
         return (
           <div className="space-y-4">
             <div className="font-medium">{question.question_text}</div>
-            {question.details.items && question.details.items.length > 0 && (
+            {details.items && details.items.length > 0 && (
               <div className="grid grid-cols-2 gap-2">
-                <div className="font-semibold">{question.details.left_column_header || 'Column A'}</div>
-                <div className="font-semibold">{question.details.right_column_header || 'Column B'}</div>
-                {question.details.items.map((item, idx) => (
+                <div className="font-semibold">{details.left_column_header || 'Column A'}</div>
+                <div className="font-semibold">{details.right_column_header || 'Column B'}</div>
+                {details.items.map((item, idx) => (
                   <React.Fragment key={idx}>
                     <div className="p-2 bg-gray-50 rounded">
                       {item.left_item_label}. {item.left_item_text}
@@ -295,24 +336,24 @@ export default function BiologyQuestionReview() {
         return (
           <div className="space-y-4">
             <div className="font-medium">{question.question_text}</div>
-            {question.details.intro_text && (
-              <div className="italic">{question.details.intro_text}</div>
+            {details.intro_text && (
+              <div className="italic">{details.intro_text}</div>
             )}
-            {question.details.items && (
+            {details.items && details.items.length > 0 && (
               <div className="grid gap-2">
-                {question.details.items.map((item, idx) => (
+                {details.items.map((item, idx) => (
                   <div key={idx} className="p-2 bg-gray-50 rounded">
                     {item.item_label || item.item_number}. {item.item_text}
                   </div>
                 ))}
               </div>
             )}
-            {question.details.correct_sequence && (
+            {details.correct_sequence && (
               <div>
                 <span className="font-semibold">Correct sequence: </span>
-                {Array.isArray(question.details.correct_sequence) 
-                  ? question.details.correct_sequence.join(' → ') 
-                  : question.details.correct_sequence}
+                {Array.isArray(details.correct_sequence) 
+                  ? details.correct_sequence.join(' → ') 
+                  : details.correct_sequence}
               </div>
             )}
           </div>
@@ -337,14 +378,14 @@ export default function BiologyQuestionReview() {
             <div className="space-y-2">
               <Label htmlFor="topic">Topic</Label>
               <Select
-                value={filters.topic_id?.toString() || ""}
-                onValueChange={(value) => handleFilterChange('topic_id', value ? parseInt(value) : null)}
+                value={filters.topic_id?.toString() || undefined}
+                onValueChange={(value) => handleFilterChange('topic_id', value === "all" ? null : parseInt(value))}
               >
                 <SelectTrigger id="topic">
                   <SelectValue placeholder="Select a topic" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Topics</SelectItem>
+                  <SelectItem value="all">All Topics</SelectItem>
                   {topics.map((topic) => (
                     <SelectItem key={topic.topic_id} value={topic.topic_id.toString()}>
                       {topic.topic_name}
@@ -357,15 +398,15 @@ export default function BiologyQuestionReview() {
             <div className="space-y-2">
               <Label htmlFor="subtopic">Subtopic</Label>
               <Select
-                value={filters.subtopic_id?.toString() || ""}
-                onValueChange={(value) => handleFilterChange('subtopic_id', value ? parseInt(value) : null)}
+                value={filters.subtopic_id?.toString() || undefined}
+                onValueChange={(value) => handleFilterChange('subtopic_id', value === "all" ? null : parseInt(value))}
                 disabled={!filters.topic_id}
               >
                 <SelectTrigger id="subtopic">
                   <SelectValue placeholder={filters.topic_id ? "Select a subtopic" : "Select a topic first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Subtopics</SelectItem>
+                  <SelectItem value="all">All Subtopics</SelectItem>
                   {filteredSubtopics.map((subtopic) => (
                     <SelectItem key={subtopic.subtopic_id} value={subtopic.subtopic_id.toString()}>
                       {subtopic.subtopic_name}
@@ -378,14 +419,14 @@ export default function BiologyQuestionReview() {
             <div className="space-y-2">
               <Label htmlFor="difficulty">Difficulty</Label>
               <Select
-                value={filters.difficulty_level || ""}
-                onValueChange={(value) => handleFilterChange('difficulty_level', value || null)}
+                value={filters.difficulty_level || undefined}
+                onValueChange={(value) => handleFilterChange('difficulty_level', value === "any" ? null : value)}
               >
                 <SelectTrigger id="difficulty">
                   <SelectValue placeholder="Any difficulty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any Difficulty</SelectItem>
+                  <SelectItem value="any">Any Difficulty</SelectItem>
                   <SelectItem value="easy">Easy</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="hard">Hard</SelectItem>
@@ -396,14 +437,14 @@ export default function BiologyQuestionReview() {
             <div className="space-y-2">
               <Label htmlFor="questionType">Question Type</Label>
               <Select
-                value={filters.question_type || ""}
-                onValueChange={(value) => handleFilterChange('question_type', value || null)}
+                value={filters.question_type || undefined}
+                onValueChange={(value) => handleFilterChange('question_type', value === "any" ? null : value)}
               >
                 <SelectTrigger id="questionType">
                   <SelectValue placeholder="Any type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any Type</SelectItem>
+                  <SelectItem value="any">Any Type</SelectItem>
                   <SelectItem value="MultipleChoice">Multiple Choice</SelectItem>
                   <SelectItem value="Matching">Matching</SelectItem>
                   <SelectItem value="MultipleCorrectStatements">Multiple Correct Statements</SelectItem>
@@ -429,6 +470,15 @@ export default function BiologyQuestionReview() {
           </form>
         </CardContent>
       </Card>
+      
+      {/* Error Message */}
+      {error && (
+        <Card className="bg-red-50 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-red-600">{error}</p>
+          </CardContent>
+        </Card>
+      )}
       
       {/* Questions List */}
       {isLoading ? (
@@ -475,13 +525,13 @@ export default function BiologyQuestionReview() {
                   
                   <TabsContent value="question" className="pt-4">
                     {question.is_image_based && question.image_url && (
-                      <div className="mb-4 relative h-64 w-full"> {/* Added relative positioning and height */}
+                      <div className="mb-4 relative h-64 w-full">
                         <Image
                           src={question.image_url}
                           alt="Question Image"
-                          fill // Use fill to cover the container
-                          style={{ objectFit: 'contain' }} // Maintain aspect ratio
-                          className="mx-auto" // Keep centering if needed
+                          fill
+                          style={{ objectFit: 'contain' }}
+                          className="mx-auto"
                         />
                       </div>
                     )}
@@ -511,7 +561,13 @@ export default function BiologyQuestionReview() {
           {/* Pagination */}
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, (totalPages * pageSize))} of {totalPages * pageSize} questions
+              {totalItems > 0 ? (
+                <>
+                  Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems} questions
+                </>
+              ) : (
+                'No questions found'
+              )}
             </div>
             
             <div className="flex items-center gap-2">

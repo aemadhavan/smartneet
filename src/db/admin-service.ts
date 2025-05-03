@@ -1,7 +1,7 @@
 // src/app/db/admin-service.ts
 import { db } from './index'; // Assuming this is how your db connection is exported
 import { subjects, topics, subtopics, questions, question_papers, exam_years } from '@/db/schema';
-import { eq, and, sql, desc } from 'drizzle-orm';
+import { eq, and, sql, asc, desc } from 'drizzle-orm';
 import { questionTypeEnum, questionSourceTypeEnum, difficultyLevelEnum } from '@/db/schema';
 
 // Subjects
@@ -106,6 +106,7 @@ export async function deleteSubtopic(id: number) {
 export async function getAllQuestions(limit = 100, offset = 0) {
   return db.select().from(questions)
     .where(eq(questions.is_active, true))
+    .orderBy(asc(questions.question_id))
     .limit(limit)
     .offset(offset);
 }
