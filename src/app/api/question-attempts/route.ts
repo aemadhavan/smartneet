@@ -142,40 +142,28 @@ export async function POST(request: NextRequest) {
       if (!sessionQuestion) {
         return NextResponse.json({ error: 'Session question not found' }, { status: 404 });
       }
+      const { recordQuestionAttempt, updateTopicMastery } = await import('@/lib/utilities/sessionUtils');
 
-      // Create the attempt record
-      const [newAttempt] = await db.insert(question_attempts).values({
-        user_id: userId,
-        question_id: validatedData.question_id,
-        session_id: validatedData.session_id,
-        session_question_id: validatedData.session_question_id,
-        user_answer: validatedData.user_answer,
-        is_correct: isCorrect,
-        time_taken_seconds: validatedData.time_taken_seconds,
-        marks_awarded: marksAwarded,
-        user_notes: validatedData.user_notes,
-        attempt_timestamp: new Date()
-      }).returning();
-
-      // Update session statistics
-      await updateSessionStats(validatedData.session_id, isCorrect, marksAwarded);
+      // Use the standardized approach to record the attempt and update session
+      const result = await recordQuestionAttempt(
+        userId,
+        validatedData.session_id,
+        validatedData.question_id,
+        validatedData.session_question_id,
+        validatedData.user_answer,
+        isCorrect,
+        marksAwarded,
+        validatedData.time_taken_seconds
+      );
 
       // Update topic mastery
       await updateTopicMastery(userId, questionDetails.topic_id, isCorrect);
 
-      // Update session question time spent
-      if (validatedData.time_taken_seconds) {
-        await db.update(session_questions)
-          .set({ 
-            time_spent_seconds: validatedData.time_taken_seconds 
-          })
-          .where(eq(session_questions.session_question_id, validatedData.session_question_id));
-      }
-
       return NextResponse.json({
-        attempt_id: newAttempt.attempt_id,
+        attempt_id: result.attempt.attempt_id,
         is_correct: isCorrect,
-        marks_awarded: marksAwarded
+        marks_awarded: marksAwarded,
+        session_stats: result.sessionStats
       });
     } catch (validationError) {
       console.error('Validation error:', validationError);

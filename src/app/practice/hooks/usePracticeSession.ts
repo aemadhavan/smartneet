@@ -257,55 +257,55 @@ export function usePracticeSession(
     });
     
     // Debounced API call to save the answer - no need to wait for response
-    const saveAnswer = () => {
-      if (!session) return;
+    // const saveAnswer = () => {
+    //   if (!session) return;
       
-      const currentQuestion = session.questions[currentQuestionIndex];
-      if (!currentQuestion) return;
+    //   const currentQuestion = session.questions[currentQuestionIndex];
+    //   if (!currentQuestion) return;
       
-      // First, look up the correct session_question_id
-      fetch(`/api/session-questions/lookup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: session.sessionId,
-          question_id: currentQuestion.question_id
-        }),
-      })
-      .then(response => response.json())
-      .then(data => {
-        // Now submit the attempt with the correct session_question_id
-        if (data.session_question_id) {
-          fetch(`/api/question-attempts`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              session_id: session.sessionId,
-              session_question_id: data.session_question_id,
-              question_id: currentQuestion.question_id,
-              user_answer: {
-                selectedOption: optionNumber
-              },
-              time_taken_seconds: 30
-            }),
-          }).catch(err => {
-            console.warn('Failed to save answer, will retry later:', err);
-          });
-        } else {
-          console.warn('Could not find session_question_id for question', currentQuestion.question_id);
-        }
-      })
-      .catch(err => {
-        console.warn('Failed to look up session_question_id:', err);
-      });
-    };
+    //   // First, look up the correct session_question_id
+    //   fetch(`/api/session-questions/lookup`, {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //     },
+    //     body: JSON.stringify({
+    //       session_id: session.sessionId,
+    //       question_id: currentQuestion.question_id
+    //     }),
+    //   })
+    //   .then(response => response.json())
+    //   .then(data => {
+    //     // Now submit the attempt with the correct session_question_id
+    //     if (data.session_question_id) {
+    //       fetch(`/api/question-attempts`, {
+    //         method: 'POST',
+    //         headers: {
+    //           'Content-Type': 'application/json',
+    //         },
+    //         body: JSON.stringify({
+    //           session_id: session.sessionId,
+    //           session_question_id: data.session_question_id,
+    //           question_id: currentQuestion.question_id,
+    //           user_answer: {
+    //             selectedOption: optionNumber
+    //           },
+    //           time_taken_seconds: 30
+    //         }),
+    //       }).catch(err => {
+    //         console.warn('Failed to save answer, will retry later:', err);
+    //       });
+    //     } else {
+    //       console.warn('Could not find session_question_id for question', currentQuestion.question_id);
+    //     }
+    //   })
+    //   .catch(err => {
+    //     console.warn('Failed to look up session_question_id:', err);
+    //   });
+    // };
     
     // Add a small delay to avoid too many API calls when user is selecting different options
-    setTimeout(saveAnswer, 500);
+    //setTimeout(saveAnswer, 500);
   }, [session, currentQuestionIndex, sessionCache]);
 
   // Handle completion of session

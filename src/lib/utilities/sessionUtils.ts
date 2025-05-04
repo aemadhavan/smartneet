@@ -1,7 +1,7 @@
 // Create a utility function in a shared location (e.g., src/lib/utilities/sessionUtils.ts)
-
+//File: src/lib/utilities/sessionUtils.ts
 import { db } from '@/db';
-import { practice_sessions, session_questions, question_attempts, questions } from '@/db/schema'; // Added 'questions'
+import { practice_sessions, session_questions, question_attempts, questions, topic_mastery } from '@/db/schema'; // Added 'questions'
 import { and, eq, count, countDistinct, sum } from 'drizzle-orm'; // Added countDistinct, sum
 
 /**
@@ -208,5 +208,117 @@ export async function recordQuestionAttempt(
     const sessionStats = await updateSessionStats(sessionId, userId);
 
     return { attempt: newAttempt, sessionStats };
+  });
+}
+
+/**
+ * Updates the topic mastery level for a user based on their question attempts
+ * 
+ * @param userId User ID
+ * @param topicId Topic ID
+ * @param isCorrect Whether the latest attempt was correct
+ * @returns Object containing updated mastery information
+ */
+export async function updateTopicMastery(
+  userId: string, 
+  topicId: number, 
+  isCorrect: boolean
+): Promise<{
+  mastery_level: string,
+  questions_attempted: number,
+  questions_correct: number,
+  accuracy_percentage: number
+}> {
+  return await db.transaction(async (tx) => {
+    // Get current mastery level
+    const [mastery] = await tx
+      .select()
+      .from(topic_mastery)
+      .where(
+        and(
+          eq(topic_mastery.user_id, userId),
+          eq(topic_mastery.topic_id, topicId)
+        )
+      );
+    
+    if (mastery) {
+      // Update existing mastery record
+      const questionsAttempted = mastery.questions_attempted + 1;
+      const questionsCorrect = isCorrect ? mastery.questions_correct + 1 : mastery.questions_correct;
+      const accuracyPercentage = Math.round((questionsCorrect / questionsAttempted) * 100);
+      
+      // Determine new mastery level
+      let masteryLevel = mastery.mastery_level;
+      
+      // Simple mastery algorithm (customize as needed)
+      if (questionsAttempted >= 20) {
+        if (accuracyPercentage >= 90) masteryLevel = 'mastered';
+        else if (accuracyPercentage >= 75) masteryLevel = 'advanced';
+        else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
+        else masteryLevel = 'beginner';
+      } else if (questionsAttempted >= 10) {
+        if (accuracyPercentage >= 80) masteryLevel = 'advanced';
+        else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
+        else masteryLevel = 'beginner';
+      } else if (questionsAttempted >= 5) {
+        if (accuracyPercentage >= 70) masteryLevel = 'intermediate';
+        else masteryLevel = 'beginner';
+      } else {
+        masteryLevel = 'beginner';
+      }
+      
+      // Update the record
+      await tx
+        .update(topic_mastery)
+        .set({
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
+          accuracy_percentage: accuracyPercentage,
+          mastery_level: masteryLevel,
+          last_practiced: new Date(),
+          updated_at: new Date()
+        })
+        .where(
+          and(
+            eq(topic_mastery.user_id, userId),
+            eq(topic_mastery.topic_id, topicId)
+          )
+        );
+      
+      // Return the updated mastery info
+      return {
+        mastery_level: masteryLevel,
+        questions_attempted: questionsAttempted,
+        questions_correct: questionsCorrect,
+        accuracy_percentage: accuracyPercentage
+      };
+    } else {
+      // Create new mastery record
+      const initialAccuracy = isCorrect ? 100 : 0;
+      const initialMasteryLevel = 'beginner';
+      
+      // Insert the record
+      await tx
+        .insert(topic_mastery)
+        .values({
+          user_id: userId,
+          topic_id: topicId,
+          mastery_level: initialMasteryLevel,
+          questions_attempted: 1,
+          questions_correct: isCorrect ? 1 : 0,
+          accuracy_percentage: initialAccuracy,
+          last_practiced: new Date(),
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      
+      // Return the new mastery info
+      return {
+        mastery_level: initialMasteryLevel,
+        questions_attempted: 1,
+        questions_correct: isCorrect ? 1 : 0,
+        accuracy_percentage: initialAccuracy
+      };
+    }
   });
 }

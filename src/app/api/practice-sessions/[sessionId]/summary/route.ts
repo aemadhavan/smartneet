@@ -36,14 +36,19 @@ export async function GET(
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
+    const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
+    await updateSessionStats(sessionId, userId);
 
     // Get the session details
-    const session = await db.query.practice_sessions.findFirst({
-      where: and(
+    const [session] = await db
+    .select()
+    .from(practice_sessions)
+    .where(
+      and(
         eq(practice_sessions.session_id, sessionId),
         eq(practice_sessions.user_id, userId)
       )
-    });
+    );
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -144,34 +149,32 @@ export async function GET(
     // Format the summary data
     const summary = {
       sessionId,
-      totalQuestions,
-      questionsCorrect,
-      questionsIncorrect: totalQuestions - questionsCorrect,
-      accuracy,
-      timeTakenMinutes,
-      score,
-      maxScore,
-      topicPerformance
+      totalQuestions: session.total_questions ?? 0, // Handle potential null
+      questionsAttempted: session.questions_attempted ?? 0, // Handle potential null
+      questionsCorrect: session.questions_correct ?? 0, // Handle potential null
+      questionsIncorrect: (session.questions_attempted ?? 0) - (session.questions_correct ?? 0), // Handle potential null
+      accuracy: (session.questions_attempted ?? 0) > 0 
+        ? Math.round(((session.questions_correct ?? 0) / (session.questions_attempted ?? 1)) * 100) // Handle potential null and division by zero
+        : 0,
+      timeTakenMinutes: session.duration_minutes ?? 0, // Keep existing null check
+      score: session.score ?? 0, // Keep existing null check
+      max_score: session.max_score || 0,
+      topicPerformance // From existing logic
     };
 
     // Also update the session record with the final stats
     await db.update(practice_sessions)
-      .set({
-        end_time: new Date(),
-        duration_minutes: timeTakenMinutes,
-        questions_attempted: totalQuestions,
-        questions_correct: questionsCorrect,
-        score: score,
-        max_score: maxScore,
-        is_completed: true,
-        updated_at: new Date()
-      })
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionId),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
+    .set({
+      end_time: new Date(),
+      is_completed: true,
+      updated_at: new Date()
+    })
+    .where(
+      and(
+        eq(practice_sessions.session_id, sessionId),
+        eq(practice_sessions.user_id, userId)
+      )
+    );
 
     return NextResponse.json(summary);
     

@@ -87,6 +87,13 @@ type QuestionDetails =
   | DiagramBasedDetails
   | MultipleCorrectStatementsDetails;
 
+// Interface for individual result objects
+interface AnswerResult {
+  question_id: number;
+  is_correct: boolean;
+  marks_awarded: number;
+}
+
 interface SubmitAnswersBody {
   answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
 }
@@ -152,12 +159,6 @@ export async function POST(
       );
     }
 
-    // Process each answer
-    const results = [];
-    let totalCorrect = 0;
-    let totalScore = 0;
-    let maxScore = 0;
-
     // Get all session questions with their details
     const sessionQuestions = await db
       .select({
@@ -192,239 +193,115 @@ export async function POST(
         return map;
       }, {} as Record<string, QuestionDetailsWithSessionInfo>);
 
-    // Function to parse and validate question details
-    function parseQuestionDetails(
-      questionType: string,
-      details: QuestionDetails
-    ): QuestionDetails | null {
-      try {
-        switch (questionType) {
-          case 'MultipleChoice':
-            const multipleChoiceDetails = details as MultipleChoiceDetails;
-            if (
-              Array.isArray(multipleChoiceDetails.options) &&
-              multipleChoiceDetails.options.every(
-                (opt) =>
-                  typeof opt.is_correct === 'boolean' &&
-                  typeof opt.option_text === 'string' &&
-                  typeof opt.option_number === 'string'
-              )
-            ) {
-              return multipleChoiceDetails;
-            }
-            break;
-
-          case 'Matching':
-            const matchingDetails = details as MatchingDetails;
-            if (
-              Array.isArray(matchingDetails.items) &&
-              Array.isArray(matchingDetails.options)
-            ) {
-              return matchingDetails;
-            }
-            break;
-
-          case 'AssertionReason':
-            const assertionReasonDetails = details as AssertionReasonDetails;
-            if (
-              Array.isArray(assertionReasonDetails.statements) &&
-              Array.isArray(assertionReasonDetails.options)
-            ) {
-              return assertionReasonDetails;
-            }
-            break;
-
-          case 'SequenceOrdering':
-            const sequenceOrderingDetails = details as SequenceOrderingDetails;
-            if (
-              Array.isArray(sequenceOrderingDetails.sequence_items) &&
-              Array.isArray(sequenceOrderingDetails.options)
-            ) {
-              return sequenceOrderingDetails;
-            }
-            break;
-
-          case 'DiagramBased':
-            const diagramBasedDetails = details as DiagramBasedDetails;
-            if (
-              Array.isArray(diagramBasedDetails.options) &&
-              diagramBasedDetails.options.every(
-                (opt) =>
-                  typeof opt.is_correct === 'boolean' &&
-                  typeof opt.option_text === 'string' &&
-                  typeof opt.option_number === 'string'
-              )
-            ) {
-              return diagramBasedDetails;
-            }
-            break;
-
-          case 'MultipleCorrectStatements':
-            const multipleCorrectStatementsDetails = details as MultipleCorrectStatementsDetails;
-            if (
-              Array.isArray(multipleCorrectStatementsDetails.statements) &&
-              Array.isArray(multipleCorrectStatementsDetails.options)
-            ) {
-              return multipleCorrectStatementsDetails;
-            }
-            break;
-
-          default:
-            console.error(`Unsupported question type: ${questionType}`);
-            break;
+    // Check existing attempts to avoid duplicates
+    const existingAttempts = await db
+      .select({ question_id: question_attempts.question_id })
+      .from(question_attempts)
+      .where(
+        and(
+          eq(question_attempts.session_id, sessionId),
+          eq(question_attempts.user_id, userId)
+        )
+      );
+    
+    // Create a set of question IDs that already have attempts
+    const existingAttemptIds = new Set(
+      existingAttempts.map(a => a.question_id.toString())
+    );
+    
+    const results: AnswerResult[] = [];
+    
+    // Process each answer and create records for new attempts only
+    await db.transaction(async (tx) => {
+      for (const questionId of Object.keys(answers)) {
+        // Skip if this question already has an attempt
+        if (existingAttemptIds.has(questionId)) {
+          continue;
         }
-      } catch (error) {
-        console.error(`Error parsing details for question type ${questionType}:`, error);
-      }
+        
+        const userAnswer = answers[questionId];
+        const questionDetails = questionDetailsMap[questionId];
 
-      return null; // Return null if parsing fails
-    }
+        if (!questionDetails) {
+          continue; // Skip this question if it doesn't belong to the session
+        }
 
-    // Process each answer
-    for (const questionId of Object.keys(answers)) {
-      const userAnswer = answers[questionId]; // Access using string key
-      const questionDetails = questionDetailsMap[questionId]; // Access using string key
-
-      if (!questionDetails) {
-        continue; // Skip this question if it doesn't belong to the session
-      }
-
-      let isCorrect = false;
-      let marksAwarded = 0;
-
-      try {
-        const parsedDetails = parseQuestionDetails(
+        // Evaluate if the answer is correct
+        const isCorrect = evaluateAnswer(
           questionDetails.question_type,
-          questionDetails.details
+          questionDetails.details,
+          userAnswer
         );
 
-        if (!parsedDetails) {
-          console.error(
-            `Invalid details for question type: ${questionDetails.question_type}`
-          );
-          isCorrect = false;
-          marksAwarded = 0;
-        } else {
-          switch (questionDetails.question_type) {
-            case 'MultipleChoice':
-              const correctOption = (parsedDetails as MultipleChoiceDetails).options.find(
-                (opt) => opt.is_correct && opt.option_number === userAnswer
-              );
-              isCorrect = !!correctOption;
-              break;
-
-            case 'Matching':
-              const matchingPairs = (parsedDetails as MatchingDetails).items;
-              isCorrect = matchingPairs.every((pair) => {
-                const userRightItemLabel = (userAnswer as { [key: string]: string })[pair.left_item_label];
-                return userRightItemLabel === pair.right_item_label;
-              });
-              break;
-
-            case 'AssertionReason':
-              const assertionReason = parsedDetails as AssertionReasonDetails;
-              isCorrect =
-                assertionReason.options.some(
-                  (opt) => opt.is_correct && opt.option_number === userAnswer
-                );
-              break;
-
-            case 'SequenceOrdering':
-              const sequenceOrdering = parsedDetails as SequenceOrderingDetails;
-              isCorrect =
-                sequenceOrdering.options.some(
-                  (opt) => opt.is_correct && opt.option_number === userAnswer
-                );
-              break;
-
-            case 'DiagramBased':
-              const diagramBased = parsedDetails as DiagramBasedDetails;
-              isCorrect =
-                diagramBased.options.some(
-                  (opt) => opt.is_correct && opt.option_number === userAnswer
-                );
-              break;
-
-            case 'MultipleCorrectStatements':
-              const multipleCorrectStatements = parsedDetails as MultipleCorrectStatementsDetails;
-              isCorrect =
-                multipleCorrectStatements.options.some(
-                  (opt) => opt.is_correct && opt.option_number === userAnswer
-                );
-              break;
-
-            default:
-              console.error(
-                `Unsupported question type: ${questionDetails.question_type}`
-              );
-              isCorrect = false;
-              marksAwarded = 0;
-          }
-        }
-
-        // Calculate marks
-        marksAwarded = isCorrect
+        // Calculate marks awarded
+        const marksAwarded = isCorrect
           ? questionDetails.marks ?? 0
           : -(questionDetails.negative_marks ?? 0);
 
-        // Add to total score
-        if (isCorrect) {
-          totalCorrect++;
-          totalScore += questionDetails.marks ?? 0;
-        } else {
-          totalScore -= questionDetails.negative_marks ?? 0;
-        }
-        maxScore += questionDetails.marks ?? 0;
-      } catch (error) {
-        console.error(`Error processing question ${questionId}:`, error);
-        isCorrect = false;
-        marksAwarded = 0;
-      }
+        // Create the question attempt record
+        await tx
+          .insert(question_attempts)
+          .values({
+            user_id: userId,
+            question_id: parseInt(questionId),
+            session_id: sessionId,
+            session_question_id: questionDetails.session_question_id,
+            attempt_number: 1, // First attempt
+            user_answer: JSON.stringify({ option: userAnswer }),
+            is_correct: isCorrect,
+            marks_awarded: marksAwarded,
+            attempt_timestamp: new Date(),
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
 
-      // Create the question attempt record
-      await db
-        .insert(question_attempts)
-        .values({
-          user_id: userId,
-          question_id: parseInt(questionId), // Convert back to number for DB
-          session_id: sessionId,
-          session_question_id: questionDetails.session_question_id,
-          attempt_number: 1, // First attempt
-          user_answer: JSON.stringify({ option: userAnswer }),
+        results.push({
+          question_id: parseInt(questionId),
           is_correct: isCorrect,
           marks_awarded: marksAwarded,
-          attempt_timestamp: new Date(),
-          created_at: new Date(),
-          updated_at: new Date(),
         });
+      }
+    });
 
-      results.push({
-        question_id: parseInt(questionId), // Convert back to number for consistency
-        is_correct: isCorrect,
-        marks_awarded: marksAwarded,
-      });
-    }
+    // After the transaction, update session statistics
+    const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
+    await updateSessionStats(sessionId, userId);
 
-    // Update session with partial results
-    await db
-      .update(practice_sessions)
-      .set({
-        questions_attempted: Object.keys(answers).length,
-        questions_correct: totalCorrect,
-        score: totalScore,
-        max_score: maxScore,
-        updated_at: new Date(),
+    // Get the updated session stats
+    const [updatedSession] = await db
+      .select({
+        questions_attempted: practice_sessions.questions_attempted,
+        questions_correct: practice_sessions.questions_correct,
+        score: practice_sessions.score,
+        max_score: practice_sessions.max_score,
+        is_completed: practice_sessions.is_completed
       })
+      .from(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
 
+    // Mark the session as completed if not already
+    if (!updatedSession.is_completed) {
+      await db
+        .update(practice_sessions)
+        .set({
+          is_completed: true,
+          end_time: new Date(),
+          updated_at: new Date()
+        })
+        .where(eq(practice_sessions.session_id, sessionId));
+    }
+
+    // Return the response with the latest statistics
     return NextResponse.json({
       success: true,
       session_id: sessionId,
       total_answers: Object.keys(answers).length,
-      total_correct: totalCorrect,
-      accuracy: Math.round((totalCorrect / Object.keys(answers).length) * 100),
-      score: totalScore,
-      max_score: maxScore,
+      total_correct: updatedSession.questions_correct ?? 0,
+      accuracy: (updatedSession.questions_attempted ?? 0) > 0 
+        ? Math.round(((updatedSession.questions_correct ?? 0) / (updatedSession.questions_attempted ?? 1)) * 100) // Handle null check and division by zero
+        : 0,
+      score: updatedSession.score ?? 0,
+      max_score: updatedSession.max_score ?? 0,
       results,
     });
   } catch (error) {
@@ -433,5 +310,68 @@ export async function POST(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+// Function to parse and evaluate question details
+function evaluateAnswer(
+  questionType: string,
+  details: QuestionDetails,
+  userAnswer: unknown
+): boolean {
+  try {
+    switch (questionType) {
+      case 'MultipleChoice':
+        const multipleChoiceDetails = details as MultipleChoiceDetails;
+        const stringAnswer = typeof userAnswer === 'string' ? userAnswer : '';
+        return multipleChoiceDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number === stringAnswer
+        );
+
+      case 'Matching':
+        const matchingDetails = details as MatchingDetails;
+        const matchingAnswer = userAnswer as { [key: string]: string };
+        if (!matchingAnswer || typeof matchingAnswer !== 'object') return false;
+        
+        return matchingDetails.items.every((pair) => {
+          const userRightItemLabel = matchingAnswer[pair.left_item_label];
+          return userRightItemLabel === pair.right_item_label;
+        });
+
+      case 'AssertionReason':
+        const assertionReasonDetails = details as AssertionReasonDetails;
+        const assertionAnswer = typeof userAnswer === 'string' ? userAnswer : '';
+        return assertionReasonDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number === assertionAnswer
+        );
+
+      case 'SequenceOrdering':
+        const sequenceOrderingDetails = details as SequenceOrderingDetails;
+        const sequenceAnswer = typeof userAnswer === 'string' ? userAnswer : '';
+        return sequenceOrderingDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number === sequenceAnswer
+        );
+
+      case 'DiagramBased':
+        const diagramBasedDetails = details as DiagramBasedDetails;
+        const diagramAnswer = typeof userAnswer === 'string' ? userAnswer : '';
+        return diagramBasedDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number === diagramAnswer
+        );
+
+      case 'MultipleCorrectStatements':
+        const multipleCorrectStatementsDetails = details as MultipleCorrectStatementsDetails;
+        const mcAnswer = typeof userAnswer === 'string' ? userAnswer : '';
+        return multipleCorrectStatementsDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number === mcAnswer
+        );
+
+      default:
+        console.warn(`Unsupported question type: ${questionType}`);
+        return false;
+    }
+  } catch (error) {
+    console.error(`Error evaluating answer for question type ${questionType}:`, error);
+    return false;
   }
 }
