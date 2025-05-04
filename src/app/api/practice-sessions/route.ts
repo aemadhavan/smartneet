@@ -492,7 +492,7 @@ async function invalidateUserSessionCaches(userId: string) {
   
   // Delete common pagination variants
   await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
-  await cache.delete(`api:practice-sessions:user:${userId}:limit:20:offset:0`);
+  await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
   
   // Invalidate subscription-related caches
   await cache.delete(`user:${userId}:subscription`);

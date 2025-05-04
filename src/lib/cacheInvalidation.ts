@@ -140,7 +140,7 @@ export class CacheInvalidator {
     
     // Delete common pagination variants
     await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
-    await cache.delete(`api:practice-sessions:user:${userId}:limit:20:offset:0`);
+    await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
     
     // Invalidate recent sessions for dashboard
     await cache.delete(`user:${userId}:recent-sessions`);
