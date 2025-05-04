@@ -7,7 +7,6 @@ import {
   question_attempts,
   questions,
   topics,
-  //subtopics
 } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
@@ -84,11 +83,7 @@ export async function GET(
 
     // Process question data to calculate overall statistics
     const totalQuestions = sessionQuestionData.length;
-    let questionsCorrect = 0;
-    let score = 0;
-    let maxScore = 0;
-    let totalTimeSeconds = 0;
-
+    
     // For tracking topic performance
     const topicMap = new Map<number, {
       topicName: string;
@@ -96,19 +91,7 @@ export async function GET(
       questionsCorrect: number;
     }>();
 
-    sessionQuestionData.forEach(question => {
-      // Count correct questions
-      if (question.isCorrect) {
-        questionsCorrect++;
-      }
-
-      // Calculate score
-      score += question.marksAwarded || 0;
-      maxScore += question.marksPossible || 0;
-
-      // Track time
-      totalTimeSeconds += question.timeTaken || 0;
-
+    const calculatedMetrics = sessionQuestionData.reduce((metrics, question) => {
       // Track topic performance
       if (!topicMap.has(question.topicId)) {
         topicMap.set(question.topicId, {
@@ -120,18 +103,30 @@ export async function GET(
 
       const topicStats = topicMap.get(question.topicId)!;
       topicStats.questionsTotal++;
+      
+      // Count correct questions and calculate metrics
       if (question.isCorrect) {
+        metrics.questionsCorrect++;
         topicStats.questionsCorrect++;
       }
+
+      // Calculate score
+      metrics.score += question.marksAwarded || 0;
+      metrics.maxScore += question.marksPossible || 0;
+
+      // Track time
+      metrics.totalTimeSeconds += question.timeTaken || 0;
+
+      return metrics;
+    }, {
+      questionsCorrect: 0,
+      score: 0,
+      maxScore: 0,
+      totalTimeSeconds: 0
     });
 
-    // Calculate overall accuracy
-    const accuracy = totalQuestions > 0 
-      ? Math.round((questionsCorrect / totalQuestions) * 100) 
-      : 0;
-
     // Convert time from seconds to minutes
-    const timeTakenMinutes = Math.round(totalTimeSeconds / 60);
+    const calculatedTimeTakenMinutes = Math.round(calculatedMetrics.totalTimeSeconds / 60);
 
     // Format topic performance data
     const topicPerformance: TopicPerformance[] = Array.from(topicMap.entries())
@@ -149,17 +144,20 @@ export async function GET(
     // Format the summary data
     const summary = {
       sessionId,
-      totalQuestions: session.total_questions ?? 0, // Handle potential null
-      questionsAttempted: session.questions_attempted ?? 0, // Handle potential null
-      questionsCorrect: session.questions_correct ?? 0, // Handle potential null
-      questionsIncorrect: (session.questions_attempted ?? 0) - (session.questions_correct ?? 0), // Handle potential null
+      totalQuestions: session.total_questions ?? 0,
+      questionsAttempted: session.questions_attempted ?? 0,
+      questionsCorrect: session.questions_correct ?? 0,
+      questionsIncorrect: (session.questions_attempted ?? 0) - (session.questions_correct ?? 0),
       accuracy: (session.questions_attempted ?? 0) > 0 
-        ? Math.round(((session.questions_correct ?? 0) / (session.questions_attempted ?? 1)) * 100) // Handle potential null and division by zero
+        ? Math.round(((session.questions_correct ?? 0) / (session.questions_attempted ?? 1)) * 100)
         : 0,
-      timeTakenMinutes: session.duration_minutes ?? 0, // Keep existing null check
-      score: session.score ?? 0, // Keep existing null check
-      max_score: session.max_score || 0,
-      topicPerformance // From existing logic
+      calculatedAccuracy: totalQuestions > 0 
+        ? Math.round((calculatedMetrics.questionsCorrect / totalQuestions) * 100)
+        : 0,
+      timeTakenMinutes: session.duration_minutes ?? calculatedTimeTakenMinutes, 
+      score: session.score ?? calculatedMetrics.score, 
+      max_score: session.max_score || calculatedMetrics.maxScore,
+      topicPerformance
     };
 
     // Also update the session record with the final stats

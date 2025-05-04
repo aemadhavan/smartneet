@@ -1,8 +1,7 @@
-// Create a utility function in a shared location (e.g., src/lib/utilities/sessionUtils.ts)
-//File: src/lib/utilities/sessionUtils.ts
+// src/lib/utilities/sessionUtils.ts
 import { db } from '@/db';
-import { practice_sessions, session_questions, question_attempts, questions, topic_mastery } from '@/db/schema'; // Added 'questions'
-import { and, eq, count, countDistinct, sum } from 'drizzle-orm'; // Added countDistinct, sum
+import { practice_sessions, session_questions, question_attempts, questions, topic_mastery } from '@/db/schema';
+import { and, eq, countDistinct, sum } from 'drizzle-orm';
 
 /**
  * Atomically updates the practice session statistics based on question attempts
@@ -39,19 +38,6 @@ export async function updateSessionStats(
     if (!session) {
       throw new Error('Session not found or does not belong to the user');
     }
-
-    // Get the actual count of question attempts for this session
-    const [attemptsResult] = await tx
-      .select({
-        count: count()
-      })
-      .from(question_attempts)
-      .where(
-        and(
-          eq(question_attempts.session_id, sessionId),
-          eq(question_attempts.user_id, userId)
-        )
-      );
 
     // Calculate the total number of questions that have been attempted
     // This gets all unique questions that have attempts

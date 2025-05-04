@@ -4,9 +4,7 @@ import { db } from '@/db';
 import { 
   question_attempts, 
   questions, 
-  session_questions,
-  practice_sessions,
-  topic_mastery 
+  session_questions 
 } from '@/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
@@ -259,113 +257,4 @@ function evaluateAnswer(
       console.warn(`Evaluation for question type ${questionType} not fully implemented`);
       return false;
   }
-}
-
-// Helper function to update session statistics
-async function updateSessionStats(
-  sessionId: number, 
-  isCorrect: boolean, 
-  marksAwarded: number
-): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Get current session stats
-    const [session] = await tx
-      .select({
-        questions_attempted: practice_sessions.questions_attempted,
-        questions_correct: practice_sessions.questions_correct,
-        score: practice_sessions.score
-      })
-      .from(practice_sessions)
-      .where(eq(practice_sessions.session_id, sessionId));
-    
-    if (!session) return;
-    
-    // Update session stats
-    await tx
-      .update(practice_sessions)
-      .set({
-        questions_attempted: (session.questions_attempted || 0) + 1,
-        questions_correct: isCorrect ? (session.questions_correct || 0) + 1 : (session.questions_correct || 0),
-        score: (session.score || 0) + marksAwarded,
-        updated_at: new Date()
-      })
-      .where(eq(practice_sessions.session_id, sessionId));
-  });
-}
-
-// Helper function to update topic mastery
-async function updateTopicMastery(
-  userId: string, 
-  topicId: number, 
-  isCorrect: boolean
-): Promise<void> {
-  await db.transaction(async (tx) => {
-    // Get current mastery level
-    const [mastery] = await tx
-      .select()
-      .from(topic_mastery)
-      .where(
-        and(
-          eq(topic_mastery.user_id, userId),
-          eq(topic_mastery.topic_id, topicId)
-        )
-      );
-    
-    if (mastery) {
-      // Update existing mastery record
-      const questionsAttempted = mastery.questions_attempted + 1;
-      const questionsCorrect = isCorrect ? mastery.questions_correct + 1 : mastery.questions_correct;
-      const accuracyPercentage = Math.round((questionsCorrect / questionsAttempted) * 100);
-      
-      // Determine new mastery level
-      let masteryLevel = mastery.mastery_level;
-      
-      // Simple mastery algorithm (customize as needed)
-      if (questionsAttempted >= 20) {
-        if (accuracyPercentage >= 90) masteryLevel = 'mastered';
-        else if (accuracyPercentage >= 75) masteryLevel = 'advanced';
-        else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
-        else masteryLevel = 'beginner';
-      } else if (questionsAttempted >= 10) {
-        if (accuracyPercentage >= 80) masteryLevel = 'advanced';
-        else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
-        else masteryLevel = 'beginner';
-      } else if (questionsAttempted >= 5) {
-        if (accuracyPercentage >= 70) masteryLevel = 'intermediate';
-        else masteryLevel = 'beginner';
-      } else {
-        masteryLevel = 'beginner';
-      }
-      
-      await tx
-        .update(topic_mastery)
-        .set({
-          questions_attempted: questionsAttempted,
-          questions_correct: questionsCorrect,
-          accuracy_percentage: accuracyPercentage,
-          mastery_level: masteryLevel,
-          last_practiced: new Date(),
-          updated_at: new Date()
-        })
-        .where(
-          and(
-            eq(topic_mastery.user_id, userId),
-            eq(topic_mastery.topic_id, topicId)
-          )
-        );
-    } else {
-      // Create new mastery record
-      await tx
-        .insert(topic_mastery)
-        .values({
-          user_id: userId,
-          topic_id: topicId,
-          mastery_level: 'beginner',
-          questions_attempted: 1,
-          questions_correct: isCorrect ? 1 : 0,
-          accuracy_percentage: isCorrect ? 100 : 0,
-          last_practiced: new Date()
-        });
-    }
-  });
 }
