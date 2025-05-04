@@ -5,6 +5,7 @@ import { createCheckoutSession } from '@/lib/stripe';
 import { db } from '@/db';
 import { eq } from 'drizzle-orm';
 import { subscription_plans } from '@/db/schema';
+import { subscriptionService } from '@/lib/services/SubscriptionService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,24 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
+    if (plan.plan_code === 'free') {
+      // Handle free plan subscription without Stripe
+      // Direct creation in your database
+      await subscriptionService.createOrUpdateSubscription({
+        userId,
+        planId: plan.plan_id,
+        stripeSubscriptionId: 'free_plan',
+        stripeCustomerId: 'free_customer',
+        status: 'active',
+        periodStart: new Date(),
+        periodEnd: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      });
+      
+      return NextResponse.json({ 
+        success: true, 
+        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/subscription?success=true` 
+      });
+    }
     // Create a Stripe checkout session
     const { sessionId } = await createCheckoutSession({
       priceId: plan.price_id_stripe,
@@ -69,7 +87,10 @@ export async function POST(req: NextRequest) {
       cancelUrl: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?canceled=true`,
     });
 
-    return NextResponse.json({ sessionId });
+    return NextResponse.json({  
+      success: true,
+      isPaid: true,
+      sessionId  });
   } catch (error: unknown) {
     console.error('Error creating checkout session:', error);
     return NextResponse.json(

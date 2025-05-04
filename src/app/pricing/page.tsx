@@ -130,23 +130,35 @@ export default function PricingPage() {
         throw new Error(errorData.error || 'Failed to create checkout session');
       }
       
-      const { sessionId } = await response.json();
+      const data = await response.json();
+      console.log('Checkout response:', data); // For debugging
       
-      // Load Stripe.js and redirect to checkout
-      const stripe = await getStripe();
-      if (!stripe) {
-        throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
-      }
-      
-      const result = await stripe.redirectToCheckout({ sessionId });
-      
-      if (result.error) {
-        throw new Error(result.error.message || 'Error redirecting to checkout');
+      // Handle free plan (redirectUrl) vs. paid plan (sessionId)
+      if (data.redirectUrl) {
+        // Free plan - just redirect directly
+        router.push(data.redirectUrl);
+      } else if (data.sessionId) {
+        // Paid plan - redirect to Stripe checkout
+        const stripe = await getStripe();
+        if (!stripe) {
+          throw new Error('Could not initialize Stripe. Please check if Stripe is properly configured.');
+        }
+        
+        const result = await stripe.redirectToCheckout({ 
+          sessionId: data.sessionId 
+        });
+        
+        if (result.error) {
+          throw new Error(result.error.message || 'Error redirecting to checkout');
+        }
+      } else {
+        throw new Error('Invalid response from server');
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred during checkout';
       setError(errorMessage);
       console.error('Checkout error:', err);
+    } finally {
       setIsCheckingOut(false);
       setCheckoutPlanId(null);
     }

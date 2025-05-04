@@ -42,7 +42,7 @@ const createSessionSchema = z.object({
   }).optional(),
   question_count: z.number({
     invalid_type_error: "question_count must be a number"
-  }).default(20)
+  }).default(10)
 });
 
 // Create a new practice session
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
           }, { status: 400 });
         }
       } else {
-        question_count = 20; // Default value
+        question_count = 10; // Default value
       }
       
       const session_type = searchParams.get('session_type') || 'Practice';
@@ -388,7 +388,7 @@ async function getPersonalizedQuestions(
   subjectId: number, 
   topicId?: number, 
   subtopicId?: number, 
-  questionCount: number = 20
+  questionCount: number = 10
 ) {
   // Define a type for the question object that matches the database query result
   interface QuestionWithDetails {
@@ -404,12 +404,11 @@ async function getPersonalizedQuestions(
     topic_name: string;
     subtopic_id: number | null;
     subtopic_name: string | null;
+    source_type: string; // Add source_type field
   }
   
-  // Cache key for the potential questions pool
-  // Note: We don't include userId in this cache key because the potential
-  // questions pool is the same for all users with the same parameters
-  const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}`;
+  // Cache key for the potential questions pool - include source_type in cache key
+  const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}:source:AI_Generated`;
   
   // Try to get the potential questions pool from cache
   let potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey);
@@ -430,14 +429,18 @@ async function getPersonalizedQuestions(
       topic_id: topics.topic_id,
       topic_name: topics.topic_name,
       subtopic_id: subtopics.subtopic_id,
-      subtopic_name: subtopics.subtopic_name
+      subtopic_name: subtopics.subtopic_name,
+      source_type: questions.source_type, // Select source_type field
     })
     .from(questions)
     .innerJoin(topics, eq(questions.topic_id, topics.topic_id))
     .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id));
     
     // Build conditions array
-    const conditions = [eq(questions.subject_id, subjectId)];
+    const conditions = [
+      eq(questions.subject_id, subjectId),
+      eq(questions.source_type, 'AI_Generated') // Add filter for AI_Generated questions
+    ];
     
     // Add topic filter if specified
     if (topicId) {
@@ -482,7 +485,6 @@ async function getPersonalizedQuestions(
   
   return selectedQuestions;
 }
-
 // Helper function to invalidate all session cache entries for a user
 async function invalidateUserSessionCaches(userId: string) {
   // Delete the main cache key
