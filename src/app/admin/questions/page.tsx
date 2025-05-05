@@ -6,7 +6,7 @@ import JsonUploader from '@/app/admin/components/JsonUploader';
 import { 
   HeaderActions, 
   QuestionsFilters, 
-  QuestionsTable, 
+ // QuestionsTable, 
   QuestionForm, 
   ViewQuestionModal, 
   Pagination, 
@@ -44,7 +44,9 @@ export default function QuestionsPage() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [currentQuestion, setCurrentQuestion] = useState<Partial<Question>>({});
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [viewQuestion, setViewQuestion] = useState<Question | null>(null);
+  const [viewQuestion, 
+    //setViewQuestion
+  ] = useState<Question | null>(null);
   
   // JSON Uploader and Other States
   const [isJsonUploaderOpen, setIsJsonUploaderOpen] = useState(false);
@@ -287,69 +289,69 @@ export default function QuestionsPage() {
     setIsFormOpen(true);
   };
 
-  const handleEditClick = async (id: number) => {
-    try {
-      const response = await fetch(`/api/admin/questions?id=${id}`);
+  // const handleEditClick = async (id: number) => {
+  //   try {
+  //     const response = await fetch(`/api/admin/questions?id=${id}`);
       
-      if (response.ok) {
-        const question = await response.json();
-        setCurrentQuestion(question);
-        if (question.topic_id) {
-          const subtopicsResponse = await fetch(`/api/admin/subtopics?topicId=${question.topic_id}`);
-          if (subtopicsResponse.ok) {
-            const subtopicsData = await subtopicsResponse.json();
-            setSubtopics(subtopicsData);
-          }
-        }
-        setFormMode('edit');
-        setIsFormOpen(true);
-      } else {
-        setError('Failed to load question details');
-      }
-    } catch (err) {
-      console.error('Error fetching question details:', err); 
-      setError('Failed to load question details');
-    }
-  };
+  //     if (response.ok) {
+  //       const question = await response.json();
+  //       setCurrentQuestion(question);
+  //       if (question.topic_id) {
+  //         const subtopicsResponse = await fetch(`/api/admin/subtopics?topicId=${question.topic_id}`);
+  //         if (subtopicsResponse.ok) {
+  //           const subtopicsData = await subtopicsResponse.json();
+  //           setSubtopics(subtopicsData);
+  //         }
+  //       }
+  //       setFormMode('edit');
+  //       setIsFormOpen(true);
+  //     } else {
+  //       setError('Failed to load question details');
+  //     }
+  //   } catch (err) {
+  //     console.error('Error fetching question details:', err); 
+  //     setError('Failed to load question details');
+  //   }
+  // };
 
-  const handleViewClick = async (id: number) => {
-    try {
-      const response = await fetch(`/api/admin/questions?id=${id}`);
+  // const handleViewClick = async (id: number) => {
+  //   try {
+  //     const response = await fetch(`/api/admin/questions?id=${id}`);
       
-      if (response.ok) {
-        const question = await response.json();
-        setViewQuestion(question);
-        setIsViewModalOpen(true);
-      } else {
-        setError('Failed to load question details');
-      }
-    } catch (err) {
-      console.error('Error fetching question details:', err); 
-      setError('Failed to load question details');
-    }
-  };
+  //     if (response.ok) {
+  //       const question = await response.json();
+  //       setViewQuestion(question);
+  //       setIsViewModalOpen(true);
+  //     } else {
+  //       setError('Failed to load question details');
+  //     }
+  //   } catch (err) {
+  //     console.error('Error fetching question details:', err); 
+  //     setError('Failed to load question details');
+  //   }
+  // };
 
-  const handleDeleteClick = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this question?')) {
-      return;
-    }
+  // const handleDeleteClick = async (id: number) => {
+  //   if (!confirm('Are you sure you want to delete this question?')) {
+  //     return;
+  //   }
 
-    try {
-      const response = await fetch(`/api/admin/questions?id=${id}`, {
-        method: 'DELETE',
-      });
+  //   try {
+  //     const response = await fetch(`/api/admin/questions?id=${id}`, {
+  //       method: 'DELETE',
+  //     });
 
-      if (response.ok) {
-        // Update the list
-        setQuestions(questions.filter(q => q.question_id !== id));
-      } else {
-        setError('Failed to delete question');
-      }
-    } catch (err) {
-      console.error('Error deleting question:', err);
-      setError('Failed to delete question');
-    }
-  };
+  //     if (response.ok) {
+  //       // Update the list
+  //       setQuestions(questions.filter(q => q.question_id !== id));
+  //     } else {
+  //       setError('Failed to delete question');
+  //     }
+  //   } catch (err) {
+  //     console.error('Error deleting question:', err);
+  //     setError('Failed to delete question');
+  //   }
+  // };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
