@@ -156,7 +156,7 @@ export async function GET(
         : 0,
       timeTakenMinutes: session.duration_minutes ?? calculatedTimeTakenMinutes, 
       score: session.score ?? calculatedMetrics.score, 
-      max_score: session.max_score || calculatedMetrics.maxScore,
+      maxScore: session.max_score || calculatedMetrics.maxScore,
       topicPerformance
     };
 
