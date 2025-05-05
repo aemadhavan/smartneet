@@ -431,13 +431,13 @@ export default function QuestionsPage() {
         <NoQuestionsFound />
       ) : (
         <>
-          <QuestionsTable 
+          {/* <QuestionsTable 
             questions={questions}
             getTopicName={getTopicName}
             onViewClick={handleViewClick}
             onEditClick={handleEditClick}
             onDeleteClick={handleDeleteClick}
-          />
+          /> */}
           
           <Pagination 
             currentPage={page}
