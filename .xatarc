@@ -1,0 +1,7 @@
+{
+  "databaseURL": "https://Madhavan-s-workspace-79j6ki.us-east-1.xata.sh/db/smartneet:main",
+  "branch": "main",
+  "codegen": {
+    "output": "xata.ts"
+  }
+}
