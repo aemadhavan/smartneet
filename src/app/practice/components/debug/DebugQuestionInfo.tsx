@@ -2,11 +2,52 @@
 // This component can be conditionally included only in development environments
 
 import { useState } from 'react';
-import { Question } from '@/app/practice/types';
+// Import the actual types from the project
+import { 
+  Question, 
+  QuestionDetails, 
+  MultipleChoiceOption,
+  MatchingItem,
+  Statement,
+  SequenceItem
+  // DiagramLabel, // Removed as it's no longer directly used after changing labels to unknown[]
+  // QuestionOption, // Not strictly needed as parseDetails maps to MultipleChoiceOption
+} from '../../types';
 
 interface DebugQuestionInfoProps {
   question: Question;
   selectedOption: string | null;
+}
+
+// Explicitly define all possible properties for ParsedQuestionDetails
+// to satisfy TypeScript and strict linting rules without an index signature.
+interface ParsedQuestionDetails {
+  // Common fields for parsing status
+  error?: string;
+  raw?: string;
+
+  // Properties from MultipleChoiceDetails (and other detail types after parsing)
+  // parseDetails ensures options are mapped to MultipleChoiceOption[]
+  options?: MultipleChoiceOption[];
+
+  // Properties from MatchingDetails
+  items?: MatchingItem[];
+  left_column_header?: string;
+  right_column_header?: string;
+
+  // Properties from AssertionReasonDetails & MultipleCorrectStatementsDetails
+  statements?: Statement[];
+
+  // Properties from SequenceOrderingDetails
+  sequence_items?: SequenceItem[];
+  
+  // Properties from DiagramBasedDetails
+  diagram_url?: string;
+  labels?: unknown[]; // Changed DiagramLabel[] to unknown[] to attempt to satisfy linter
+  
+  // Dynamically added properties often found in parsed details for correct answer
+  correctAnswer?: string | number;
+  correct_option?: string | number;
 }
 
 export function DebugQuestionInfo({ question, selectedOption }: DebugQuestionInfoProps) {
@@ -17,28 +58,73 @@ export function DebugQuestionInfo({ question, selectedOption }: DebugQuestionInf
     return null;
   }
   
-  // Helper to parse details if they're stored as a string
-  const parseDetails = (details: string | any): any => {
-    if (typeof details === 'string') {
-      try {
-        return JSON.parse(details);
-      } catch (e) {
-        return { error: 'Invalid JSON', raw: details };
-      }
+  // Helper to parse details with type safety
+  const parseDetails = (details: string | QuestionDetails): ParsedQuestionDetails => {
+    // If details is already an object, return it
+    if (typeof details !== 'string') {
+      return details as ParsedQuestionDetails;
     }
-    return details;
+
+    try {
+      // Try parsing the string as JSON
+      const parsedDetails = JSON.parse(details) as Record<string, unknown>;
+      
+      // Ensure it has the expected structure
+      if (typeof parsedDetails === 'object' && parsedDetails !== null) {
+        // Since we're using imported types, we need to be careful with option mapping
+        if (Array.isArray(parsedDetails.options)) {
+          // Map the options according to the existing type structure
+          const typedOptions = parsedDetails.options.map(opt => {
+            const option = opt as Record<string, unknown>;
+            // Only include the properties that exist in the actual MultipleChoiceOption type
+            return {
+              option_number: option.option_number?.toString() || '',
+              option_text: option.option_text?.toString() || ''
+              // Note: is_correct is not included because the error suggests it doesn't exist in the actual type
+            } as MultipleChoiceOption;
+          });
+          
+          // Assign back to parsedDetails
+          parsedDetails.options = typedOptions;
+        }
+        
+        return parsedDetails as ParsedQuestionDetails;
+      }
+      
+      // If parsing fails or results in invalid structure
+      return { 
+        error: 'Invalid JSON structure', 
+        raw: details 
+      } as ParsedQuestionDetails;
+    } catch {
+      // If JSON parsing fails
+      return { 
+        error: 'Invalid JSON', 
+        raw: details 
+      } as ParsedQuestionDetails;
+    }
   };
   
   const details = parseDetails(question.details);
   
-  // Find the correct option
-  const findCorrectOption = () => {
-    if (!details || !details.options) return 'Unknown';
+  // Find the correct option - adapted to work with the actual type structure
+  const findCorrectOption = (): string => {
+    if (!details?.options || !Array.isArray(details.options)) return 'Unknown';
     
-    const correctOption = details.options.find((opt: any) => opt.is_correct);
-    if (correctOption) {
-      return `${correctOption.option_number} - ${correctOption.option_text}`;
+    // correctAnswer and correct_option are now optional properties on ParsedQuestionDetails
+    // Their types are (string | number | undefined)
+    const correctOptionNumber = details.correctAnswer || details.correct_option;
+    
+    if (correctOptionNumber !== undefined) { 
+      const foundOption = details.options.find(opt => 
+        opt.option_number === String(correctOptionNumber)
+      );
+      
+      if (foundOption) {
+        return `${foundOption.option_number} - ${foundOption.option_text}`;
+      }
     }
+    
     return 'Unknown';
   };
   
