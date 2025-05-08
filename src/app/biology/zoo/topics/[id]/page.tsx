@@ -187,18 +187,18 @@ export default function TopicDetailPage() {
                 </ul>
               </div>
               
-              <div className="mt-8 flex justify-between">
-                <Link 
+              <div className="mt-8 flex justify-end">
+                {/* <Link 
                   href={`/notes/biology/${topic.topic_id}/${activeSubtopic.subtopic_id}`} 
                   className="text-indigo-600 hover:text-indigo-800"
                 >
                   View Study Notes
-                </Link>
+                </Link> */}
                 <Link
                   href={`/practice?subject=zoology&topicId=${topic.topic_id}&subtopicId=${activeSubtopic.subtopic_id}`}
                   className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-4 py-2 rounded-md"
                 >
-                  Practice Questions
+                  Practice {activeSubtopic.subtopic_name} Questions
                 </Link>
               </div>
             </div>
