@@ -319,15 +319,18 @@ export function usePracticeSession(
       ) {
         return;
       }
-
+  
+      // Simplified answer payload format - just directly send the option as a string
       const answersPayload: Record<number, string> = {};
       session.questions.forEach((question) => {
         const questionId = question.question_id;
         if (userAnswers[questionId]) {
-          answersPayload[questionId] = userAnswers[questionId];
+          // If the answer is an object, don't convert it to a string
+          answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? userAnswers[questionId] : String(userAnswers[questionId]);
         }
       });
-
+      console.log('Submitting answers:', JSON.stringify(answersPayload, null, 2));
+      
       const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
         method: 'POST',
         headers: {
@@ -335,12 +338,12 @@ export function usePracticeSession(
         },
         body: JSON.stringify({ answers: answersPayload }),
       });
-
+  
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to submit answers.');
       }
-
+  
       const responseData = await response.json();
       console.log('Submission successful:', responseData);
       
@@ -356,7 +359,6 @@ export function usePracticeSession(
       alert('Failed to submit answers. Please try again.');
     }
   }, [session, userAnswers, sessionCache]);
-  
   // Store the most recent version of handleCompleteSession in the ref
   useEffect(() => {
     handleCompleteSessionRef.current = handleCompleteSession;
@@ -420,6 +422,42 @@ export function usePracticeSession(
     }
   }, [selectedSubject, createSession]);
 
+  const forceCompleteSession = useCallback(async () => {
+    if (!session) return;
+    
+    try {
+      // Directly mark the session as completed in the database without evaluating answers
+      const response = await fetch(`/api/practice-sessions/${session.sessionId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: session.sessionId,
+          isCompleted: true
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to complete session.');
+      }
+      
+      // Mark session as completed in state
+      setSessionCompleted(true);
+      
+      // Clear the session cache
+      if (sessionCacheKey.current) {
+        sessionCache.clearCache(sessionCacheKey.current);
+      }
+      
+      console.log('Session force-completed successfully');
+    } catch (err) {
+      console.error('Error force-completing session:', err);
+      alert('Failed to complete session. Please try again.');
+    }
+  }, [session, sessionCache]);
+
   return {
     session,
     loading,
@@ -435,6 +473,7 @@ export function usePracticeSession(
     handleCompleteSession,
     handleStartNewSession,
     handleRetry,
+    forceCompleteSession,
     createSession // Expose the createSession function so it can be called manually
   };
 }

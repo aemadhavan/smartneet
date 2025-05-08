@@ -158,7 +158,7 @@ export async function POST(
         { status: 400 }
       );
     }
-
+    
     // Get all session questions with their details
     const sessionQuestions = await db
       .select({
@@ -183,9 +183,7 @@ export async function POST(
       sessionQuestions.reduce((map, q) => {
         map[q.question_id.toString()] = {
           session_question_id: q.session_question_id,
-          details: typeof q.details === 'string' 
-            ? JSON.parse(q.details) 
-            : q.details,
+          details: parseQuestionDetails(q.details), // Use our improved parser
           marks: q.marks,
           negative_marks: q.negative_marks,
           question_type: q.question_type,
@@ -210,6 +208,7 @@ export async function POST(
     );
     
     const results: AnswerResult[] = [];
+    const evaluationLog: Record<string, any> = {};
     
     // Process each answer and create records for new attempts only
     await db.transaction(async (tx) => {
@@ -226,12 +225,33 @@ export async function POST(
           continue; // Skip this question if it doesn't belong to the session
         }
 
-        // Evaluate if the answer is correct
-        const isCorrect = evaluateAnswer(
-          questionDetails.question_type,
-          questionDetails.details,
-          userAnswer
+        // For debugging purposes
+        const correctAnswer = getCorrectAnswerForQuestionType(
+          questionDetails.question_type, 
+          questionDetails.details
         );
+        
+        // Evaluate if the answer is correct using our improved function
+        let isCorrect = false;
+        try {
+          isCorrect = evaluateAnswer(
+            questionDetails.question_type,
+            questionDetails.details,
+            userAnswer
+          );
+          
+          // Store evaluation details for debugging
+          evaluationLog[questionId] = {
+            questionType: questionDetails.question_type,
+            userAnswer,
+            correctAnswer,
+            isCorrect
+          };
+          
+        } catch (error) {
+          console.error('Error evaluating answer:', error);
+          continue; // Skip this question if there's an error
+        }
 
         // Calculate marks awarded
         const marksAwarded = isCorrect
@@ -262,6 +282,9 @@ export async function POST(
         });
       }
     });
+
+    // Add detailed evaluation log to the server logs
+    console.log('Answer evaluation results:', JSON.stringify(evaluationLog, null, 2));
 
     // After the transaction, update session statistics
     const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
@@ -303,6 +326,7 @@ export async function POST(
       score: updatedSession.score ?? 0,
       max_score: updatedSession.max_score ?? 0,
       results,
+      evaluation_summary: evaluationLog // Include this for debugging during development
     });
   } catch (error) {
     console.error('Error submitting answers:', error);
@@ -313,65 +337,165 @@ export async function POST(
   }
 }
 
-// Function to parse and evaluate question details
 function evaluateAnswer(
   questionType: string,
   details: QuestionDetails,
   userAnswer: unknown
 ): boolean {
   try {
+    // Normalize userAnswer to simplify processing
+    let normalizedAnswer: string | string[] | null = null;
+    
+    // Handle different input formats consistently
+    if (userAnswer === null || userAnswer === undefined) {
+      return false;
+    }
+    
+    // Convert numeric answers to strings
+    if (typeof userAnswer === 'number') {
+      userAnswer = userAnswer.toString();
+    }
+    
+    // Extract the normalized answer from various possible formats
+    if (typeof userAnswer === 'string') {
+      normalizedAnswer = userAnswer;
+    } else if (typeof userAnswer === 'object' && userAnswer !== null) {
+      // Handle nested object structures
+      if ('option' in userAnswer) {
+        const optionValue = (userAnswer as any).option;
+        if (typeof optionValue === 'string' || typeof optionValue === 'number') {
+          normalizedAnswer = optionValue.toString();
+        } else if (optionValue && typeof optionValue === 'object') {
+          if ('selectedOption' in optionValue) {
+            normalizedAnswer = optionValue.selectedOption.toString();
+          } else if ('selectedMatches' in optionValue) {
+            normalizedAnswer = optionValue.selectedMatches.toString();
+          }
+        }
+      } else if ('selectedOption' in userAnswer) {
+        normalizedAnswer = (userAnswer as any).selectedOption.toString();
+      } else if ('selectedMatches' in userAnswer) {
+        normalizedAnswer = (userAnswer as any).selectedMatches.toString();
+      }
+    }
+
+    // If we couldn't extract a meaningful answer, return false
+    if (normalizedAnswer === null) {
+      console.warn('Could not normalize user answer:', userAnswer);
+      return false;
+    }
+
+    // Log for debugging
+    console.log(`Evaluating ${questionType}:`, { 
+      normalizedAnswer, 
+      details: JSON.stringify(details).substring(0, 100) + '...' 
+    });
+
+    // Evaluate based on question type
     switch (questionType) {
-      case 'MultipleChoice':
+      case 'MultipleChoice': {
         const multipleChoiceDetails = details as MultipleChoiceDetails;
-        const stringAnswer = typeof userAnswer === 'string' ? userAnswer : '';
         return multipleChoiceDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === stringAnswer
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
         );
-
-      case 'Matching':
+      }
+      
+      case 'Matching': {
         const matchingDetails = details as MatchingDetails;
-        const matchingAnswer = userAnswer as { [key: string]: string };
-        if (!matchingAnswer || typeof matchingAnswer !== 'object') return false;
-        
-        return matchingDetails.items.every((pair) => {
-          const userRightItemLabel = matchingAnswer[pair.left_item_label];
-          return userRightItemLabel === pair.right_item_label;
-        });
-
-      case 'AssertionReason':
+        return matchingDetails.options.some(
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
+        );
+      }
+      
+      case 'AssertionReason': {
         const assertionReasonDetails = details as AssertionReasonDetails;
-        const assertionAnswer = typeof userAnswer === 'string' ? userAnswer : '';
         return assertionReasonDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === assertionAnswer
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
         );
-
-      case 'SequenceOrdering':
+      }
+      
+      case 'SequenceOrdering': {
         const sequenceOrderingDetails = details as SequenceOrderingDetails;
-        const sequenceAnswer = typeof userAnswer === 'string' ? userAnswer : '';
         return sequenceOrderingDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === sequenceAnswer
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
         );
-
-      case 'DiagramBased':
+      }
+      
+      case 'DiagramBased': {
         const diagramBasedDetails = details as DiagramBasedDetails;
-        const diagramAnswer = typeof userAnswer === 'string' ? userAnswer : '';
         return diagramBasedDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === diagramAnswer
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
         );
-
-      case 'MultipleCorrectStatements':
+      }
+      
+      case 'MultipleCorrectStatements': {
         const multipleCorrectStatementsDetails = details as MultipleCorrectStatementsDetails;
-        const mcAnswer = typeof userAnswer === 'string' ? userAnswer : '';
         return multipleCorrectStatementsDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === mcAnswer
+          (opt) => opt.is_correct && opt.option_number.toString() === normalizedAnswer
         );
-
-      default:
+      }
+      
+      default: {
         console.warn(`Unsupported question type: ${questionType}`);
         return false;
+      }
     }
   } catch (error) {
     console.error(`Error evaluating answer for question type ${questionType}:`, error);
+    // Add detailed logging to help diagnose the issue
+    console.error('Question details:', JSON.stringify(details, null, 2));
+    console.error('User answer:', JSON.stringify(userAnswer, null, 2));
     return false;
+  }
+}
+function parseQuestionDetails(details: any): QuestionDetails {
+  if (!details) {
+    throw new Error('Question details are missing or undefined');
+  }
+  
+  // If details is a string, try to parse it as JSON
+  if (typeof details === 'string') {
+    try {
+      details = JSON.parse(details);
+    } catch (e) {
+      console.error('Failed to parse question details string:', e);
+      throw new Error('Invalid JSON format in question details');
+    }
+  }
+  
+  // Normalize options array format for all question types
+  if (details.options) {
+    details.options = details.options.map((opt: any) => ({
+      ...opt,
+      // Ensure option_number is a string for consistent comparison
+      option_number: opt.option_number?.toString() || ''
+    }));
+  }
+  
+  return details;
+}
+
+// Function to extract correct answer for logging/debugging purposes
+function getCorrectAnswerForQuestionType(questionType: string, details: any): string {
+  const parsedDetails = parseQuestionDetails(details);
+  
+  try {
+    switch (questionType) {
+      case 'MultipleChoice':
+      case 'Matching':
+      case 'AssertionReason':
+      case 'SequenceOrdering':
+      case 'DiagramBased':
+      case 'MultipleCorrectStatements':
+        // For all these types, find the option marked as correct
+        const correctOption = parsedDetails.options?.find((opt: any) => opt.is_correct);
+        return correctOption ? `Option ${correctOption.option_number}: ${correctOption.option_text}` : 'Unknown';
+      
+      default:
+        return 'Unknown question type';
+    }
+  } catch (error) {
+    console.error('Error extracting correct answer:', error);
+    return 'Error extracting correct answer';
   }
 }

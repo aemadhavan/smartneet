@@ -18,6 +18,7 @@ import {
   SequenceOrderingQuestion,
   DiagramBasedQuestion
 } from '@/app/practice/components/questions';
+import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 
 interface QuestionDisplayProps {
   question: Question;
@@ -84,6 +85,32 @@ export function QuestionDisplay({
 
   // Render different question types
   const renderQuestionContent = () => {
+    if (!hasValidDetails()) {
+      return (
+        <div className="bg-yellow-50 dark:bg-yellow-900/30 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+          <p className="text-yellow-700 dark:text-yellow-200 mb-2 font-medium">Invalid question details format</p>
+          <p className="text-yellow-600 dark:text-yellow-300 text-sm mb-4">
+            This question cannot be displayed correctly. You can skip it or complete the session.
+          </p>
+          {isLastQuestion ? (
+            <button 
+              onClick={forceCompleteSession}
+              className="px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-800 dark:hover:bg-amber-700 dark:text-amber-100 rounded"
+            >
+              Complete Session
+            </button>
+          ) : (
+            <button 
+              onClick={onNextQuestion}
+              className="px-3 py-1 bg-indigo-100 hover:bg-indigo-200 text-indigo-800 dark:bg-indigo-800 dark:hover:bg-indigo-700 dark:text-indigo-100 rounded"
+            >
+              Skip to Next Question
+            </button>
+          )}
+        </div>
+      );
+    }
+
     switch (question.question_type) {
       case 'MultipleChoice':
         console.log('Multiple choice question:', question.question_id, details);
@@ -146,6 +173,37 @@ export function QuestionDisplay({
         );
     }
   };
+  const forceCompleteSession = () => {
+    if (confirm('There appears to be an issue with some questions. Would you like to complete the session anyway?')) {
+      onCompleteSession();
+    }
+  };
+  const hasValidDetails = () => {
+    if (!details) return false;
+    
+    try {
+      // Check if details has the expected structure for the question type
+      switch (question.question_type) {
+        case 'MultipleChoice':
+          return Array.isArray((details as MultipleChoiceDetails).options);
+        case 'Matching':
+          return Array.isArray((details as MatchingDetails).options);
+        case 'AssertionReason':
+          return Array.isArray((details as AssertionReasonDetails).options);
+        case 'MultipleCorrectStatements':
+          return Array.isArray((details as MultipleCorrectStatementsDetails).options);
+        case 'SequenceOrdering':
+          return Array.isArray((details as SequenceOrderingDetails).options);
+        case 'DiagramBased':
+          return Array.isArray((details as DiagramBasedDetails).options);
+        default:
+          return false;
+      }
+    } catch (e) {
+      console.error('Error validating question details:', e);
+      return false;
+    }
+  };
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
@@ -206,18 +264,19 @@ export function QuestionDisplay({
         </button>
 
         <button
-          onClick={isLastQuestion ? onCompleteSession : onNextQuestion}
-          disabled={!selectedOption}
-          className={`px-4 py-2 rounded-md ${
-            !selectedOption
-              ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-              : isLastQuestion
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600'
-          }`}
-        >
-          {isLastQuestion ? 'Complete' : 'Next'}
-        </button>
+            onClick={isLastQuestion ? 
+              (selectedOption ? onCompleteSession : forceCompleteSession) : 
+              onNextQuestion}
+            className={`px-4 py-2 rounded-md ${
+              !selectedOption && isLastQuestion
+                ? 'bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-700 dark:hover:bg-amber-600'
+                : isLastQuestion
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-700 dark:hover:bg-indigo-600'
+            }`}
+          >
+            {!selectedOption && isLastQuestion ? 'Force Complete' : (isLastQuestion ? 'Complete' : 'Next')}
+          </button>
       </div>
 
       {/* Explanation section */}
@@ -230,6 +289,13 @@ export function QuestionDisplay({
           />
         </div>
       )}
+      {/* Add the debug component for development */}
+        {process.env.NODE_ENV === 'development' && (
+          <DebugQuestionInfo 
+            question={question} 
+            selectedOption={selectedOption}
+          />
+        )}
     </div>
   );
 }
