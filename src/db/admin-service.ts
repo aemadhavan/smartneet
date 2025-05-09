@@ -156,6 +156,16 @@ interface QuestionDetails {
     item_label?: string;
     item_text?: string;
   }>;
+  matching_details?: {
+    items: Array<{
+      left_item_label: string;
+      left_item_text: string;
+      right_item_label: string;
+      right_item_text: string;
+    }>;
+    left_column_header?: string;
+    right_column_header?: string;
+  };
   intro_text?: string;
   correct_option?: number | string;
   correct_sequence?: string | number[];

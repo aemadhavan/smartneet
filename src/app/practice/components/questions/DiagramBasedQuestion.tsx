@@ -4,7 +4,7 @@ import { QuestionOption } from '@/app/practice/types';
 import { normalizeDiagramBasedDetails, extractDiagramLabelsFromText } from '@/app/practice/utils/questionUtils';
 
 interface DiagramBasedQuestionProps {
-  details: unknown;
+  details: string | Record<string, unknown>;
   imageUrl?: string | null;
   questionText?: string;
   selectedOption: string | null;
@@ -93,6 +93,11 @@ export function DiagramBasedQuestion({
 
   return (
     <div>
+      {normalizedDetails.diagram_details?.description && (
+        <p className="mb-4 text-gray-700 dark:text-gray-300">
+          {normalizedDetails.diagram_details.description}
+        </p>
+      )}
       <div className="mb-6">
         {/* Use our reusable DiagramDisplay component */}
         <DiagramDisplay 

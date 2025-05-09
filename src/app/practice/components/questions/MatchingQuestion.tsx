@@ -4,7 +4,7 @@ import { OptionButton } from '@/app/practice/components/ui';
 import { normalizeMatchingDetails } from '@/app/practice/utils/questionUtils';
 
 interface MatchingQuestionProps {
-  details: unknown;
+  details: string | Record<string, unknown>;
   questionText: string;
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
@@ -20,7 +20,12 @@ export function MatchingQuestion({
   const normalizedDetails = normalizeMatchingDetails(details, questionText);
   
   // Check if normalization was successful
-  if (!normalizedDetails || !Array.isArray(normalizedDetails.items) || !Array.isArray(normalizedDetails.options)) {
+  if (
+    !normalizedDetails ||
+    !normalizedDetails.options || !Array.isArray(normalizedDetails.options) ||
+    !normalizedDetails.matching_details ||
+    !normalizedDetails.matching_details.items || !Array.isArray(normalizedDetails.matching_details.items)
+  ) {
     return (
       <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
         <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
@@ -32,7 +37,8 @@ export function MatchingQuestion({
   }
 
   // Use the normalized details
-  const { items, options, left_column_header, right_column_header } = normalizedDetails;
+  const { options, matching_details } = normalizedDetails;
+  const { items, left_column_header, right_column_header } = matching_details;
 
   return (
     <div>

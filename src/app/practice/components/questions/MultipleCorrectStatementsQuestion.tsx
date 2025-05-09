@@ -4,8 +4,11 @@ import { Statement, QuestionOption } from '@/app/practice/types';
 
 interface MultipleCorrectStatementsQuestionProps {
   details: {
-    statements: Statement[];
     options: QuestionOption[];
+    statement_details: {
+      intro_text: string;
+      statements: Statement[];
+    };
   };
   selectedOption: string | null;
   onOptionSelect: (option: string) => void;
@@ -17,7 +20,7 @@ export function MultipleCorrectStatementsQuestion({
   onOptionSelect 
 }: MultipleCorrectStatementsQuestionProps) {
   // Check if details has the expected structure
-  if (!details || !Array.isArray(details.statements) || !Array.isArray(details.options)) {
+  if (!details || !details.statement_details || !Array.isArray(details.statement_details.statements) || !Array.isArray(details.options)) {
     return (
       <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
         <p className="text-yellow-700 dark:text-yellow-200">Invalid question details format.</p>
@@ -27,8 +30,11 @@ export function MultipleCorrectStatementsQuestion({
 
   return (
     <div>
+      <div className="mb-4">
+        <p className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: details.statement_details.intro_text }} />
+      </div>
       <div className="mb-6 space-y-3 border-b border-gray-200 dark:border-gray-700 pb-4">
-        {details.statements.map((statement, index) => (
+        {details.statement_details.statements.map((statement, index) => (
           <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
             <div className="flex">
               <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">{statement.statement_label}:</span>

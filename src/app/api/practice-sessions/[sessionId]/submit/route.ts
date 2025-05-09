@@ -20,17 +20,21 @@ interface MultipleChoiceDetails {
 }
 
 interface MatchingDetails {
-  items: Array<{
-    left_item_text: string;
-    left_item_label: string;
-    right_item_text: string;
-    right_item_label: string;
-  }>;
   options: Array<{
     is_correct: boolean;
     option_text: string;
     option_number: string;
   }>;
+  matching_details: {
+    items: Array<{
+      left_item_text: string;
+      left_item_label: string;
+      right_item_text: string;
+      right_item_label: string;
+    }>;
+    left_column_header?: string;
+    right_column_header?: string;
+  };
 }
 
 interface AssertionReasonDetails {
@@ -515,11 +519,11 @@ function isQuestionDetails(details: unknown): details is QuestionDetails {
   return typedDetails.options.every(opt => {
     if (typeof opt !== 'object' || opt === null) return false;
     
-    const typedOpt = opt as Partial<ParsedOptionDetails>;
+    const typedOpt = opt as any; // Use 'any' for looser check before normalization
     return (
-      typeof typedOpt.option_number === 'string' &&
-      typeof typedOpt.option_text === 'string' &&
-      typeof typedOpt.is_correct === 'boolean'
+      (typeof typedOpt.option_number === 'string' || typeof typedOpt.option_number === 'number') &&
+      (typedOpt.option_text === undefined || typedOpt.option_text === null || typeof typedOpt.option_text === 'string') &&
+      (typeof typedOpt.is_correct === 'boolean' || typeof typedOpt.is_correct === 'number') // Numbers 0 or 1 are often used for boolean
     );
   });
 }

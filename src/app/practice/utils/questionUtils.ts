@@ -7,8 +7,48 @@ import {
   MatchingDetails,
   DiagramBasedDetails,
   QuestionDetails,
-  DiagramLabel
+  DiagramLabel,
+  // Added for stronger typing in normalizers
+  QuestionOption,
+  Statement,
+  SequenceItem,
+  MatchingItem,
 } from '@/app/practice/types';
+
+// Raw types for parsing potentially unnormalized details
+type RawAssertionReasonDetails = {
+  statements?: Statement[];
+  options?: QuestionOption[];
+  assertion_reason_details?: {
+    assertion_text?: string;
+    reason_text?: string;
+  };
+  assertion_text?: string;
+  reason_text?: string;
+};
+
+type RawSequenceOrderingDetails = {
+  options?: QuestionOption[];
+  sequence_details?: {
+    intro_text?: string;
+    items?: SequenceItem[] | null;
+  };
+  intro_text?: string;
+  sequence_items?: SequenceItem[] | null;
+};
+
+type RawMultipleCorrectStatementsDetails = Partial<MultipleCorrectStatementsDetails> & {
+  // For old format, if not nested under statement_details
+  statements?: Statement[];
+  intro_text?: string;
+};
+
+type RawMatchingDetails = Partial<MatchingDetails> & {
+  // For old format, if not nested under matching_details
+  items?: MatchingItem[];
+  left_column_header?: string;
+  right_column_header?: string;
+};
 
 /**
  * Parses JSON string or returns the object if already parsed
@@ -106,19 +146,70 @@ export const parseMatchingQuestion = (questionText: string): {
  * Normalizes an assertion-reason question to have the expected format
  */
 export const normalizeAssertionReasonDetails = (
-  details: unknown, 
+  details: string | Record<string, unknown>, 
   questionText: string
 ): AssertionReasonDetails | null => {
-  const parsedDetails = parseJsonDetails<Partial<AssertionReasonDetails>>(details as string | Partial<AssertionReasonDetails>);
+  const parsedDetails = parseJsonDetails<RawAssertionReasonDetails>(details);
   
   if (!parsedDetails) {
     return null;
   }
   
-  // If details already has the correct structure
+  // If details already has the correct structure with statements and options
   if (parsedDetails.statements && Array.isArray(parsedDetails.statements) &&
       parsedDetails.options && Array.isArray(parsedDetails.options)) {
     return parsedDetails as AssertionReasonDetails;
+  }
+  
+  // Handle new format with assertion_reason_details
+  if (parsedDetails.options && Array.isArray(parsedDetails.options) &&
+      parsedDetails.assertion_reason_details && 
+      typeof parsedDetails.assertion_reason_details === 'object') {
+    
+    const assertionTextFull = parsedDetails.assertion_reason_details.assertion_text || '';
+    const reasonTextFull = parsedDetails.assertion_reason_details.reason_text || '';
+    
+    // Extract only the assertion part from assertion_text for the 'A' statement
+    // and only the reason part from reason_text for the 'R' statement
+    const assertionOnlyText = (assertionTextFull.split('\n')[0] || '').replace(/^Assertion \(A\): /i, '').trim();
+    const reasonOnlyText = reasonTextFull.replace(/^Reason \(R\): /i, '').trim();
+
+    const statements = [
+      {
+        statement_label: 'A',
+        statement_text: assertionOnlyText
+      },
+      {
+        statement_label: 'R',
+        statement_text: reasonOnlyText
+      }
+    ];
+    
+    return {
+      statements,
+      options: parsedDetails.options
+    };
+  }
+  
+  // Handle old format with assertion_text and reason_text at root level
+  if (parsedDetails.options && Array.isArray(parsedDetails.options) &&
+      parsedDetails.assertion_text && parsedDetails.reason_text) {
+    
+    const statements = [
+      {
+        statement_label: 'A',
+        statement_text: (parsedDetails.assertion_text || '').replace(/^Assertion \(A\): /i, '').trim()
+      },
+      {
+        statement_label: 'R',
+        statement_text: (parsedDetails.reason_text || '').replace(/^Reason \(R\): /i, '').trim()
+      }
+    ];
+    
+    return {
+      statements,
+      options: parsedDetails.options
+    };
   }
   
   // If we have options but no statements, try to extract them from question text
@@ -140,43 +231,160 @@ export const normalizeAssertionReasonDetails = (
 };
 
 /**
- * Normalizes a sequence-ordering question to have the expected format
+ * Extracts sequence items from question text.
+ * Example: "A. Item 1", "B. Item 2" or "I. Item 1", "II. Item 2"
+ * This version iterates through lines and applies a regex to each.
  */
-export const normalizeSequenceOrderingDetails = (details: unknown): SequenceOrderingDetails | null => {
-  const parsedDetails = parseJsonDetails<Partial<SequenceOrderingDetails>>(details as string | Partial<SequenceOrderingDetails>);
+export const extractSequenceItemsFromText = (questionText: string): { item_number: string; item_text: string }[] => {
+  const items: { item_number: string; item_text: string }[] = [];
+  const lines = questionText.split('\n');
+  // Regex for lines starting with a label (A., 1., I.) followed by text.
+  const itemPattern = /^\s*(?:([A-Z])\.|([0-9]+)\.|([IVXLCDM]+)\.)\s*(.+)/;
+  let match;
+
+  for (const line of lines) {
+    match = line.match(itemPattern);
+    if (match) {
+      const item_number = match[1] || match[2] || match[3]; // Captured A-Z, 0-9, or Roman numeral
+      const item_text = match[4].trim();
+      
+      if (item_number && item_text) {
+        // Basic validation to avoid overly long captures or accidental matches of options.
+        if (item_text.length > 0 && item_text.length < 250 && !item_text.toLowerCase().includes("all of the above") && !item_text.toLowerCase().includes("none of the above")) {
+          items.push({ item_number, item_text });
+        }
+      }
+    }
+  }
+  return items;
+};
+
+/**
+ * Normalizes a sequence-ordering question to have the expected format.
+ * It prioritizes items from `details` JSON, then falls back to parsing `questionText`.
+ */
+export const normalizeSequenceOrderingDetails = (details: string | Record<string, unknown>, questionText: string): SequenceOrderingDetails | null => {
+  const parsedDetails = parseJsonDetails<RawSequenceOrderingDetails>(details); 
   
   if (!parsedDetails) {
     return null;
   }
   
-  // If details already has the correct structure
-  if (parsedDetails.sequence_items && Array.isArray(parsedDetails.sequence_items) &&
-      parsedDetails.options && Array.isArray(parsedDetails.options)) {
-    return parsedDetails as SequenceOrderingDetails;
+  let introText: string | undefined = undefined;
+  let sequenceItems: { item_number: string; item_text: string }[] = [];
+  let options: QuestionOption[] | undefined = undefined;
+
+  if (parsedDetails.options && Array.isArray(parsedDetails.options)) {
+    options = parsedDetails.options;
+  } else {
+    console.warn('SequenceOrderingDetails: Missing options array.', parsedDetails);
+    return null; // Options are essential
+  }
+
+  // Get introText
+  if (parsedDetails.sequence_details && typeof parsedDetails.sequence_details === 'object') {
+    introText = parsedDetails.sequence_details.intro_text;
+  } else { 
+    introText = parsedDetails.intro_text; // Old format or already normalized
+  }
+
+  // Determine sequenceItems:
+  // Priority:
+  // 1. Explicit items in `details` JSON (new `sequence_details.items` or old `sequence_items`).
+  //    If this is an array (even empty), it's considered definitive from `details`.
+  // 2. If `details` does not provide an array for items (e.g., field is missing, null, or not an array),
+  //    then fall back to parsing `questionText`.
+
+  let itemsFoundInDetailsJson = false;
+  if (parsedDetails.sequence_details && typeof parsedDetails.sequence_details === 'object') { // New DB format
+    if (parsedDetails.sequence_details.items !== undefined) { // Key 'items' exists
+      if (Array.isArray(parsedDetails.sequence_details.items)) {
+        sequenceItems = parsedDetails.sequence_details.items; // Use it, even if empty array
+        itemsFoundInDetailsJson = true;
+      } else if (parsedDetails.sequence_details.items === null) {
+        // items is explicitly null, means no items from details, allow fallback
+        itemsFoundInDetailsJson = false; 
+      } else {
+        // items is present but not an array and not null (malformed)
+        console.warn('SequenceOrderingDetails: sequence_details.items is malformed.', parsedDetails.sequence_details.items);
+        itemsFoundInDetailsJson = false; // Treat as no valid items from details
+      }
+    }
+    // If 'items' key is undefined, itemsFoundInDetailsJson remains false.
+  } else if (parsedDetails.sequence_items !== undefined) { // Old DB format or already normalized with sequence_items at root
+     if (Array.isArray(parsedDetails.sequence_items)) {
+        sequenceItems = parsedDetails.sequence_items; // Use it, even if empty array
+        itemsFoundInDetailsJson = true;
+     } else if (parsedDetails.sequence_items === null) {
+        // sequence_items is explicitly null
+        itemsFoundInDetailsJson = false;
+     } else {
+        console.warn('SequenceOrderingDetails: sequence_items is malformed.', parsedDetails.sequence_items);
+        itemsFoundInDetailsJson = false;
+     }
+  }
+  // If itemsFoundInDetailsJson is false (meaning details didn't provide a definitive array, or provided null),
+  // then try parsing questionText.
+  if (!itemsFoundInDetailsJson && questionText) {
+    const extractedItems = extractSequenceItemsFromText(questionText);
+    // extractedItems will be an array (possibly empty if no items found in text)
+    sequenceItems = extractedItems; 
   }
   
-  return null;
+  // introText is sourced only from parsedDetails (new or old format) as determined above.
+  // If not present in details, it will be undefined, and component will use its default.
+
+  if (!options) { // Should have been caught earlier, but as a safeguard.
+    console.warn('Could not normalize SequenceOrderingDetails: options are missing.');
+    return null;
+  }
+
+  return {
+    intro_text: introText,
+    sequence_items: sequenceItems,
+    options: options,
+  } as SequenceOrderingDetails;
 };
 
 /**
  * Normalizes a multiple-correct-statements question to have the expected format
  */
 export const normalizeMultipleCorrectStatementsDetails = (
-  details: unknown,
+  details: string | Record<string, unknown>,
   questionText: string
 ): MultipleCorrectStatementsDetails | null => {
-  const parsedDetails = parseJsonDetails<Partial<MultipleCorrectStatementsDetails>>(
-    details as string | Partial<MultipleCorrectStatementsDetails>
+  const parsedDetails = parseJsonDetails<RawMultipleCorrectStatementsDetails>(
+    details
   );
   
   if (!parsedDetails) {
     return null;
   }
   
-  // If details already has the correct structure
-  if (parsedDetails.statements && Array.isArray(parsedDetails.statements) &&
-      parsedDetails.options && Array.isArray(parsedDetails.options)) {
-    return parsedDetails as MultipleCorrectStatementsDetails;
+  // Handle new format
+  if (parsedDetails.options && Array.isArray(parsedDetails.options) &&
+      parsedDetails.statement_details && typeof parsedDetails.statement_details === 'object' &&
+      Array.isArray(parsedDetails.statement_details.statements)) {
+    // Ensure all properties of MultipleCorrectStatementsDetails are present if asserting
+    // Or ensure the Raw type is compatible enough or cast specific parts
+    return {
+        options: parsedDetails.options,
+        statement_details: parsedDetails.statement_details
+    } as MultipleCorrectStatementsDetails;
+  }
+  
+  // Handle old format (for backward compatibility during migration)
+  if (parsedDetails.options && Array.isArray(parsedDetails.options) &&
+      parsedDetails.statements && Array.isArray(parsedDetails.statements) &&
+      typeof parsedDetails.intro_text === 'string') {
+    
+    return {
+      options: parsedDetails.options,
+      statement_details: {
+        intro_text: parsedDetails.intro_text,
+        statements: parsedDetails.statements
+      }
+    } as MultipleCorrectStatementsDetails;
   }
   
   // If we have options but no statements, try to extract them from question text
@@ -185,12 +393,18 @@ export const normalizeMultipleCorrectStatementsDetails = (
     
     if (extractedStatements.length > 0) {
       return {
-        statements: extractedStatements.map(s => ({
-          statement_label: s.label,
-          statement_text: s.text
-        })),
-        options: parsedDetails.options
-      };
+        options: parsedDetails.options,
+        statement_details: {
+          intro_text: questionText, // Fallback to full question text if intro_text is missing
+          statements: extractedStatements.map(s => ({
+            statement_label: s.label,
+            statement_text: s.text,
+            // Ensure all properties of Statement are present, even if with default/inferred values
+            is_correct: false, // This might need adjustment based on how correctness is determined
+            statement_number: 0 // This might need adjustment based on how numbering is determined
+          }))
+        }
+      } as MultipleCorrectStatementsDetails;
     }
   }
   
@@ -201,23 +415,44 @@ export const normalizeMultipleCorrectStatementsDetails = (
  * Normalizes a matching question to have the expected format
  */
 export const normalizeMatchingDetails = (
-  details: unknown,
+  details: string | Record<string, unknown>,
   questionText: string
 ): MatchingDetails | null => {
-  const parsedDetails = parseJsonDetails<Partial<MatchingDetails>>(details as string | Partial<MatchingDetails>);
+  const parsedDetails = parseJsonDetails<RawMatchingDetails>(details);
   
   if (!parsedDetails) {
     return null;
   }
   
-  // If details already has the correct structure
-  if (parsedDetails.items && Array.isArray(parsedDetails.items) &&
-      parsedDetails.options && Array.isArray(parsedDetails.options)) {
-    return parsedDetails as MatchingDetails;
+  // If details already has the correct new structure
+  if (
+    parsedDetails.options && Array.isArray(parsedDetails.options) &&
+    parsedDetails.matching_details && typeof parsedDetails.matching_details === 'object' &&
+    parsedDetails.matching_details.items && Array.isArray(parsedDetails.matching_details.items)
+  ) {
+    // Ensure the cast is safe or that RawMatchingDetails is sufficiently compatible
+     return {
+        options: parsedDetails.options,
+        matching_details: parsedDetails.matching_details
+     } as MatchingDetails;
   }
-  
-  // If we have options but no items, try to extract them from question text
+
+  // If we have options, check for old structure or parse from text
   if (parsedDetails.options && Array.isArray(parsedDetails.options)) {
+    // Check if it's the old structure (items, left_column_header, right_column_header directly under parsedDetails)
+    // This is a transitional step to support old data format before migration
+    if (parsedDetails.items && Array.isArray(parsedDetails.items)) {
+      return {
+        options: parsedDetails.options, 
+        matching_details: {
+          items: parsedDetails.items,
+          left_column_header: parsedDetails.left_column_header || "List I",
+          right_column_header: parsedDetails.right_column_header || "List II",
+        },
+      } as MatchingDetails;
+    }
+
+    // If not the old structure with items, try to parse items from questionText
     const { listI, listII } = parseMatchingQuestion(questionText);
     
     if (listI.length > 0 && listII.length > 0) {
@@ -229,10 +464,12 @@ export const normalizeMatchingDetails = (
       }));
       
       return {
-        items,
         options: parsedDetails.options,
-        left_column_header: "List I",
-        right_column_header: "List II"
+        matching_details: {
+          items,
+          left_column_header: "List I",
+          right_column_header: "List II"
+        }
       };
     }
   }
@@ -363,12 +600,12 @@ export const extractDiagramLabelsFromText = (questionText: string): DiagramLabel
  * Normalizes a diagram-based question to have the expected format
  */
 export const normalizeDiagramBasedDetails = (
-  details: unknown,
+  details: string | Record<string, unknown>,
   imageUrl: string | null,
   questionText: string
 ): DiagramBasedDetails | null => {
   // Try to parse the details
-  const parsedDetails = parseJsonDetails<Partial<DiagramBasedDetails>>(details as string | Partial<DiagramBasedDetails>);
+  const parsedDetails = parseJsonDetails<Partial<DiagramBasedDetails>>(details);
   
   if (!parsedDetails) {
     console.log('Failed to parse diagram details:', details);
@@ -376,9 +613,13 @@ export const normalizeDiagramBasedDetails = (
   }
   
   // If details already has the complete structure, just return it
-  if (parsedDetails.diagram_url && 
+  if (parsedDetails.diagram_url &&
       parsedDetails.options && Array.isArray(parsedDetails.options)) {
-    return parsedDetails as DiagramBasedDetails;
+    // Ensure diagram_details is preserved if it exists
+    return {
+      ...parsedDetails,
+      diagram_details: parsedDetails.diagram_details,
+    } as DiagramBasedDetails;
   }
   
   // Start building normalized details
@@ -411,6 +652,11 @@ export const normalizeDiagramBasedDetails = (
     }
     // It's okay if we don't have labels - they're optional in the DiagramBasedDetails type
   }
+
+  // Add diagram_details if it exists in parsed details
+  if (parsedDetails.diagram_details) {
+    normalizedDetails.diagram_details = parsedDetails.diagram_details;
+  }
   
   return normalizedDetails as DiagramBasedDetails;
 };
@@ -419,7 +665,7 @@ export const normalizeDiagramBasedDetails = (
  * Normalizes question details based on the question type
  */
 export const normalizeQuestionDetails = (
-  details: unknown, 
+  details: string | Record<string, unknown>, 
   questionType: string,
   questionText: string,
   imageUrl?: string | null
@@ -428,7 +674,7 @@ export const normalizeQuestionDetails = (
     case 'AssertionReason':
       return normalizeAssertionReasonDetails(details, questionText);
     case 'SequenceOrdering':
-      return normalizeSequenceOrderingDetails(details);
+      return normalizeSequenceOrderingDetails(details, questionText); // Pass questionText again
     case 'MultipleCorrectStatements':
       return normalizeMultipleCorrectStatementsDetails(details, questionText);
     case 'Matching':
