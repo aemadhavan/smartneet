@@ -18,6 +18,7 @@ interface Statement {
   statement_label: string;
   statement_text: string;
   is_correct: boolean;
+  statement_number?: number;
 }
 
 // Match columns item interface
@@ -35,21 +36,44 @@ interface SequenceItem {
   item_text: string;
 }
 
-// Question details interface
-interface QuestionDetails {
-  options?: MultipleChoiceOption[];
-  statements?: Statement[];
-  assertion_text?: string;
-  reason_text?: string;
-  left_column_header?: string;
-  right_column_header?: string;
-  items?: MatchColumnsItem[] | SequenceItem[]; // Can be either type depending on question_type
-  intro_text?: string;
-  correct_option?: number | string;
-  correct_sequence?: string | number[];
+// Specific detail interfaces
+interface MatchingDetails {
+  items: MatchColumnsItem[];
+  left_column_header: string;
+  right_column_header: string;
 }
 
-// New interfaces for handling legacy data
+interface StatementDetails {
+  intro_text: string;
+  statements: Statement[];
+}
+
+interface AssertionReasonDetails {
+  assertion_text: string;
+  reason_text: string;
+}
+
+interface DiagramDetails {
+  description: string;
+}
+
+interface SequenceDetails {
+  items?: SequenceItem[] | null;
+  intro_text: string;
+  correct_sequence: number[] | string;
+}
+
+// Updated Question details interface
+interface QuestionDetails {
+  options?: MultipleChoiceOption[];
+  matching_details?: MatchingDetails;
+  statement_details?: StatementDetails;
+  assertion_reason_details?: AssertionReasonDetails;
+  diagram_details?: DiagramDetails;
+  sequence_details?: SequenceDetails;
+}
+
+// Legacy interface support (for backward compatibility)
 interface AssertionReasonData {
   assertion_text: string;
   reason_text: string;
@@ -74,10 +98,10 @@ interface StatementBasedData {
 interface SequenceOrderingData {
   intro_text?: string;
   correct_sequence: string | number[];
-  items?: SequenceItem[];
+  items?: SequenceItem[] | null;
 }
 
-// Base question interface 
+// Base question interface
 interface BaseQuestionData {
   paper_id: number;
   subject_id: number;
@@ -95,11 +119,19 @@ interface BaseQuestionData {
   details?: QuestionDetails;
 }
 
-// Complete question data interface with legacy fields
+// Complete question data interface with support for both updated and legacy fields
 interface QuestionData extends BaseQuestionData {
   options?: MultipleChoiceOption[];
   statements?: Statement[];
-  question_number: number;
+  
+  // Updated nested structures
+  matching_details?: MatchingDetails;
+  statement_details?: StatementDetails;
+  assertion_reason_details?: AssertionReasonDetails;
+  diagram_details?: DiagramDetails;
+  sequence_details?: SequenceDetails;
+  
+  // Legacy fields for backward compatibility
   assertion_reason?: AssertionReasonData;
   match_columns?: MatchColumnsData;
   statement_based?: StatementBasedData;
@@ -202,8 +234,8 @@ function processQuestionData(questionData: QuestionData): QuestionData {
   const processedQuestion: QuestionData = {
     ...questionData,
     question_number: typeof questionData.question_number === 'string' 
-    ? parseFloat(questionData.question_number) 
-    : questionData.question_number,
+      ? parseFloat(questionData.question_number) 
+      : questionData.question_number,
     details: questionData.details || {}
   };
 
@@ -224,85 +256,101 @@ function processQuestionData(questionData: QuestionData): QuestionData {
       break;
 
     case 'AssertionReason':
-      // Move assertion_reason data to details if needed
-      if (questionData.assertion_reason) {
+      // Handle new nested assertion_reason_details structure
+      if (questionData.assertion_reason_details) {
         processedQuestion.details = {
           ...processedQuestion.details,
-          assertion_text: questionData.assertion_reason.assertion_text,
-          reason_text: questionData.assertion_reason.reason_text,
-          correct_option: questionData.assertion_reason.correct_option
+          assertion_reason_details: questionData.assertion_reason_details
         };
-        
-        // If options exist in assertion_reason but not in details
-        if (questionData.assertion_reason.options && !processedQuestion.details?.options) {
-          processedQuestion.details = {
-            ...processedQuestion.details,
-            options: questionData.assertion_reason.options
-          };
-        }
+      }
+      // Legacy support for old structure
+      else if (questionData.assertion_reason) {
+        processedQuestion.details = {
+          ...processedQuestion.details,
+          assertion_reason_details: {
+            assertion_text: questionData.assertion_reason.assertion_text,
+            reason_text: questionData.assertion_reason.reason_text
+          }
+        };
       }
       break;
 
     case 'Matching':
-      // Move match_columns data to details if needed
-      if (questionData.match_columns) {
+      // Handle new nested matching_details structure
+      if (questionData.matching_details) {
         processedQuestion.details = {
           ...processedQuestion.details,
-          left_column_header: questionData.match_columns.left_column_header,
-          right_column_header: questionData.match_columns.right_column_header,
-          items: questionData.match_columns.items
+          matching_details: questionData.matching_details
+        };
+      }
+      // Legacy support for old structure
+      else if (questionData.match_columns) {
+        processedQuestion.details = {
+          ...processedQuestion.details,
+          matching_details: {
+            left_column_header: questionData.match_columns.left_column_header || '',
+            right_column_header: questionData.match_columns.right_column_header || '',
+            items: questionData.match_columns.items || []
+          }
         };
       }
       break;
 
     case 'MultipleCorrectStatements':
-      // Move statement_based data to details if needed
-      const statementBasedData = questionData.statement_based_questions || questionData.statement_based;
-      if (statementBasedData) {
+      // Handle new nested statement_details structure
+      if (questionData.statement_details) {
         processedQuestion.details = {
           ...processedQuestion.details,
-          intro_text: statementBasedData.intro_text,
-          correct_option: statementBasedData.correct_option
+          statement_details: questionData.statement_details
         };
+      }
+      // Legacy support
+      else {
+        const statementBasedData = questionData.statement_based_questions || questionData.statement_based;
+        const statements = questionData.statements || 
+                          (statementBasedData ? statementBasedData.statements : null);
         
-        // If options exist in statement_based but not in details
-        if (statementBasedData.options && !processedQuestion.details?.options) {
+        if (statementBasedData || statements) {
           processedQuestion.details = {
             ...processedQuestion.details,
-            options: statementBasedData.options
+            statement_details: {
+              intro_text: statementBasedData ? statementBasedData.intro_text || '' : '',
+              statements: statements || []
+            }
           };
         }
       }
-      
-      // Move statements to details if needed
-      if (questionData.statements && !processedQuestion.details?.statements) {
+      break;
+
+    case 'DiagramBased':
+      // Handle diagram_details structure
+      if (questionData.diagram_details) {
         processedQuestion.details = {
           ...processedQuestion.details,
-          statements: questionData.statements
-        };
-      } else if (statementBasedData && statementBasedData.statements && !processedQuestion.details?.statements) {
-        processedQuestion.details = {
-          ...processedQuestion.details,
-          statements: statementBasedData.statements
+          diagram_details: questionData.diagram_details
         };
       }
       break;
 
     case 'SequenceOrdering':
-      // Move sequence_ordering data to details if needed
-      const sequenceData = questionData.sequence_ordering_questions || questionData.sequence_ordering;
-      if (sequenceData) {
+      // Handle new nested sequence_details structure
+      if (questionData.sequence_details) {
         processedQuestion.details = {
           ...processedQuestion.details,
-          intro_text: sequenceData.intro_text,
-          correct_sequence: sequenceData.correct_sequence
+          sequence_details: questionData.sequence_details
         };
-        
-        // Move items to details if needed - these should be SequenceItem[] for this question type
-        if (sequenceData.items && !processedQuestion.details?.items) {
+      }
+      // Legacy support
+      else {
+        const sequenceData = questionData.sequence_ordering_questions || questionData.sequence_ordering;
+        if (sequenceData) {
           processedQuestion.details = {
             ...processedQuestion.details,
-            items: sequenceData.items as SequenceItem[]
+            sequence_details: {
+              intro_text: sequenceData.intro_text || '',
+              correct_sequence: sequenceData.correct_sequence,
+              items: sequenceData.items
+            }
           };
         }
       }
