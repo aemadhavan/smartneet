@@ -1,4 +1,4 @@
-//File: src/app/dashboard/page.tsx
+//File: src/app/practice/page.tsx
 
 import { Suspense } from 'react';
 import PracticeClientPage from './client-page';

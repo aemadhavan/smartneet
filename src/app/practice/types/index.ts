@@ -51,10 +51,13 @@ export interface Subject {
   }
   
   export interface MatchingDetails {
-    items: MatchingItem[];
     options: QuestionOption[];
-    left_column_header?: string;
-    right_column_header?: string;
+    matching_details: {
+      items: MatchingItem[];
+      left_column_header?: string;
+      right_column_header?: string;
+    };
+    [key: string]: unknown; 
   }
   
   export interface Statement {
@@ -75,35 +78,46 @@ export interface Subject {
   // Define the possible structures for details based on question type
   export interface MultipleChoiceDetails {
     options: MultipleChoiceOption[];
+    [key: string]: unknown; 
   }
   
-  export interface MatchingDetails {
-    left_column_header?: string;
-    right_column_header?: string;
-    items: MatchingItem[];
-    options: QuestionOption[];
-  }
+  // Removed duplicate MatchingDetails definition here
   
   export interface AssertionReasonDetails {
-    statements: Statement[];
+    // This structure reflects what normalizeAssertionReasonDetails will produce
+    // after processing either the old or new DB format.
+    statements: Statement[]; 
     options: QuestionOption[];
+    // The raw DB format might look different (e.g. with assertion_reason_details nested object)
+    // but the component will receive the normalized version.
+    [key: string]: unknown;
   }
   
   export interface MultipleCorrectStatementsDetails {
-    statements: Statement[];
     options: QuestionOption[];
+    statement_details: {
+      intro_text: string;
+      statements: Statement[];
+    };
+    [key: string]: unknown;
   }
   
-  export interface SequenceOrderingDetails {
-    sequence_items: SequenceItem[];
-    options: QuestionOption[];
-  }
-  
-  // Define DiagramBased question details structure
+export interface SequenceOrderingDetails {
+  intro_text?: string; // Added to display the instruction from DB
+  sequence_items: SequenceItem[];
+  options: QuestionOption[];
+  [key: string]: unknown;
+}
+
+// Define DiagramBased question details structure
 export interface DiagramBasedDetails {
   diagram_url: string;
   labels?: DiagramLabel[];
   options: QuestionOption[];
+  diagram_details?: { // Add this new field
+    description?: string;
+  };
+  [key: string]: unknown;
 }
 
 export interface DiagramLabel {
