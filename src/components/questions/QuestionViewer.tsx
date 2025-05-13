@@ -1,7 +1,16 @@
 // src/components/questions/QuestionViewer.tsx
 import { useState, useEffect } from 'react';
 import useQuestionById from '@/hooks/useQuestionById';
-import { Question } from '@/app/practice/types';
+import {
+  Question,
+  QuestionDetails,
+  MultipleChoiceDetails,
+  MatchingDetails,
+  AssertionReasonDetails,
+  MultipleCorrectStatementsDetails,
+  SequenceOrderingDetails,
+  DiagramBasedDetails
+} from '@/app/practice/types';
 import { 
   MultipleChoiceQuestion, 
   MatchingQuestion, 
@@ -20,6 +29,7 @@ interface QuestionViewerProps {
   showNavigation?: boolean;
   showFeedback?: boolean;
   onSubmit?: (questionId: number, selectedOption: string) => Promise<boolean>;
+  selectedOption?: string | null;
 }
 
 export function QuestionViewer({
@@ -30,17 +40,21 @@ export function QuestionViewer({
   isLastQuestion = false,
   showNavigation = true,
   showFeedback = false,
-  onSubmit
+  onSubmit,
+  selectedOption: externalSelectedOption
 }: QuestionViewerProps) {
   const {
     question,
     loading,
     error,
-    selectedOption,
+    selectedOption: internalSelectedOption,
     showExplanation,
     handleOptionSelect,
     toggleExplanation
   } = useQuestionById(questionId);
+  
+  // Use external selectedOption if provided, otherwise use internal state
+  const selectedOption = externalSelectedOption !== undefined ? externalSelectedOption : internalSelectedOption;
 
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
   const [submitted, setSubmitted] = useState<boolean>(false);
@@ -52,7 +66,7 @@ export function QuestionViewer({
   }, [questionId]);
 
   // Helper to parse question details
-  const parseDetails = (details: string | any): any => {
+  const parseDetails = (details: string | QuestionDetails): QuestionDetails | { error: string; raw: string } => {
     if (typeof details === 'string') {
       try {
         return JSON.parse(details);
@@ -144,11 +158,23 @@ export function QuestionViewer({
 
   // Render different question types
   const renderQuestionContent = () => {
+    // Handle cases where details parsing failed
+    if ('error' in details) {
+      return (
+        <div className="bg-red-50 dark:bg-red-900 p-4 rounded-md border border-red-200 dark:border-red-700">
+          <p className="text-red-700 dark:text-red-200">
+            Error loading question details: {details.error as string}. Raw data: {details.raw as string}
+          </p>
+        </div>
+      );
+    }
+
+    // If we reach here, 'details' is narrowed to QuestionDetails
     switch (question.question_type) {
       case 'MultipleChoice':
         return (
           <MultipleChoiceQuestion
-            details={details}
+            details={details as MultipleChoiceDetails}
             selectedOption={selectedOption}
             onOptionSelect={handleSelect}
           />
@@ -156,7 +182,7 @@ export function QuestionViewer({
       case 'Matching':
         return (
           <MatchingQuestion
-            details={details}
+            details={details as MatchingDetails}
             questionText={question.question_text}
             selectedOption={selectedOption}
             onOptionSelect={handleSelect}
@@ -165,7 +191,7 @@ export function QuestionViewer({
       case 'AssertionReason':
         return (
           <AssertionReasonQuestion
-            details={details}
+            details={details as AssertionReasonDetails}
             questionText={question.question_text}
             selectedOption={selectedOption}
             onOptionSelect={handleSelect}
@@ -174,7 +200,7 @@ export function QuestionViewer({
       case 'MultipleCorrectStatements':
         return (
           <MultipleCorrectStatementsQuestion
-            details={details}
+            details={details as MultipleCorrectStatementsDetails}
             selectedOption={selectedOption}
             onOptionSelect={handleSelect}
           />
@@ -182,7 +208,7 @@ export function QuestionViewer({
       case 'SequenceOrdering':
         return (
           <SequenceOrderingQuestion
-            details={details}
+            details={details as SequenceOrderingDetails}
             selectedOption={selectedOption}
             onOptionSelect={handleSelect}
           />
@@ -190,7 +216,7 @@ export function QuestionViewer({
       case 'DiagramBased':
         return (
           <DiagramBasedQuestion
-            details={details}
+            details={details as DiagramBasedDetails}
             imageUrl={getDiagramImageUrl(question)}
             questionText={question.question_text}
             selectedOption={selectedOption}

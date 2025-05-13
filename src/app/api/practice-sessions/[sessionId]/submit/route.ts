@@ -122,6 +122,14 @@ interface ParsedOptionDetails {
   is_correct: boolean;
 }
 
+// Interface for the raw shape of an option before validation and normalization
+interface RawOptionBeforeNormalization {
+  option_number: unknown;
+  option_text?: unknown;
+  is_correct: unknown;
+  [key: string]: unknown;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -519,7 +527,7 @@ function isQuestionDetails(details: unknown): details is QuestionDetails {
   return typedDetails.options.every(opt => {
     if (typeof opt !== 'object' || opt === null) return false;
     
-    const typedOpt = opt as any; // Use 'any' for looser check before normalization
+    const typedOpt = opt as RawOptionBeforeNormalization; // Use a specific type for looser check before normalization
     return (
       (typeof typedOpt.option_number === 'string' || typeof typedOpt.option_number === 'number') &&
       (typedOpt.option_text === undefined || typedOpt.option_text === null || typeof typedOpt.option_text === 'string') &&

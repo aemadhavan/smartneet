@@ -7,13 +7,13 @@ import {
   subtopics, 
   subjects 
 } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { cache } from '@/lib/cache';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { questionId: string } }
+  { params }: { params: Promise<{ questionId: string }> }
 ) {
   try {
     // Authenticate user
@@ -22,7 +22,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const questionId = parseInt(params.questionId);
+    // Safely access params with proper error handling
+    const questionIdString = (await params).questionId;
+    if (!questionIdString) {
+      return NextResponse.json({ error: 'Missing question ID' }, { status: 400 });
+    }
+
+    const questionId = parseInt(questionIdString);
     if (isNaN(questionId)) {
       return NextResponse.json({ error: 'Invalid question ID' }, { status: 400 });
     }
