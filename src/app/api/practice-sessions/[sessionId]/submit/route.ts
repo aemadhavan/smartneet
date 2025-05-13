@@ -20,17 +20,21 @@ interface MultipleChoiceDetails {
 }
 
 interface MatchingDetails {
-  items: Array<{
-    left_item_text: string;
-    left_item_label: string;
-    right_item_text: string;
-    right_item_label: string;
-  }>;
   options: Array<{
     is_correct: boolean;
     option_text: string;
     option_number: string;
   }>;
+  matching_details: {
+    items: Array<{
+      left_item_text: string;
+      left_item_label: string;
+      right_item_text: string;
+      right_item_label: string;
+    }>;
+    left_column_header?: string;
+    right_column_header?: string;
+  };
 }
 
 interface AssertionReasonDetails {
@@ -105,6 +109,26 @@ interface QuestionDetailsWithSessionInfo {
   negative_marks: number | null;
   question_type: string;
 }
+// type OptionBasedResponse = 
+//   | string 
+//   | number 
+//   | { option: string | number } 
+//   | { selectedOption: string | number }
+//   | { selectedMatches: string | number };
+
+interface ParsedOptionDetails {
+  option_number: string;
+  option_text: string;
+  is_correct: boolean;
+}
+
+// Interface for the raw shape of an option before validation and normalization
+interface RawOptionBeforeNormalization {
+  option_number: unknown;
+  option_text?: unknown;
+  is_correct: unknown;
+  [key: string]: unknown;
+}
 
 export async function POST(
   request: NextRequest,
@@ -158,7 +182,7 @@ export async function POST(
         { status: 400 }
       );
     }
-
+    
     // Get all session questions with their details
     const sessionQuestions = await db
       .select({
@@ -181,11 +205,10 @@ export async function POST(
     // Create a map for easier access
     const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = 
       sessionQuestions.reduce((map, q) => {
+        const parsedDetails = parseQuestionDetails(q.details);
         map[q.question_id.toString()] = {
           session_question_id: q.session_question_id,
-          details: typeof q.details === 'string' 
-            ? JSON.parse(q.details) 
-            : q.details,
+          details: parsedDetails,
           marks: q.marks,
           negative_marks: q.negative_marks,
           question_type: q.question_type,
@@ -210,6 +233,7 @@ export async function POST(
     );
     
     const results: AnswerResult[] = [];
+    const evaluationLog: Record<string, unknown> = {};
     
     // Process each answer and create records for new attempts only
     await db.transaction(async (tx) => {
@@ -226,12 +250,33 @@ export async function POST(
           continue; // Skip this question if it doesn't belong to the session
         }
 
-        // Evaluate if the answer is correct
-        const isCorrect = evaluateAnswer(
-          questionDetails.question_type,
-          questionDetails.details,
-          userAnswer
+        // For debugging purposes
+        const correctAnswer = getCorrectAnswerForQuestionType(
+          questionDetails.question_type, 
+          questionDetails.details
         );
+        
+        // Evaluate if the answer is correct using our improved function
+        let isCorrect = false;
+        try {
+          isCorrect = evaluateAnswer(
+            questionDetails.question_type,
+            questionDetails.details,
+            userAnswer
+          );
+          
+          // Store evaluation details for debugging
+          evaluationLog[questionId] = {
+            questionType: questionDetails.question_type,
+            userAnswer,
+            correctAnswer,
+            isCorrect
+          };
+          
+        } catch (error) {
+          console.error('Error evaluating answer:', error);
+          continue; // Skip this question if there's an error
+        }
 
         // Calculate marks awarded
         const marksAwarded = isCorrect
@@ -262,6 +307,9 @@ export async function POST(
         });
       }
     });
+
+    // Add detailed evaluation log to the server logs
+    console.log('Answer evaluation results:', JSON.stringify(evaluationLog, null, 2));
 
     // After the transaction, update session statistics
     const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
@@ -303,6 +351,7 @@ export async function POST(
       score: updatedSession.score ?? 0,
       max_score: updatedSession.max_score ?? 0,
       results,
+      evaluation_summary: evaluationLog // Include this for debugging during development
     });
   } catch (error) {
     console.error('Error submitting answers:', error);
@@ -313,65 +362,180 @@ export async function POST(
   }
 }
 
-// Function to parse and evaluate question details
 function evaluateAnswer(
   questionType: string,
   details: QuestionDetails,
   userAnswer: unknown
 ): boolean {
   try {
-    switch (questionType) {
-      case 'MultipleChoice':
-        const multipleChoiceDetails = details as MultipleChoiceDetails;
-        const stringAnswer = typeof userAnswer === 'string' ? userAnswer : '';
-        return multipleChoiceDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === stringAnswer
-        );
-
-      case 'Matching':
-        const matchingDetails = details as MatchingDetails;
-        const matchingAnswer = userAnswer as { [key: string]: string };
-        if (!matchingAnswer || typeof matchingAnswer !== 'object') return false;
-        
-        return matchingDetails.items.every((pair) => {
-          const userRightItemLabel = matchingAnswer[pair.left_item_label];
-          return userRightItemLabel === pair.right_item_label;
-        });
-
-      case 'AssertionReason':
-        const assertionReasonDetails = details as AssertionReasonDetails;
-        const assertionAnswer = typeof userAnswer === 'string' ? userAnswer : '';
-        return assertionReasonDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === assertionAnswer
-        );
-
-      case 'SequenceOrdering':
-        const sequenceOrderingDetails = details as SequenceOrderingDetails;
-        const sequenceAnswer = typeof userAnswer === 'string' ? userAnswer : '';
-        return sequenceOrderingDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === sequenceAnswer
-        );
-
-      case 'DiagramBased':
-        const diagramBasedDetails = details as DiagramBasedDetails;
-        const diagramAnswer = typeof userAnswer === 'string' ? userAnswer : '';
-        return diagramBasedDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === diagramAnswer
-        );
-
-      case 'MultipleCorrectStatements':
-        const multipleCorrectStatementsDetails = details as MultipleCorrectStatementsDetails;
-        const mcAnswer = typeof userAnswer === 'string' ? userAnswer : '';
-        return multipleCorrectStatementsDetails.options.some(
-          (opt) => opt.is_correct && opt.option_number === mcAnswer
-        );
-
-      default:
-        console.warn(`Unsupported question type: ${questionType}`);
-        return false;
+    // Normalize userAnswer to simplify processing
+    const normalizedAnswer = normalizeUserAnswer(userAnswer);
+    
+    // If we couldn't extract a meaningful answer, return false
+    if (normalizedAnswer === null) {
+      console.warn('Could not normalize user answer:', userAnswer);
+      return false;
     }
+
+    // Log for debugging
+    console.log(`Evaluating ${questionType}:`, { 
+      normalizedAnswer, 
+      details: JSON.stringify(details).substring(0, 100) + '...' 
+    });
+
+    // Evaluate based on question type
+    return evaluateOptionBasedAnswer(questionType, details, normalizedAnswer);
   } catch (error) {
     console.error(`Error evaluating answer for question type ${questionType}:`, error);
+    // Add detailed logging to help diagnose the issue
+    console.error('Question details:', JSON.stringify(details, null, 2));
+    console.error('User answer:', JSON.stringify(userAnswer, null, 2));
     return false;
   }
 }
+
+function normalizeUserAnswer(userAnswer: unknown): string | null {
+  // Handle different input formats consistently
+  if (userAnswer === null || userAnswer === undefined) {
+    return null;
+  }
+  
+  // Convert numeric answers to strings
+  if (typeof userAnswer === 'number') {
+    return userAnswer.toString();
+  }
+  
+  // Extract the normalized answer from various possible formats
+  if (typeof userAnswer === 'string') {
+    return userAnswer;
+  } 
+  
+  // Handle object-based answers
+  if (typeof userAnswer === 'object' && userAnswer !== null) {
+    const answerObj = userAnswer as Record<string, unknown>;
+    
+    // Check for nested option formats
+    const optionKeys = ['option', 'selectedOption', 'selectedMatches'];
+    for (const key of optionKeys) {
+      const optionValue = answerObj[key];
+      if (typeof optionValue === 'string' || typeof optionValue === 'number') {
+        return optionValue.toString();
+      }
+    }
+  }
+
+  // Could not normalize
+  console.warn('Could not normalize user answer:', userAnswer);
+  return null;
+}
+
+function evaluateOptionBasedAnswer(
+  questionType: string, 
+  details: QuestionDetails, 
+  normalizedAnswer: string
+): boolean {
+  // Ensure the details have options
+  if (!('options' in details) || !Array.isArray(details.options)) {
+    console.warn(`No options found for question type: ${questionType}`);
+    return false;
+  }
+
+  // Find matching option
+  return details.options.some(
+    (opt: ParsedOptionDetails) => 
+      opt.is_correct && opt.option_number.toString() === normalizedAnswer
+  );
+}
+
+function parseQuestionDetails(details: unknown): QuestionDetails {
+  // First, check if the details are already in the correct format
+  if (isQuestionDetails(details)) {
+    // Normalize options to ensure consistent structure
+    return {
+      ...details,
+      options: details.options.map(opt => ({
+        option_number: opt.option_number.toString(),
+        option_text: opt.option_text || '',
+        is_correct: !!opt.is_correct
+      }))
+    };
+  }
+
+  // If details is a string, try to parse it as JSON
+  if (typeof details === 'string') {
+    try {
+      const parsedDetails = JSON.parse(details);
+      
+      // Validate the parsed details
+      if (isQuestionDetails(parsedDetails)) {
+        return {
+          ...parsedDetails,
+          options: parsedDetails.options.map(opt => ({
+            option_number: opt.option_number.toString(),
+            option_text: opt.option_text || '',
+            is_correct: !!opt.is_correct
+          }))
+        };
+      }
+      
+      throw new Error('Parsed details do not match expected structure');
+    } catch (e) {
+      console.error('Failed to parse question details string:', e);
+      throw new Error('Invalid JSON format in question details');
+    }
+  }
+
+  // If we reach here, the details are in an invalid format
+  throw new Error('Invalid question details format');
+}
+
+// Function to extract correct answer for logging/debugging purposes
+function getCorrectAnswerForQuestionType(
+  questionType: string, 
+  details: QuestionDetails
+): string {
+  try {
+    // All supported question types have options
+    if ('options' in details && Array.isArray(details.options)) {
+      const correctOption = details.options.find((opt: ParsedOptionDetails) => opt.is_correct);
+      return correctOption 
+        ? `Option ${correctOption.option_number}: ${correctOption.option_text}` 
+        : 'Unknown';
+    }
+    
+    return 'No correct option found';
+  } catch (error) {
+    console.error('Error extracting correct answer:', error);
+    return 'Error extracting correct answer';
+  }
+}
+// Type guard for parsing details with improved type safety
+function isQuestionDetails(details: unknown): details is QuestionDetails {
+  if (typeof details !== 'object' || details === null) {
+    return false;
+  }
+
+  // Check for required properties based on known question types
+  const typedDetails = details as Partial<QuestionDetails>;
+
+  // Check for options array in the details
+  if (!Array.isArray(typedDetails.options)) {
+    return false;
+  }
+
+  // Validate options structure
+  return typedDetails.options.every(opt => {
+    if (typeof opt !== 'object' || opt === null) return false;
+    
+    const typedOpt = opt as RawOptionBeforeNormalization; // Use a specific type for looser check before normalization
+    return (
+      (typeof typedOpt.option_number === 'string' || typeof typedOpt.option_number === 'number') &&
+      (typedOpt.option_text === undefined || typedOpt.option_text === null || typeof typedOpt.option_text === 'string') &&
+      (typeof typedOpt.is_correct === 'boolean' || typeof typedOpt.is_correct === 'number') // Numbers 0 or 1 are often used for boolean
+    );
+  });
+}
+
+// function explainOptionBasedResponse(_response: OptionBasedResponse): string {
+//   return 'This function exists to provide type documentation for OptionBasedResponse';
+// }

@@ -84,6 +84,7 @@ export const metadata: Metadata = {
   },
 };
 
+
 // Performance optimization:
 // 1. Streamlined rendering
 // 2. Prioritized critical content path
