@@ -53,6 +53,11 @@ interface QuestionAttempt {
     correctOption?: string; // For selection-based matching questions
     left_column_header?: string; // For structured data
     right_column_header?: string; // For structured data
+    matching_details?: {
+      items?: StructuredItem[];
+      left_column_header?: string;
+      right_column_header?: string;
+    };
   } | null;
   isImageBased?: boolean | null | undefined;
   imageUrl?: string | null | undefined;
@@ -164,12 +169,21 @@ function getOptionNumber(option: Option | StructuredOption): string {
 
 // Check if this is a structured data matching question
 function hasStructuredData(attempt: QuestionAttempt): boolean {
-  // Check for structured items
+  // Check for structured items directly under details
   if (attempt.details?.items && 
       attempt.details.items.length > 0 && 
       isStructuredItem(attempt.details.items[0])) {
     return true;
   }
+  
+  // Check for structured items under matching_details
+  if (attempt.details?.matching_details?.items && 
+      Array.isArray(attempt.details.matching_details.items) &&
+      attempt.details.matching_details.items.length > 0 &&
+      isStructuredItem(attempt.details.matching_details.items[0])) {
+    return true;
+  }
+  
   return false;
 }
 
@@ -217,16 +231,34 @@ export default function Matching({ attempt }: MatchingProps) {
               <thead>
                 <tr>
                   <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-r border-gray-200 dark:border-gray-700">
-                    {attempt.details?.left_column_header || 'List I'}
+                    {attempt.details?.matching_details?.left_column_header || 
+                     attempt.details?.left_column_header || 
+                     'List I'}
                   </th>
                   <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
-                    {attempt.details?.right_column_header || 'List II'}
+                    {attempt.details?.matching_details?.right_column_header || 
+                     attempt.details?.right_column_header || 
+                     'List II'}
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
+                {/* Render items directly from details.items if available */}
                 {attempt.details?.items && 
                  attempt.details.items.filter(isStructuredItem).map((item, idx) => (
+                  <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
+                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
+                      {item.left_item_label}. {item.left_item_text}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300">
+                      {item.right_item_label}. {item.right_item_text}
+                    </td>
+                  </tr>
+                ))}
+                
+                {/* Render items from matching_details.items if available */}
+                {!attempt.details?.items && attempt.details?.matching_details?.items && 
+                 attempt.details.matching_details.items.filter(isStructuredItem).map((item, idx) => (
                   <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
                       {item.left_item_label}. {item.left_item_text}
