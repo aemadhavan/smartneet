@@ -61,7 +61,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('MultipleChoice');
     
     if (!found) {
-      test.skip('No Multiple Choice questions found in this session');
+      test.skip(true, 'No Multiple Choice questions found in this session');
       return;
     }
     
@@ -95,7 +95,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('Matching');
     
     if (!found) {
-      test.skip('No Matching questions found in this session');
+      test.skip(true, 'No Matching questions found in this session');
       return;
     }
     
@@ -118,7 +118,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('AssertionReason');
     
     if (!found) {
-      test.skip('No Assertion Reason questions found in this session');
+      test.skip(true, 'No Assertion Reason questions found in this session');
       return;
     }
     
@@ -143,7 +143,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('MultipleCorrectStatements');
     
     if (!found) {
-      test.skip('No Multiple Correct Statements questions found in this session');
+      test.skip(true, 'No Multiple Correct Statements questions found in this session');
       return;
     }
     
@@ -166,7 +166,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('SequenceOrdering');
     
     if (!found) {
-      test.skip('No Sequence Ordering questions found in this session');
+      test.skip(true, 'No Sequence Ordering questions found in this session');
       return;
     }
     
@@ -189,7 +189,7 @@ test.describe('Question Type Tests', () => {
     const found = await findQuestionType('DiagramBased');
     
     if (!found) {
-      test.skip('No Diagram Based questions found in this session');
+      test.skip(true, 'No Diagram Based questions found in this session');
       return;
     }
     
