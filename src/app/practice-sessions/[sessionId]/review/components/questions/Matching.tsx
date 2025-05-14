@@ -5,7 +5,7 @@ import Image from 'next/image';
 interface Item {
   key: string;
   text: string;
-  label?: string; // Added for display purposes
+  label?: string; 
 }
 
 // Define structured item interface for directly accessing API data
@@ -19,14 +19,14 @@ interface StructuredItem {
 interface Option {
   key: string;
   text: string;
-  is_correct?: boolean; // Add this for compatibility with API data
+  is_correct?: boolean;
 }
 
 // Define structured option interface for directly accessing API data
 interface StructuredOption {
   is_correct: boolean;
   option_text: string;
-  option_number: string;
+  option_number: string | number;
 }
 
 interface Matches {
@@ -36,9 +36,9 @@ interface Matches {
 // Create a more specific answer type to avoid using 'any'
 interface MatchingAnswerObject {
   matches?: Matches;
-  option?: string; // Add this for selection-type matching questions
-  selection?: string; // Add this for compatibility
-  selectedOption?: string; // Add this for compatibility
+  option?: string; 
+  selection?: string;
+  selectedOption?: string;
   [key: string]: unknown;
 }
 
@@ -50,9 +50,9 @@ interface QuestionAttempt {
     options?: (Option | StructuredOption)[];
     left_items?: Item[];
     right_items?: Option[];
-    correctOption?: string; // For selection-based matching questions
-    left_column_header?: string; // For structured data
-    right_column_header?: string; // For structured data
+    correctOption?: string;
+    left_column_header?: string;
+    right_column_header?: string;
     matching_details?: {
       items?: StructuredItem[];
       left_column_header?: string;
@@ -63,8 +63,8 @@ interface QuestionAttempt {
   imageUrl?: string | null | undefined;
   userAnswer?: MatchingAnswerObject | string | null;
   correctAnswer?: MatchingAnswerObject | string | null;
-  correctOption?: string; // Added for direct correct option reference
-  isCorrect?: boolean; // Added to know if the answer was correct
+  correctOption?: string;
+  isCorrect?: boolean;
 }
 
 interface MatchingProps {
@@ -74,7 +74,6 @@ interface MatchingProps {
 // Utility type guard to check if an option is a StructuredOption
 function isStructuredOption(option: unknown): option is StructuredOption {
   return typeof option === 'object' && option !== null && 
-         'is_correct' in option && 
          'option_text' in option && 
          'option_number' in option;
 }
@@ -88,40 +87,48 @@ function isStructuredItem(item: unknown): item is StructuredItem {
          'right_item_label' in item;
 }
 
-// Find the correct option letter (A, B, C, D) for the answer
-// function findCorrectOptionLetter(attempt: QuestionAttempt): string | null {
-//   // First check structured options if available
-//   if (attempt.details?.options && Array.isArray(attempt.details.options)) {
-//     for (const option of attempt.details.options) {
-//       // Check if this is a structured option with is_correct flag
-//       if (isStructuredOption(option) && option.is_correct === true) {
-//         return option.option_number;
-//       }
-//     }
-//   }
+// Find the correct option letter/number
+function findCorrectOptionKey(attempt: QuestionAttempt): string | null {
+  // First check structured options if available
+  if (attempt.details?.options && Array.isArray(attempt.details.options)) {
+    for (const option of attempt.details.options) {
+      if (isStructuredOption(option) && option.is_correct === true) {
+        return String(option.option_number);
+      }
+      if (!isStructuredOption(option) && (option.is_correct === true)) {
+        return option.key;
+      }
+    }
+  }
   
-//   // Check other properties if structured options didn't give a result
-//   if (attempt.correctAnswer) {
-//     if (typeof attempt.correctAnswer === 'object' && attempt.correctAnswer !== null) {
-//       return (attempt.correctAnswer as MatchingAnswerObject).option || 
-//              (attempt.correctAnswer as MatchingAnswerObject).selection || 
-//              (attempt.correctAnswer as MatchingAnswerObject).selectedOption || 
-//              null;
-//     }
-//     if (typeof attempt.correctAnswer === 'string') {
-//       return attempt.correctAnswer;
-//     }
-//   }
+  // Check other properties if structured options didn't give a result
+  if (attempt.correctAnswer) {
+    if (typeof attempt.correctAnswer === 'object' && attempt.correctAnswer !== null) {
+      const correctAnswer = attempt.correctAnswer as MatchingAnswerObject;
+      return correctAnswer.option || 
+             correctAnswer.selection || 
+             correctAnswer.selectedOption || 
+             null;
+    }
+    if (typeof attempt.correctAnswer === 'string') {
+      try {
+        const parsed = JSON.parse(attempt.correctAnswer);
+        return parsed.option || parsed.selection || parsed.selectedOption || null;
+      } catch {
+        return attempt.correctAnswer;
+      }
+    }
+  }
   
-//   // Check explicit correctOption property
-//   if (attempt.correctOption) {
-//     return attempt.correctOption;
-//   }
+  // Check explicit correctOption property
+  if (attempt.correctOption) {
+    return attempt.correctOption;
+  }
   
-//   return null;
-// }
+  return null;
+}
 
-// Get the user-selected option letter
+// Get the user-selected option key/number
 function getUserSelectedOption(attempt: QuestionAttempt): string | null {
   if (!attempt.userAnswer) return null;
   
@@ -140,7 +147,6 @@ function getUserSelectedOption(attempt: QuestionAttempt): string | null {
         const parsed = JSON.parse(attempt.userAnswer);
         return parsed.option || parsed.selection || parsed.selectedOption || null;
       } catch (e) {
-        console.error('Error parsing user answer:', e);
         // Not JSON, use as-is
       }
     }
@@ -162,7 +168,7 @@ function getOptionText(option: Option | StructuredOption): string {
 // Extract option number/key for option identifier
 function getOptionNumber(option: Option | StructuredOption): string {
   if (isStructuredOption(option)) {
-    return option.option_number;
+    return String(option.option_number);
   }
   return option.key;
 }
@@ -188,17 +194,61 @@ function hasStructuredData(attempt: QuestionAttempt): boolean {
 }
 
 export default function Matching({ attempt }: MatchingProps) {
+  if (!attempt) return null;
+  
+  // Parse user answer and correct answer if they're JSON strings
+  const processAnswer = (answer: any): any => {
+    if (typeof answer === 'string' && answer.startsWith('{')) {
+      try {
+        return JSON.parse(answer);
+      } catch {
+        return answer;
+      }
+    }
+    return answer;
+  };
+  
+  // Get processed answers
+  const processedUserAnswer = processAnswer(attempt.userAnswer);
+  const processedCorrectAnswer = processAnswer(attempt.correctAnswer);
+  
   // Get user selection and correct option
-  const userSelection = getUserSelectedOption(attempt);
-  //const correctOption = findCorrectOptionLetter(attempt);
+  const userSelection = getUserSelectedOption({...attempt, userAnswer: processedUserAnswer});
+  const correctOption = findCorrectOptionKey({...attempt, correctAnswer: processedCorrectAnswer});
   
   // Check if we have structured data in the details
-  const isStructuredFormat = hasStructuredData(attempt);
+  let isStructuredFormat = false;
+  let matchingItems: StructuredItem[] = [];
+  let matchingOptions: (Option | StructuredOption)[] = [];
   
-  // Render nothing if no attempt data
-  if (!attempt) {
-    return null;
+  // First try to get items from matching_details
+  if (attempt.details?.matching_details?.items && 
+      Array.isArray(attempt.details.matching_details.items)) {
+    isStructuredFormat = true;
+    matchingItems = attempt.details.matching_details.items;
+  } 
+  // Then try to get items directly from details
+  else if (attempt.details?.items && 
+          Array.isArray(attempt.details.items) && 
+          attempt.details.items.length > 0 &&
+          'left_item_text' in attempt.details.items[0]) {
+    isStructuredFormat = true;
+    matchingItems = attempt.details.items as StructuredItem[];
   }
+  
+  // Get options
+  if (attempt.details?.options && Array.isArray(attempt.details.options)) {
+    matchingOptions = attempt.details.options;
+  }
+  
+  // Get column headers
+  const leftHeader = attempt.details?.matching_details?.left_column_header || 
+                    attempt.details?.left_column_header || 
+                    'List I';
+  
+  const rightHeader = attempt.details?.matching_details?.right_column_header || 
+                     attempt.details?.right_column_header || 
+                     'List II';
 
   return (
     <div className="space-y-4">
@@ -231,34 +281,15 @@ export default function Matching({ attempt }: MatchingProps) {
               <thead>
                 <tr>
                   <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-r border-gray-200 dark:border-gray-700">
-                    {attempt.details?.matching_details?.left_column_header || 
-                     attempt.details?.left_column_header || 
-                     'List I'}
+                    {leftHeader}
                   </th>
                   <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
-                    {attempt.details?.matching_details?.right_column_header || 
-                     attempt.details?.right_column_header || 
-                     'List II'}
+                    {rightHeader}
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
-                {/* Render items directly from details.items if available */}
-                {attempt.details?.items && 
-                 attempt.details.items.filter(isStructuredItem).map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
-                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
-                      {item.left_item_label}. {item.left_item_text}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300">
-                      {item.right_item_label}. {item.right_item_text}
-                    </td>
-                  </tr>
-                ))}
-                
-                {/* Render items from matching_details.items if available */}
-                {!attempt.details?.items && attempt.details?.matching_details?.items && 
-                 attempt.details.matching_details.items.filter(isStructuredItem).map((item, idx) => (
+                {matchingItems.map((item, idx) => (
                   <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
                       {item.left_item_label}. {item.left_item_text}
@@ -276,12 +307,12 @@ export default function Matching({ attempt }: MatchingProps) {
           <div className="mt-6">
             <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Answer Options:</h3>
             <div className="space-y-2">
-              {attempt.details?.options && 
-               attempt.details.options.filter(isStructuredOption).map((option, idx) => {
-                const optionNumber = getOptionNumber(option);
-                const optionText = getOptionText(option);
-                const isCorrect = option.is_correct === true;
-                const isSelected = userSelection === optionNumber;
+              {matchingOptions.map((Option, idx) => {
+                const optionNumber = getOptionNumber(Option);
+                const optionText = getOptionText(Option);
+                const isCorrect = 'is_correct' in Option ? Option.is_correct === true : false;
+                const isSelected = userSelection === String(optionNumber);
+                
                 
                 return (
                   <div 
