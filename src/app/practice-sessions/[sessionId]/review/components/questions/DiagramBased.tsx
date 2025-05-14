@@ -5,25 +5,14 @@ import Image from 'next/image';
 interface Option {
   key: string;
   text: string;
-}
-
-// Possible option formats for incoming data
-interface PossibleOptionFormat {
-  text?: string;
-  label?: string;
-  value?: string;
-  content?: string;
-  option_text?: string;
-  option_number?: string;
   is_correct?: boolean;
-  [key: string]: unknown;
 }
 
 // Create more specific types to avoid using 'any'
 interface OptionAnswerObject {
   selectedOption?: string;
   selection?: string;
-  option?: string; // Add this to handle {"option":"a"} format
+  option?: string;
   [key: string]: unknown;
 }
 
@@ -31,212 +20,114 @@ interface OptionAnswerObject {
 interface DiagramBasedQuestionAttempt {
   questionText?: string;
   details?: {
-    options?: Option[] | PossibleOptionFormat[] | unknown[] | string[]; // Accept various option formats including JSON strings
+    options?: any[]; // Keep this flexible to handle different formats
+    [key: string]: unknown;
   } | null;
   isImageBased?: boolean | null | undefined;
   imageUrl?: string | null | undefined;
-  userAnswer?: OptionAnswerObject | string | null;  // Allow string type for user answer
-  correctAnswer?: OptionAnswerObject | string | null; // Allow string type for correct answer
+  userAnswer?: OptionAnswerObject | string | null;
+  correctAnswer?: OptionAnswerObject | string | null;
 }
 
 interface DiagramBasedProps {
   attempt: DiagramBasedQuestionAttempt;
 }
 
-// Improved normalize options utility function
-// function normalizeOptions(rawOptions: unknown): Option[] {
-//   // If no options, return empty array
-//   if (!rawOptions) return [];
+// Helper function to extract selection from various answer formats
+function extractSelection(answer: unknown): string {
+  if (!answer) return '';
   
-//   // If rawOptions is already an array of objects with key and text, return it
-//   if (Array.isArray(rawOptions) && rawOptions.length > 0 && 
-//       rawOptions.every(o => typeof o === 'object' && o !== null && 'key' in o && 'text' in o)) {
-//     return rawOptions as Option[];
-//   }
+  // If answer is a string
+  if (typeof answer === 'string') {
+    // If it looks like JSON, try to parse it
+    if (answer.startsWith('{') && (answer.includes('option') || answer.includes('selection') || answer.includes('selectedOption'))) {
+      try {
+        const parsed = JSON.parse(answer);
+        return typeof parsed.selectedOption === 'string' || typeof parsed.selectedOption === 'number'
+          ? String(parsed.selectedOption) 
+          : typeof parsed.selection === 'string' || typeof parsed.selection === 'number'
+          ? String(parsed.selection)
+          : typeof parsed.option === 'string' || typeof parsed.option === 'number'
+          ? String(parsed.option)
+          : '';
+      } catch (e) {
+        console.error('Error parsing answer:', e);
+        return answer;
+      }
+    }
+    return answer;
+  }
   
-//   // If it's an array but has different structure
-//   if (Array.isArray(rawOptions) && rawOptions.length > 0) {
-//     // Special case for JSON strings like {"is_correct":false,"option_text":"D","option_number":"a"}
-//     if (typeof rawOptions[0] === 'string' && 
-//         (rawOptions[0].includes('"option_text"') || rawOptions[0].includes('"option_number"'))) {
-//       return rawOptions.map((option, index) => {
-//         try {
-//           // Try to parse the JSON string
-//           let optionObj: Record<string, unknown>;
-          
-//           if (typeof option === 'string') {
-//             optionObj = JSON.parse(option);
-//           } else if (typeof option === 'object' && option !== null) {
-//             optionObj = option as Record<string, unknown>;
-//           } else {
-//             // Fallback for unexpected formats
-//             return {
-//               key: String.fromCharCode(65 + index),
-//               text: String(option)
-//             };
-//           }
-          
-//           // Extract option_text and option_number
-//           const key = typeof optionObj.option_number === 'string' ? optionObj.option_number : 
-//                       typeof optionObj.key === 'string' ? optionObj.key :
-//                       String.fromCharCode(65 + index);
-                      
-//           const text = typeof optionObj.option_text === 'string' ? optionObj.option_text :
-//                        typeof optionObj.text === 'string' ? optionObj.text :
-//                        JSON.stringify(option);
-          
-//           return { key, text };
-//         } catch (e) {
-//           console.error('Error parsing option JSON:', e);
-//           return {
-//             key: String.fromCharCode(65 + index),
-//             text: String(option)
-//           };
-//         }
-//       });
-//     }
-    
-//     const firstItem = rawOptions[0];
-    
-//     // Check if items might be objects with different properties
-//     if (typeof firstItem === 'object' && firstItem !== null) {
-//       // Try to extract text from common properties
-//       if ('text' in firstItem || 'label' in firstItem || 'value' in firstItem || 'content' in firstItem || 
-//           'option_text' in firstItem || 'option_number' in firstItem) {
-//         return rawOptions.map((option, index) => {
-//           const typedOption = option as PossibleOptionFormat;
-//           return {
-//             key: typedOption.option_number || 
-//                  typedOption.key?.toString() || 
-//                  String.fromCharCode(65 + index), // A, B, C, etc.
-//             text: String(
-//               typedOption.option_text ||
-//               typedOption.text || 
-//               typedOption.label || 
-//               typedOption.value || 
-//               typedOption.content || 
-//               JSON.stringify(option)
-//             )
-//           };
-//         });
-//       }
-      
-//       // If object but no recognizable text property, stringify it
-//       return rawOptions.map((option, index) => ({
-//         key: String.fromCharCode(65 + index),
-//         text: JSON.stringify(option)
-//       }));
-//     }
-    
-//     // Handle primitives (strings, numbers, etc.)
-//     return rawOptions.map((option, index) => ({
-//       key: String.fromCharCode(65 + index),
-//       text: String(option)
-//     }));
-//   }
+  // If answer is an object with any of the possible properties
+  if (typeof answer === 'object' && answer !== null) {
+    const obj = answer as Record<string, unknown>;
+    return String(obj.selectedOption || obj.selection || obj.option || '');
+  }
   
-//   // Last resort - try to handle it as a single item or unknown structure
-//   return [];
-// }
+  return '';
+}
+
+// Function to normalize options to a consistent format
+function normalizeOptions(rawOptions: any[]): Option[] {
+  if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
+    return [];
+  }
+  
+  return rawOptions.map(option => {
+    // Handle direct option objects that use the expected format
+    if (typeof option === 'object' && option !== null) {
+      const key = option.option_number !== undefined 
+        ? String(option.option_number) 
+        : String(option.key || '');
+        
+      const text = typeof option.option_text === 'string' 
+        ? option.option_text 
+        : typeof option.text === 'string'
+        ? option.text
+        : '';
+        
+      return {
+        key,
+        text,
+        is_correct: !!option.is_correct
+      };
+    }
+    
+    // Fallback for unexpected formats
+    return {
+      key: '',
+      text: String(option),
+      is_correct: false
+    };
+  });
+}
+
+// Function to find the correct option based on is_correct flag
+function findCorrectOption(options: Option[]): string {
+  const correctOption = options.find(opt => opt.is_correct);
+  return correctOption ? correctOption.key : '';
+}
 
 export default function DiagramBased({ attempt }: DiagramBasedProps) {
-  // Add null checks for all potentially undefined properties
-  const rawOptions = attempt?.details?.options ?? [];
-  // Process options to handle the JSON string format
-  const options = Array.isArray(rawOptions) ? rawOptions.map(option => {
-    if (typeof option !== 'object' || option === null) {
-      return { key: 'X', text: 'Unknown option' };
-    }
-
-    // The option already has key and text properties
-    const optionObj = option as { key: string; text: string };
-    
-    // But the text property contains a JSON string
-    if (typeof optionObj.text === 'string' && optionObj.text.startsWith('{') && optionObj.text.includes('option_text')) {
-      try {
-        // Parse the JSON in the text property
-        const parsedText = JSON.parse(optionObj.text);
-        
-        // Return a new option with the actual text value
-        return {
-          key: parsedText.option_number || optionObj.key,
-          text: parsedText.option_text || 'Unknown text'
-        };
-      } catch (e) {
-        // If parsing fails, return the original
-        console.error('Error parsing option text JSON:', e);
-        return optionObj;
-      }
-    }
-    // If text is not a JSON string, return the original
-    return optionObj;
-  }) : [];
-  
-  // UPDATED: Handle all possible formats of user answer
-  // Based on your database, the user_answer has {"option":"a"} format
-  let userSelection: string | null = null;
-  
-  if (attempt?.userAnswer) {
-    if (typeof attempt.userAnswer === 'object' && attempt.userAnswer !== null) {
-      // Type guard to ensure userAnswer is an object
-      const userAnswerObj = attempt.userAnswer as OptionAnswerObject;
-      userSelection = 
-        userAnswerObj.selectedOption ||
-        userAnswerObj.selection ||
-        userAnswerObj.option ||
-        null;
-    } else if (typeof attempt.userAnswer === 'string') {
-      // Handle case where userAnswer might be a string
-      userSelection = attempt.userAnswer;
-      
-      // Try parsing if it looks like JSON
-      if (attempt.userAnswer.startsWith('{') && attempt.userAnswer.includes('option')) {
-        try {
-          const parsed = JSON.parse(attempt.userAnswer);
-          userSelection = parsed.selectedOption || parsed.selection || parsed.option || null;
-        } catch (e) {
-          console.error('Error parsing user answer:', e);
-        }
-      }
-    }
-  }
-  
-  // Similarly update correct answer handling to check all possible formats
-  let correctOption: string | null = null;
-  if (attempt?.correctAnswer) {
-    if (typeof attempt.correctAnswer === 'object' && attempt.correctAnswer !== null) {
-      // Type guard to ensure correctAnswer is an object
-      const correctAnswerObj = attempt.correctAnswer as OptionAnswerObject;
-      correctOption = 
-        correctAnswerObj.selectedOption ||
-        correctAnswerObj.selection ||
-        correctAnswerObj.option ||
-        null;
-    } else if (typeof attempt.correctAnswer === 'string') {
-      correctOption = attempt.correctAnswer;
-      
-      // Try parsing if it looks like JSON
-      if (attempt.correctAnswer.startsWith('{') && attempt.correctAnswer.includes('option')) {
-        try {
-          const parsed = JSON.parse(attempt.correctAnswer);
-          correctOption = parsed.selectedOption || parsed.selection || parsed.option || null;
-        } catch (e) {
-          console.error('Error parsing correct answer:', e);
-        }
-      }
-    }
-  }
-  
-  // Render nothing if no attempt data
   if (!attempt) {
     return null;
   }
 
-  // For debugging - remove in production
-  console.log('Raw Options:', rawOptions);
-  console.log('Normalized Options:', options);
-  console.log('User Selection:', userSelection);
-  console.log('Correct Option:', correctOption);
+  // Get options from the attempt
+  const rawOptions = attempt.details?.options || [];
+  
+  // Normalize options to consistent format
+  const options = normalizeOptions(rawOptions);
+  
+  // Extract user selection
+  const userSelection = extractSelection(attempt.userAnswer);
+  
+  // Try to get correct option from correctAnswer, or find it in options
+  let correctOption = extractSelection(attempt.correctAnswer);
+  
+  if (!correctOption) {
+    correctOption = findCorrectOption(options);
+  }
 
   return (
     <div className="space-y-4">
@@ -323,7 +214,6 @@ export default function DiagramBased({ attempt }: DiagramBasedProps) {
                     </p>
                   </div>
                   <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
-                    {/* Make the "Your answer" badge more prominent */}
                     {isUserSelection && (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">
                         Your answer

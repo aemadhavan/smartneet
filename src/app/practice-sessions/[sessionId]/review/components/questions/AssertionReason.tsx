@@ -14,7 +14,7 @@ interface QuestionOption {
   is_correct?: boolean;
   isCorrect?: boolean;
   option_text?: string;
-  option_number?: string;
+  option_number?: string | number;
   key?: string;
   text?: string;
   [key: string]: unknown;
@@ -36,6 +36,10 @@ interface QuestionAttempt {
     statement2?: string;
     options?: Array<QuestionOption>;
     statements?: Array<QuestionStatement>;
+    assertion_reason_details?: {
+      assertion_text?: string;
+      reason_text?: string;
+    };
     [key: string]: unknown;
   } | null;
   isImageBased?: boolean | null | undefined;
@@ -63,7 +67,6 @@ function extractSelection(answer: unknown): string {
                typeof parsed.option === 'string' ? parsed.option :
                typeof parsed.selectedOption === 'string' ? parsed.selectedOption : '';
       } catch (e) {
-        console.error('Failed to parse JSON:', e);
         // Not valid JSON, return the string itself if it's a single character
         if (answer.length === 1) return answer;
         return '';
@@ -105,93 +108,106 @@ function findCorrectAnswer(details: QuestionAttempt['details']): string {
       opt.is_correct === true || opt.isCorrect === true
     );
     if (correctOption) {
-      return correctOption.option_number || correctOption.key || '';
-    }
-  }
-  
-  // If there are statement elements in the JSON, try reasoning
-  // This is for questions like "A and R" type questions
-  if (details.statements && Array.isArray(details.statements)) {
-    // In many assertion reason formats, option A means both statements are true and R explains A
-    // This is a heuristic based on common patterns
-    const statementA = details.statements.find((s: QuestionStatement) => 
-      s.statement_label === 'A' || s.statement_label === 'a'
-    );
-    const statementR = details.statements.find((s: QuestionStatement) => 
-      s.statement_label === 'R' || s.statement_label === 'r'
-    );
-    
-    if (statementA?.is_correct === true && statementR?.is_correct === true) {
-      // If both statements are true, likely the first option (A) is correct
-      // This is a common pattern in assertion-reason questions
-      return 'a';
+      return String(correctOption.option_number || correctOption.key || '');
     }
   }
   
   return '';
 }
 
+// Process the details object from a string if needed
+function processDetails(details: any): any {
+  if (typeof details === 'string') {
+    try {
+      return JSON.parse(details);
+    } catch {
+      return details;
+    }
+  }
+  return details;
+}
+
 export default function AssertionReason({ attempt }: AssertionReasonProps) {
-  const userAnswer = extractSelection(attempt?.userAnswer)?.toLowerCase();
-  
-  // First try to get the correct answer from the correctAnswer property
-  let correctAnswer = extractSelection(attempt?.correctAnswer)?.toLowerCase();
-  
-  // If no correct answer was found, try to determine it from the details
-  if (!correctAnswer && attempt?.details) {
-    correctAnswer = findCorrectAnswer(attempt.details)?.toLowerCase();
+  if (!attempt) return null;
+
+  // Process details if it's a string
+  if (typeof attempt.details === 'string') {
+    attempt.details = processDetails(attempt.details);
   }
   
-  console.log('Raw user answer:', attempt?.userAnswer);
-  console.log('Extracted user answer:', userAnswer);
-  console.log('Raw correct answer:', attempt?.correctAnswer);
-  console.log('Extracted/calculated correct answer:', correctAnswer);
-  console.log('Question details:', attempt?.details);
+  // Process user answer if it's a string that looks like JSON
+  let userAnswerObj = attempt.userAnswer;
+  if (typeof userAnswerObj === 'string' && userAnswerObj.startsWith('{')) {
+    try {
+      userAnswerObj = JSON.parse(userAnswerObj);
+    } catch {}
+  }
+
+  // Process correct answer if it's a string that looks like JSON
+  let correctAnswerObj = attempt.correctAnswer;
+  if (typeof correctAnswerObj === 'string' && correctAnswerObj.startsWith('{')) {
+    try {
+      correctAnswerObj = JSON.parse(correctAnswerObj);
+    } catch {}
+  }
+  
+  // Get user selection and correct option
+  const userAnswer = extractSelection(userAnswerObj)?.toLowerCase();
+  
+  // First try to get the correct answer from the correctAnswer property
+  let correctAnswer = extractSelection(correctAnswerObj)?.toLowerCase();
+  
+  // If no correct answer was found, try to determine it from the details
+  if (!correctAnswer && attempt.details) {
+    correctAnswer = findCorrectAnswer(attempt.details)?.toLowerCase();
+  }
 
   // Get statements from the question text or details
   let statement1 = '';
   let statement2 = '';
   
-  // Try to get statements from details.statements array (common format)
-  if (attempt?.details?.statements && Array.isArray(attempt.details.statements)) {
-    const statementA = attempt.details.statements.find((s: QuestionStatement) => 
-      s.statement_label === 'A' || s.statement_label === 'a'
-    );
+  // Try to get statements from assertion_reason_details if available
+  if (attempt.details?.assertion_reason_details) {
+    const arDetails = attempt.details.assertion_reason_details;
     
-    const statementR = attempt.details.statements.find((s: QuestionStatement) => 
-      s.statement_label === 'R' || s.statement_label === 'r'
-    );
-    
-    if (statementA) {
-      statement1 = statementA.statement_text || '';
+    // Parse the assertion text to extract Statement I
+    if (arDetails.assertion_text) {
+      const assertionMatch = arDetails.assertion_text.match(/Assertion A:?\s*([^.\n]+)/i);
+      if (assertionMatch && assertionMatch[1]) {
+        statement1 = assertionMatch[1].trim();
+      }
     }
     
-    if (statementR) {
-      statement2 = statementR.statement_text || '';
+    // Parse the reason text to extract Statement II
+    if (arDetails.reason_text) {
+      const reasonMatch = arDetails.reason_text.match(/Reason R:?\s*([^.\n]+)/i);
+      if (reasonMatch && reasonMatch[1]) {
+        statement2 = reasonMatch[1].trim();
+      }
     }
   }
   
   // Fallback to standard statement fields
   if (!statement1) {
-    statement1 = attempt?.details?.statement1 || '';
+    statement1 = attempt.details?.statement1 || '';
   }
   
   if (!statement2) {
-    statement2 = attempt?.details?.statement2 || '';
+    statement2 = attempt.details?.statement2 || '';
   }
   
   // Try to extract statements from question text if they're not in the details
-  if (!statement1 && !statement2 && attempt?.questionText) {
+  if (!statement1 && !statement2 && attempt.questionText) {
     const text = attempt.questionText;
     
     // Look for patterns like "Statement A: ..." and "Statement R: ..."
-    const aMatch = text.match(/Assertion\s+A:?\s*([^.]+)/i) || 
-                  text.match(/Statement\s+I:?\s*([^.]+)/i) ||
-                  text.match(/Statement\s+A:?\s*([^.]+)/i);
+    const aMatch = text.match(/Assertion\s+A:?\s*([^.\n]+)/i) || 
+                  text.match(/Statement\s+I:?\s*([^.\n]+)/i) ||
+                  text.match(/Statement\s+A:?\s*([^.\n]+)/i);
     
-    const rMatch = text.match(/Reason\s+R:?\s*([^.]+)/i) || 
-                  text.match(/Statement\s+II:?\s*([^.]+)/i) ||
-                  text.match(/Statement\s+R:?\s*([^.]+)/i);
+    const rMatch = text.match(/Reason\s+R:?\s*([^.\n]+)/i) || 
+                  text.match(/Statement\s+II:?\s*([^.\n]+)/i) ||
+                  text.match(/Statement\s+R:?\s*([^.\n]+)/i);
     
     if (aMatch && aMatch[1]) {
       statement1 = aMatch[1].trim();
@@ -202,37 +218,29 @@ export default function AssertionReason({ attempt }: AssertionReasonProps) {
     }
   }
 
-  // Standardized options for assertion-reason questions
-  const options = [
-    {
-      key: 'A',
-      text: 'Statement I is True, Statement II is True, Statement II is a correct explanation of Statement I',
-    },
-    {
-      key: 'B',
-      text: 'Statement I is True, Statement II is True, Statement II is NOT a correct explanation of Statement I',
-    },
-    { key: 'C', text: 'Statement I is True, Statement II is False' },
-    { key: 'D', text: 'Statement I is False, Statement II is True' },
-    { key: 'E', text: 'Statement I is False, Statement II is False' },
-  ];
-
-  // If we have custom options in the details, use those instead
-  if (attempt?.details?.options && Array.isArray(attempt.details.options)) {
-    const customOptions = attempt.details.options.map((opt: QuestionOption, index: number) => ({
-      key: opt.option_number || opt.key || String.fromCharCode(65 + index),
-      text: opt.option_text || opt.text || `Option ${String.fromCharCode(65 + index)}`
+  // Get options from details
+  let options: Array<{key: string, text: string}> = [];
+  
+  if (attempt.details?.options && Array.isArray(attempt.details.options)) {
+    options = attempt.details.options.map((opt: QuestionOption) => ({
+      key: String(opt.option_number || opt.key || ''),
+      text: String(opt.option_text || opt.text || '')
     }));
-    
-    // Only use custom options if we actually found some
-    if (customOptions.length > 0) {
-      // options = customOptions;
-    }
-  }
-
-  // Render nothing if no attempt data
-  if (!attempt) {
-    return null;
+  } else {
+    // Use default options if none provided
+    options = [
+      {
+        key: '1',
+        text: 'Both A and R are true and R is the correct explanation of A'
+      },
+      {
+        key: '2',
+        text: 'Both A and R are true but R is NOT the correct explanation of A'
+      },
+      { key: '3', text: 'A is true but R is false' },
+      { key: '4', text: 'A is false but R is true' },
+      { key: '5', text: 'Both A and R are false' },
+    ];
   }
 
   return (
@@ -278,8 +286,8 @@ export default function AssertionReason({ attempt }: AssertionReasonProps) {
 
       <div className="space-y-2 mt-4">
         {options.map((option, idx) => {
-          const isUserSelection = userAnswer && userAnswer.toUpperCase() === option.key.toUpperCase();
-          const isCorrectOption = correctAnswer && correctAnswer.toUpperCase() === option.key.toUpperCase();
+          const isUserSelection = userAnswer && userAnswer === String(option.key).toLowerCase();
+          const isCorrectOption = correctAnswer && correctAnswer === String(option.key).toLowerCase();
           const isCorrectSelection = isUserSelection && isCorrectOption;
           const isIncorrectSelection = isUserSelection && !isCorrectOption;
 
@@ -337,7 +345,6 @@ export default function AssertionReason({ attempt }: AssertionReasonProps) {
                   </p>
                 </div>
                 <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
-                  {/* Make the "Your answer" badge more prominent */}
                   {isUserSelection && (
                     <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">
                       Your answer
