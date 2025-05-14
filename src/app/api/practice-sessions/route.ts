@@ -65,12 +65,20 @@ export async function POST(request: NextRequest) {
 
     // Try to get data from request body or URL parameters
     let requestData;
-    try {
-      requestData = await request.json();
-      console.log('Using JSON body:', requestData);
-    } catch (e) {
-      // If JSON parsing fails, try to get from URL parameters
-      console.log('Error parsing JSON, trying URL parameters:', e);
+    const requestBody = await request.text(); // Read the request body as text
+    
+    if (requestBody) {
+      try {
+        requestData = await request.json();
+        console.log('Using JSON body:', requestData);
+      } catch (e) {
+        // If JSON parsing fails, try to get from URL parameters
+        console.log('Error parsing JSON, trying URL parameters:', e);
+        // Proceed to extract parameters from URL
+      }
+    }
+    
+    if (!requestBody || !requestData) {
       const searchParams = request.nextUrl.searchParams;
       
       // Parse and validate numeric parameters

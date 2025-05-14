@@ -256,12 +256,12 @@ export function QuestionDisplay({
           Previous
         </button>
 
-        <button
+        {/* <button
           onClick={() => setShowExplanation(!showExplanation)}
           className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-100 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800"
         >
           {showExplanation ? 'Hide Explanation' : 'Show Explanation'}
-        </button>
+        </button> */}
 
         <button
             onClick={isLastQuestion ? 
