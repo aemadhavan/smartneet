@@ -1,184 +1,63 @@
-// MultipleCorrect.tsx
+// src/app/practice-sessions/[sessionId]/review/components/questions/MultipleCorrect.tsx
+
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { MultipleCorrectDetails, MultipleCorrectAnswer } from '../interfaces';
 
-interface Statement {
-  key: string;
-  text: string;
-  isCorrect: boolean;
-}
-
-interface Option {
-  key: string;
-  text: string;
-  isCorrect: boolean;
-}
-
-interface MultipleCorrectAttempt {
-  questionText?: string;
-  details?: {
-    options?: Array<{
-      is_correct?: boolean;
-      isCorrect?: boolean;
-      option_text?: string;
-      option_number?: string | number;
-      text?: string;
-      key?: string;
-    }>;
-    statement_details?: {
-      statements?: Array<{
-        is_correct?: boolean;
-        isCorrect?: boolean;
-        statement_text?: string;
-        statement_label?: string;
-        statement_number?: number;
-      }>;
-      intro_text?: string;
-    };
-    statements?: Array<{
-      key?: string;
-      text?: string;
-      isCorrect?: boolean;
-      is_correct?: boolean;
-    }>;
-  } | null;
+interface MultipleCorrectProps {
+  details: MultipleCorrectDetails;
+  userAnswer: MultipleCorrectAnswer;
+  correctAnswer: MultipleCorrectAnswer;
   isImageBased?: boolean;
   imageUrl?: string;
-  userAnswer?: string | object | string[];   // Flexible type to handle various formats
-  correctAnswer?: string | object | string[]; // Flexible type to handle various formats
+  questionText?: string;
 }
 
-export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectAttempt }) {
-  if (!attempt) return null;
+/**
+ * Component for rendering Multiple Correct Statements questions
+ */
+export default function MultipleCorrect({ 
+  details, 
+  userAnswer, 
+  correctAnswer, 
+  isImageBased,
+  imageUrl,
+  questionText
+}: MultipleCorrectProps) {
+  // Get direct values from normalized data
+  const userSelectedStatements = userAnswer.selectedStatements || [];
+  const correctSelectedStatements = correctAnswer.selectedStatements || [];
+  const options = details.options;
+  const statements = details.statements || [];
+  const introText = details.introText || '';
 
-  // Extract user selected option
-  const getUserSelectedOption = (userAnswer: string | object | string[] | null | undefined): string => {
-    if (!userAnswer) return '';
-    
-    // Direct string option number
-    if (typeof userAnswer === 'string' && /^\d+$/.test(userAnswer)) {
-      return userAnswer;
-    }
-    
-    // Object with selection property
-    if (typeof userAnswer === 'object' && userAnswer !== null) {
-      if ('selection' in userAnswer) return String((userAnswer as { selection?: string }).selection || '');
-      if ('selectedOption' in userAnswer) return String((userAnswer as { selectedOption?: string }).selectedOption || '');
-      if ('option' in userAnswer) return String((userAnswer as { option?: string }).option || '');
-    }
-    
-    // Might be a JSON string
-    if (typeof userAnswer === 'string' && userAnswer.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(userAnswer);
-        if ('selection' in parsed) return String((parsed as { selection?: string }).selection || '');
-        if ('selectedOption' in parsed) return String((parsed as { selectedOption?: string }).selectedOption || '');
-        if ('option' in parsed) return String((parsed as { option?: string }).option || '');
-      } catch {
-        // Not JSON or invalid JSON
-      }
-    }
-    
-    return '';
-  };
-
-  // Extract user selected statements (for direct statement selection mode)
-  const getUserSelectedStatements = (userAnswer: string | object | string[] | null | undefined): string[] => {
-    if (!userAnswer) return [];
-    
-    // Direct array of statement keys
-    if (Array.isArray(userAnswer)) {
-      return userAnswer.map(String);
-    }
-    
-    // Object with selectedStatements property
-    if (typeof userAnswer === 'object' && userAnswer !== null && 'selectedStatements' in userAnswer) {
-      const selectedStatements = (userAnswer as { selectedStatements?: string[] }).selectedStatements;
-      return Array.isArray(selectedStatements) ? 
-        selectedStatements.map(String) : [];
-    }
-    
-    // Might be a JSON string
-    if (typeof userAnswer === 'string' && (userAnswer.startsWith('[') || userAnswer.startsWith('{'))) {
-      try {
-        const parsed = JSON.parse(userAnswer);
-        if (Array.isArray(parsed)) {
-          return parsed.map(String);
-        }
-        if (typeof parsed === 'object' && parsed !== null && 'selectedStatements' in parsed) {
-          const selectedStatements = (parsed as { selectedStatements?: string[] }).selectedStatements;
-          return Array.isArray(selectedStatements) ? 
-            selectedStatements.map(String) : [];
-        }
-      } catch {
-        // Not JSON or invalid JSON
-      }
-    }
-    
-    return [];
-  };
-
-  // Process statements from the appropriate source
-  let statements: Statement[] = [];
-  if (attempt.details?.statement_details?.statements) {
-    statements = attempt.details.statement_details.statements.map(stmt => ({
-      key: stmt.statement_label || '',
-      text: stmt.statement_text || '',
-      isCorrect: stmt.is_correct || stmt.isCorrect || false
-    }));
-  } else if (attempt.details?.statements) {
-    statements = attempt.details.statements.map(stmt => ({
-      key: stmt.key || '',
-      text: stmt.text || '',
-      isCorrect: stmt.isCorrect || stmt.is_correct || false
-    }));
-  }
-
-  // Process options
-  const options: Option[] = (attempt.details?.options || []).map(opt => ({
-    key: String(opt.option_number || opt.key || ''),
-    text: opt.option_text || opt.text || '',
-    isCorrect: opt.is_correct || opt.isCorrect || false
-  }));
-
-  // Get the user's selected option and the correct option
-  const userSelectedOption = getUserSelectedOption(attempt.userAnswer);
-  
-  // For statement-based selection, get individual statement selection
-  const userSelectedStatements = getUserSelectedStatements(attempt.userAnswer);
-  
-  // Determine display mode: show both statements and options
-  const showStatements = statements.length > 0;
-  const showOptions = options.length > 0;
-  
   // For multiple correct statements, we might have text like "B and D only" as the option
-  // Let's try to extract which statements are mentioned in each option
+  // Let's extract which statements are mentioned in each option
   const parseOptionText = (optionText: string): string[] => {
     // Look for patterns like "A, B and C only" or "B and D only"
-    const matches = optionText.match(/([A-Z](?:,\s*[A-Z])*\s+and\s+[A-Z])/i);
-    if (matches) {
-      // Extract individual letters
-      const letterMatches = optionText.match(/[A-Z]/g);
-      return letterMatches || [];
-    }
-    return [];
+    const letterMatches = optionText.match(/[A-Z]/g);
+    return letterMatches || [];
   };
   
   // Find which statements are mentioned in the user's selected option
-  const userSelectedOptionObj = options.find(opt => opt.key === userSelectedOption);
+  const userSelectedOptionObj = options.find(opt => 
+    userSelectedStatements.includes(opt.id)
+  );
+  
+  // Extract statements referenced in the selected option
   const statementsInUserSelection = userSelectedOptionObj ? 
     parseOptionText(userSelectedOptionObj.text) : [];
 
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText || 'No question text available'}
+        {questionText ?? introText ?? 'No question text available'}
       </div>
       
-      {attempt.isImageBased && attempt.imageUrl && (
+      {isImageBased && imageUrl && (
         <div className="my-4">
           <Image
-            src={attempt.imageUrl}
+            src={imageUrl}
             alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
             width={500}
@@ -191,15 +70,14 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
         </div>
       )}
       
-      {/* Display statements if available */}
-      {showStatements && (
+      {/* Display statements */}
+      {statements.length > 0 && (
         <div className="mt-4">
           <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Statements:</h3>
           <div className="space-y-2">
             {statements.map((statement, idx) => {
               // Check if this statement is selected directly or through option
-              const isSelected = userSelectedStatements.includes(statement.key) || 
-                               statementsInUserSelection.includes(statement.key);
+              const isSelected = statementsInUserSelection.includes(statement.id);
               const isCorrect = statement.isCorrect;
               
               return (
@@ -226,7 +104,7 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
                           ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                       }`}>
-                        {statement.key}
+                        {statement.id}
                       </div>
                     </div>
                     <div className="flex-1">
@@ -262,14 +140,14 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
         </div>
       )}
       
-      {/* Display your selection section */}
-      {showOptions && (
+      {/* Display options section */}
+      {options.length > 0 && (
         <div className="mt-6">
           <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Your Selection:</h3>
           <div className="space-y-2">
             {options.map((option, idx) => {
-              const isSelected = userSelectedOption === option.key;
-              const isCorrect = option.isCorrect;
+              const isSelected = userSelectedStatements.includes(option.id);
+              const isCorrect = correctSelectedStatements.includes(option.id) || option.isCorrect;
               
               return (
                 <div
@@ -295,7 +173,7 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
                           ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                       }`}>
-                        {option.key}
+                        {option.id}
                       </div>
                     </div>
                     <div className="flex-1">

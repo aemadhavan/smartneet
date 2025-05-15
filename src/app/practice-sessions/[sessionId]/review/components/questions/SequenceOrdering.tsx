@@ -1,147 +1,57 @@
+// src/app/practice-sessions/[sessionId]/review/components/questions/SequenceOrdering.tsx
+
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
-
-// Interfaces for more specific typing
-interface SequenceItem {
-  item_number: number;
-  item_label: string;
-  item_text: string;
-}
-
-interface SequenceOption {
-  is_correct: boolean;
-  option_text: string;
-  option_number: number;
-}
-
-interface SequenceDetails {
-  items?: SequenceItem[] | null;
-  intro_text: string;
-  correct_sequence: number[];
-}
-
-interface QuestionAttempt {
-  questionText?: string;
-  details?: {
-    options?: SequenceOption[];
-    sequence_details?: SequenceDetails;
-    [key: string]: unknown;
-  } | null;
-  isImageBased?: boolean;
-  imageUrl?: string;
-  userAnswer?: string | { selectedOption?: string | number } | null;
-  correctAnswer?: string | { option?: string | number } | null;
-}
+import { SequenceOrderingDetails, SequenceOrderingAnswer } from '../interfaces';
 
 interface SequenceOrderingProps {
-  attempt: QuestionAttempt;
+  details: SequenceOrderingDetails;
+  userAnswer: SequenceOrderingAnswer;
+  correctAnswer: SequenceOrderingAnswer;
+  isImageBased?: boolean;
+  imageUrl?: string;
+  questionText?: string;
 }
 
-// Helper function to extract selection from various answer formats
-function extractSelection(answer: unknown): string {
-  if (!answer) return '';
-  
-  // If answer is a string
-  if (typeof answer === 'string') {
-    // If it looks like JSON, try to parse it
-    if (answer.startsWith('{') && answer.includes('"selectedOption"')) {
-      try {
-        const parsed = JSON.parse(answer);
-        return typeof parsed.selectedOption === 'string' || typeof parsed.selectedOption === 'number' 
-          ? String(parsed.selectedOption) 
-          : '';
-      } catch (e) {
-        // Not valid JSON, return the string itself if it's a single character or number
-        if (/^\d+$/.test(answer)) return answer;
-      }
-    }
-    // If it's a number as string, it might be a direct selection
-    if (/^\d+$/.test(answer)) return answer;
-  }
-  
-  // If answer is an object with any of the possible properties
-  if (typeof answer === 'object' && answer !== null) {
-    if ('selectedOption' in answer) {
-      const selectedOption = (answer as { selectedOption?: string | number }).selectedOption;
-      return selectedOption !== undefined ? String(selectedOption) : '';
-    }
-    
-    if ('option' in answer) {
-      const option = (answer as { option?: string | number }).option;
-      return option !== undefined ? String(option) : '';
-    }
-  }
-  
-  return '';
-}
+/**
+ * Component for rendering Sequence Ordering questions
+ */
+export default function SequenceOrdering({ 
+  details, 
+  userAnswer, 
+  correctAnswer, 
+  isImageBased,
+  imageUrl,
+  questionText
+}: SequenceOrderingProps) {
+  // Get direct values from normalized data
+  const userSelectedOption = userAnswer.selectedOption || '';
+  const correctSelectedOption = correctAnswer.selectedOption || '';
+  const correctSequence = correctAnswer.sequence || details.correctSequence || [];
+  const options = details.options;
+  const introText = details.introText || '';
+  const items = details.items || [];
 
-// Process the details object from a string if needed
-function processDetails(details: any) {
-  if (typeof details === 'string') {
-    try {
-      return JSON.parse(details);
-    } catch {
-      return details;
-    }
-  }
-  return details;
-}
-
-export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
-  if (!attempt) return null;
-
-  // Process details if it's a string
-  if (typeof attempt.details === 'string') {
-    attempt.details = processDetails(attempt.details) as any;
-  }
+  // Find correct option based on isCorrect flag if correctSelectedOption is not provided
+  const correctOptionFromFlag = options.find(opt => opt.isCorrect)?.id || '';
   
-  // Process user answer if it's a string that looks like JSON
-  let userAnswerObj = attempt.userAnswer;
-  if (typeof userAnswerObj === 'string' && userAnswerObj.startsWith('{')) {
-    try {
-      userAnswerObj = JSON.parse(userAnswerObj);
-    } catch {}
-  }
-
-  // Process correct answer if it's a string that looks like JSON
-  let correctAnswerObj = attempt.correctAnswer;
-  if (typeof correctAnswerObj === 'string' && correctAnswerObj.startsWith('{')) {
-    try {
-      correctAnswerObj = JSON.parse(correctAnswerObj);
-    } catch {}
-  }
-  
-  // Get user selection and correct option
-  const userAnswer = extractSelection(userAnswerObj);
-  const correctOption = extractSelection(correctAnswerObj);
-  
-  // Get options and sequence details from attempt
-  const options = attempt.details?.options || [];
-  const sequenceDetails = attempt.details?.sequence_details;
-  
-  // Find the correct option from the options array if not specified in correctAnswer
-  const correctOptionFromOptions = options.find(opt => opt.is_correct)?.option_number.toString() || '';
-  
-  // Use the specified correct answer or fall back to the one from options
-  const correctOptionNumber = correctOption || correctOptionFromOptions;
-  
-  // Get the intro text
-  const introText = sequenceDetails?.intro_text || attempt.questionText || 'Arrange the items in the correct sequence:';
+  // Use provided correct option or fall back to one determined from flags
+  const correctOption = correctSelectedOption || correctOptionFromFlag;
 
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {introText}
+        {questionText ?? introText ?? 'No question text available'}
       </div>
-
-      {attempt.isImageBased && attempt.imageUrl && (
+      
+      {isImageBased && imageUrl && (
         <div className="my-4">
           <Image
-            src={attempt.imageUrl}
+            src={imageUrl}
             alt="Question diagram"
+            className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
             width={500}
             height={300}
-            className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
             style={{
               maxWidth: '100%',
               height: 'auto',
@@ -149,41 +59,39 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
           />
         </div>
       )}
-
+      
+      {/* Display options */}
       <div className="space-y-2 mt-4">
         {options.map((option, idx) => {
-          const isUserSelection = userAnswer === option.option_number.toString();
-          const isCorrectOption = correctOptionNumber === option.option_number.toString();
+          // Determine the status of this option
+          const isUserSelection = userSelectedOption === option.id;
+          const isCorrectOption = correctOption === option.id || option.isCorrect;
           const isCorrectSelection = isUserSelection && isCorrectOption;
           const isIncorrectSelection = isUserSelection && !isCorrectOption;
-
-          // Determine styling based on status
+          
+          // Style determination logic
           let bgColorClass = 'bg-gray-50 dark:bg-gray-800';
           let borderColorClass = 'border-gray-200 dark:border-gray-700';
           let textColorClass = 'text-gray-700 dark:text-gray-300';
           
           if (isCorrectSelection) {
-            // User selected correctly
             bgColorClass = 'bg-green-50 dark:bg-green-900/20';
             borderColorClass = 'border-green-300 dark:border-green-700';
             textColorClass = 'text-green-800 dark:text-green-300';
           } else if (isIncorrectSelection) {
-            // User selected incorrectly
             bgColorClass = 'bg-red-50 dark:bg-red-900/20';
             borderColorClass = 'border-red-300 dark:border-red-700';
             textColorClass = 'text-red-800 dark:text-red-300';
           } else if (isCorrectOption) {
-            // This is the correct option (but not selected)
             bgColorClass = 'bg-green-50 dark:bg-green-900/20';
             borderColorClass = 'border-green-300 dark:border-green-700';
             textColorClass = 'text-green-800 dark:text-green-300';
           } else if (isUserSelection) {
-            // User selection that isn't already handled
             bgColorClass = 'bg-blue-50 dark:bg-blue-900/20';
             borderColorClass = 'border-blue-300 dark:border-blue-700';
             textColorClass = 'text-blue-800 dark:text-blue-300';
           }
-
+          
           return (
             <div
               key={idx}
@@ -202,12 +110,12 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
                       ? 'bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300'
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
                   }`}>
-                    {option.option_number}
+                    {option.id}
                   </div>
                 </div>
                 <div className="flex-1">
                   <p className={`${textColorClass} font-medium`}>
-                    {option.option_text}
+                    {option.text}
                   </p>
                 </div>
                 <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
@@ -233,32 +141,37 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
           );
         })}
       </div>
-
-      {/* If the sequence_details contains individual items, we can show them separately */}
-      {sequenceDetails?.items && sequenceDetails.items.length > 0 && (
+      
+      {/* Display sequence items if available */}
+      {items.length > 0 && (
         <div className="mt-6">
           <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Sequence Items:</h3>
           <div className="grid grid-cols-1 gap-2">
-            {sequenceDetails.items.map((item, idx) => (
+            {items.map((item, idx) => (
               <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center">
-                  <span className="font-medium text-gray-700 dark:text-gray-300 mr-2">{item.item_label || item.item_number}:</span>
-                  <span className="text-gray-600 dark:text-gray-400">{item.item_text}</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300 mr-2">{item.id}:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{item.text}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      {/* If correct_sequence is available, show the correct ordering */}
-      {sequenceDetails?.correct_sequence && sequenceDetails.correct_sequence.length > 0 && !correctOptionNumber && (
+      
+      {/* Display correct sequence if available and not already shown through options */}
+      {correctSequence.length > 0 && !correctOption && (
         <div className="mt-6 p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-800">
           <h3 className="font-medium text-green-800 dark:text-green-300 mb-2">Correct Sequence:</h3>
           <div className="flex flex-wrap gap-2">
-            {sequenceDetails.correct_sequence.map((itemNum, idx) => (
-              <div key={idx} className="px-3 py-1 bg-green-100 dark:bg-green-800/40 rounded-full text-green-800 dark:text-green-300 font-medium">
-                {idx > 0 ? " → " : ""}{itemNum}
+            {correctSequence.map((item, idx) => (
+              <div key={idx} className="flex items-center">
+                {idx > 0 && (
+                  <span className="text-green-600 dark:text-green-400 mx-1">→</span>
+                )}
+                <div className="px-3 py-1 bg-green-100 dark:bg-green-800/40 rounded-full text-green-800 dark:text-green-300 font-medium">
+                  {item}
+                </div>
               </div>
             ))}
           </div>
