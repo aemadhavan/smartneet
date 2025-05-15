@@ -44,15 +44,15 @@ interface MultipleCorrectAttempt {
   } | null;
   isImageBased?: boolean;
   imageUrl?: string;
-  userAnswer?: any;   // Flexible type to handle various formats
-  correctAnswer?: any; // Flexible type to handle various formats
+  userAnswer?: string | object | string[];   // Flexible type to handle various formats
+  correctAnswer?: string | object | string[]; // Flexible type to handle various formats
 }
 
 export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectAttempt }) {
   if (!attempt) return null;
 
   // Extract user selected option
-  const getUserSelectedOption = (userAnswer: any): string => {
+  const getUserSelectedOption = (userAnswer: string | object | string[] | null | undefined): string => {
     if (!userAnswer) return '';
     
     // Direct string option number
@@ -62,18 +62,18 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
     
     // Object with selection property
     if (typeof userAnswer === 'object' && userAnswer !== null) {
-      if ('selection' in userAnswer) return String(userAnswer.selection);
-      if ('selectedOption' in userAnswer) return String(userAnswer.selectedOption);
-      if ('option' in userAnswer) return String(userAnswer.option);
+      if ('selection' in userAnswer) return String((userAnswer as { selection?: string }).selection || '');
+      if ('selectedOption' in userAnswer) return String((userAnswer as { selectedOption?: string }).selectedOption || '');
+      if ('option' in userAnswer) return String((userAnswer as { option?: string }).option || '');
     }
     
     // Might be a JSON string
     if (typeof userAnswer === 'string' && userAnswer.startsWith('{')) {
       try {
         const parsed = JSON.parse(userAnswer);
-        if ('selection' in parsed) return String(parsed.selection);
-        if ('selectedOption' in parsed) return String(parsed.selectedOption);
-        if ('option' in parsed) return String(parsed.option);
+        if ('selection' in parsed) return String((parsed as { selection?: string }).selection || '');
+        if ('selectedOption' in parsed) return String((parsed as { selectedOption?: string }).selectedOption || '');
+        if ('option' in parsed) return String((parsed as { option?: string }).option || '');
       } catch {
         // Not JSON or invalid JSON
       }
@@ -83,7 +83,7 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
   };
 
   // Extract user selected statements (for direct statement selection mode)
-  const getUserSelectedStatements = (userAnswer: any): string[] => {
+  const getUserSelectedStatements = (userAnswer: string | object | string[] | null | undefined): string[] => {
     if (!userAnswer) return [];
     
     // Direct array of statement keys
@@ -93,8 +93,9 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
     
     // Object with selectedStatements property
     if (typeof userAnswer === 'object' && userAnswer !== null && 'selectedStatements' in userAnswer) {
-      return Array.isArray(userAnswer.selectedStatements) ? 
-        userAnswer.selectedStatements.map(String) : [];
+      const selectedStatements = (userAnswer as { selectedStatements?: string[] }).selectedStatements;
+      return Array.isArray(selectedStatements) ? 
+        selectedStatements.map(String) : [];
     }
     
     // Might be a JSON string
@@ -105,8 +106,9 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
           return parsed.map(String);
         }
         if (typeof parsed === 'object' && parsed !== null && 'selectedStatements' in parsed) {
-          return Array.isArray(parsed.selectedStatements) ? 
-            parsed.selectedStatements.map(String) : [];
+          const selectedStatements = (parsed as { selectedStatements?: string[] }).selectedStatements;
+          return Array.isArray(selectedStatements) ? 
+            selectedStatements.map(String) : [];
         }
       } catch {
         // Not JSON or invalid JSON
@@ -114,12 +116,6 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
     }
     
     return [];
-  };
-
-  // Find correct option key
-  const getCorrectOptionKey = (options: Option[]): string => {
-    const correctOption = options.find(opt => opt.isCorrect);
-    return correctOption ? correctOption.key : '';
   };
 
   // Process statements from the appropriate source
@@ -147,7 +143,6 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
 
   // Get the user's selected option and the correct option
   const userSelectedOption = getUserSelectedOption(attempt.userAnswer);
-  const correctOptionKey = getCorrectOptionKey(options);
   
   // For statement-based selection, get individual statement selection
   const userSelectedStatements = getUserSelectedStatements(attempt.userAnswer);
@@ -168,12 +163,6 @@ export default function MultipleCorrect({ attempt }: { attempt: MultipleCorrectA
     }
     return [];
   };
-  
-  // Map options to the statements they include
-  const optionsWithParsedStatements = options.map(option => ({
-    ...option,
-    mentionedStatements: parseOptionText(option.text)
-  }));
   
   // Find which statements are mentioned in the user's selected option
   const userSelectedOptionObj = options.find(opt => opt.key === userSelectedOption);

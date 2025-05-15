@@ -41,7 +41,7 @@ export function QuestionDisplay({
   onPreviousQuestion,
   currentQuestionIndex
 }: QuestionDisplayProps) {
-  const [showExplanation, setShowExplanation] = useState(false);
+  const [showExplanation] = useState(false);
 
   // Helper to handle potential JSON strings in the details property
   const parseDetails = (details: string | QuestionDetails): QuestionDetails => {

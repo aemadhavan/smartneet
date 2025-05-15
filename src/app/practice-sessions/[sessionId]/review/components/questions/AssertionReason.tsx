@@ -66,7 +66,7 @@ function extractSelection(answer: unknown): string {
         return typeof parsed.selection === 'string' ? parsed.selection : 
                typeof parsed.option === 'string' ? parsed.option :
                typeof parsed.selectedOption === 'string' ? parsed.selectedOption : '';
-      } catch (e) {
+      } catch {
         // Not valid JSON, return the string itself if it's a single character
         if (answer.length === 1) return answer;
         return '';
@@ -115,13 +115,26 @@ function findCorrectAnswer(details: QuestionAttempt['details']): string {
   return '';
 }
 
+// Define a flexible type for question details
+type FlexibleQuestionDetails = {
+  statement1?: string;
+  statement2?: string;
+  options?: Array<QuestionOption>;
+  statements?: Array<QuestionStatement>;
+  assertion_reason_details?: {
+    assertion_text?: string;
+    reason_text?: string;
+  };
+  [key: string]: unknown;
+};
+
 // Process the details object from a string if needed
-function processDetails(details: any): any {
+function processDetails(details: FlexibleQuestionDetails | string): FlexibleQuestionDetails {
   if (typeof details === 'string') {
     try {
       return JSON.parse(details);
     } catch {
-      return details;
+      return { error: 'Invalid JSON format', raw: details } as unknown as FlexibleQuestionDetails;
     }
   }
   return details;

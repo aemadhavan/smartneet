@@ -20,7 +20,7 @@ interface OptionAnswerObject {
 interface DiagramBasedQuestionAttempt {
   questionText?: string;
   details?: {
-    options?: any[]; // Keep this flexible to handle different formats
+    options?: unknown[]; // Keep this flexible to handle different formats
     [key: string]: unknown;
   } | null;
   isImageBased?: boolean | null | undefined;
@@ -67,8 +67,18 @@ function extractSelection(answer: unknown): string {
   return '';
 }
 
+// Define a type for the expected option format
+type RawOption = {
+  option_number?: string | number;
+  key?: string;
+  option_text?: string;
+  text?: string;
+  is_correct?: boolean;
+  [key: string]: unknown;
+};
+
 // Function to normalize options to a consistent format
-function normalizeOptions(rawOptions: any[]): Option[] {
+function normalizeOptions(rawOptions: unknown[]): Option[] {
   if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
     return [];
   }
@@ -76,20 +86,21 @@ function normalizeOptions(rawOptions: any[]): Option[] {
   return rawOptions.map(option => {
     // Handle direct option objects that use the expected format
     if (typeof option === 'object' && option !== null) {
-      const key = option.option_number !== undefined 
-        ? String(option.option_number) 
-        : String(option.key || '');
+      const rawOption = option as RawOption;
+      const key = rawOption.option_number !== undefined 
+        ? String(rawOption.option_number) 
+        : String(rawOption.key || '');
         
-      const text = typeof option.option_text === 'string' 
-        ? option.option_text 
-        : typeof option.text === 'string'
-        ? option.text
+      const text = typeof rawOption.option_text === 'string' 
+        ? rawOption.option_text 
+        : typeof rawOption.text === 'string'
+        ? rawOption.text
         : '';
         
       return {
         key,
         text,
-        is_correct: !!option.is_correct
+        is_correct: !!rawOption.is_correct
       };
     }
     

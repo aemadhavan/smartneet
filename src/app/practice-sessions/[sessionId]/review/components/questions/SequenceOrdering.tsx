@@ -76,7 +76,7 @@ function extractSelection(answer: unknown): string {
 }
 
 // Process the details object from a string if needed
-function processDetails(details: any): any {
+function processDetails(details: any) {
   if (typeof details === 'string') {
     try {
       return JSON.parse(details);
@@ -92,7 +92,7 @@ export default function SequenceOrdering({ attempt }: SequenceOrderingProps) {
 
   // Process details if it's a string
   if (typeof attempt.details === 'string') {
-    attempt.details = processDetails(attempt.details);
+    attempt.details = processDetails(attempt.details) as any;
   }
   
   // Process user answer if it's a string that looks like JSON
