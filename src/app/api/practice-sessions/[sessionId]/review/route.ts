@@ -17,6 +17,41 @@ import {
   NormalizedAnswer 
 } from '@/app/practice-sessions/[sessionId]/review/components/interfaces';
 
+// Add connection pooling and retry logic
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000;
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastError: Error;
+  let attempt = 0;
+  
+  while (attempt < MAX_RETRIES) {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      lastError = error as Error;
+      
+      // Check if it's a concurrency limit error
+      if (
+        typeof error === 'object' && 
+        error !== null && 
+        ('code' in error && error.code === 'XATA_CONCURRENCY_LIMIT' || 
+         ('message' in error && typeof error.message === 'string' && 
+          error.message.includes('concurrent connections limit exceeded')))
+      ) {
+        attempt++;
+        console.log(`Connection limit exceeded, retrying in ${RETRY_DELAY * attempt}ms (attempt ${attempt}/${MAX_RETRIES})`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
+      } else {
+        // For other errors, don't retry
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError!;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -37,11 +72,13 @@ export async function GET(
     }
 
     // First verify that the session belongs to this user
-    const session = await db.query.practice_sessions.findFirst({
-      where: and(
-        eq(practice_sessions.session_id, sessionId),
-        eq(practice_sessions.user_id, userId)
-      ),
+    const session = await withRetry(async () => {
+      return db.query.practice_sessions.findFirst({
+        where: and(
+          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.user_id, userId)
+        ),
+      });
     });
 
     if (!session) {
@@ -52,28 +89,30 @@ export async function GET(
     }
 
     // Get all question attempts for this session
-    const attempts = await db.query.question_attempts.findMany({
-      where: and(
-        eq(question_attempts.session_id, sessionId),
-        eq(question_attempts.user_id, userId)
-      ),
-      orderBy: question_attempts.attempt_timestamp,
-      with: {
-        question: {
-          columns: {
-            question_id: true,
-            question_text: true,
-            question_type: true,
-            details: true,
-            explanation: true,
-            marks: true,
-            topic_id: true,
-            subtopic_id: true,
-            is_image_based: true,
-            image_url: true
+    const attempts = await withRetry(async () => {
+      return db.query.question_attempts.findMany({
+        where: and(
+          eq(question_attempts.session_id, sessionId),
+          eq(question_attempts.user_id, userId)
+        ),
+        orderBy: question_attempts.attempt_timestamp,
+        with: {
+          question: {
+            columns: {
+              question_id: true,
+              question_text: true,
+              question_type: true,
+              details: true,
+              explanation: true,
+              marks: true,
+              topic_id: true,
+              subtopic_id: true,
+              is_image_based: true,
+              image_url: true
+            }
           }
         }
-      }
+      });
     });
 
     if (!attempts.length) {
@@ -199,6 +238,22 @@ export async function GET(
     return NextResponse.json(safeData);
   } catch (error) {
     console.error('Error in session review API:', error);
+    
+    // Add specific handling for concurrency errors
+    if (
+      error instanceof Error && 
+      (error.message.includes('concurrent connections limit') || 
+       (typeof error === 'object' && 
+        error !== null && 
+        'code' in error && 
+        error.code === 'XATA_CONCURRENCY_LIMIT'))
+    ) {
+      return NextResponse.json(
+        { error: 'Database is busy, please try again shortly' },
+        { status: 503 }  // Service Unavailable
+      );
+    }
+    
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to retrieve session review data' },
       { status: 500 }
