@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         }).returning();
       });
 
-      // Get personalized questions based on user's history and chosen parameters
+      // Get personalized questions
       const sessionQuestions = await withRetry(async () => {
         return getPersonalizedQuestions(
           userId, 
@@ -199,8 +199,26 @@ export async function POST(request: NextRequest) {
 
       // Add questions to the session
       await withRetry(async () => {
-        return Promise.all(sessionQuestions.map((question, index) => 
-          db.insert(session_questions).values({
+        // Use a Set to track question IDs and prevent duplicates
+        const questionIdSet = new Set<number>();
+        const valuesToInsert: {
+          session_id: number;
+          question_id: number;
+          question_order: number;
+          is_bookmarked: boolean;
+          time_spent_seconds: number;
+          user_id: string;
+          topic_id: number;
+        }[] = [];
+        
+        sessionQuestions.forEach((question, index) => {
+          // Skip duplicate questions
+          if (questionIdSet.has(question.question_id)) {
+            return;
+          }
+          
+          questionIdSet.add(question.question_id);
+          valuesToInsert.push({
             session_id: newSession.session_id,
             question_id: question.question_id,
             question_order: index + 1,
@@ -208,8 +226,15 @@ export async function POST(request: NextRequest) {
             time_spent_seconds: 0,
             user_id: userId,
             topic_id: question.topic_id
-          })
-        ));
+          });
+        });
+        
+        // Use a transaction to ensure atomicity
+        return db.transaction(async (tx) => {
+          for (const values of valuesToInsert) {
+            await tx.insert(session_questions).values(values);
+          }
+        });
       });
 
       // Increment test usage for subscription tracking
