@@ -11,11 +11,11 @@ interface QuestionClientPartProps {
 export default function QuestionClientPart({ questionId }: QuestionClientPartProps) {
   const { toast } = useToast();
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
-
+  
   // Function to validate an answer
-  const submitAnswer = async (_questionId: number, _selectedOption: string): Promise<boolean> => {
+  const submitAnswer = async (): Promise<boolean> => {
     // We use questionId from props for the actual logic
-    const numericQuestionId = Number(questionId); 
+    const numericQuestionId = Number(questionId);
     try {
       // Simulate API call with delay
       await new Promise(resolve => setTimeout(resolve, 500));
