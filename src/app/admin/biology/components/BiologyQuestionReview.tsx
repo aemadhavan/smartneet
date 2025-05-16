@@ -1,7 +1,8 @@
 // src/app/admin/biology/components/BiologyQuestionReview.tsx
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React from 'react';
+
 import Image from 'next/image';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
@@ -24,9 +25,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import React from 'react';
+
 import EditQuestionModal from './EditQuestionModal';
 import { toast } from "@/components/ui/use-toast";
+
 
 // Type definitions based on your database schema
 interface Topic {
@@ -106,22 +108,22 @@ interface Filters {
 
 export default function BiologyQuestionReview() {
   // State for data
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
-  const [filteredSubtopics, setFilteredSubtopics] = useState<Subtopic[]>([]);
+  const [questions, setQuestions] = React.useState<Question[]>([]);
+  const [topics, setTopics] = React.useState<Topic[]>([]);
+  const [subtopics, setSubtopics] = React.useState<Subtopic[]>([]);
+  const [filteredSubtopics, setFilteredSubtopics] = React.useState<Subtopic[]>([]);
   
   // State for pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(1);
+  const [totalItems, setTotalItems] = React.useState(0);
+  const [pageSize, setPageSize] = React.useState(10);
   
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [selectedQuestion, setSelectedQuestion] = React.useState<Question | null>(null);
 
   // State for filters
-  const [filters, setFilters] = useState<Filters>({
+  const [filters, setFilters] = React.useState<Filters>({
     topic_id: null,
     subtopic_id: null,
     difficulty_level: null,
@@ -130,17 +132,17 @@ export default function BiologyQuestionReview() {
   });
   
   // State for loading
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
 
   // References to prevent multiple fetches
-  const initialDataFetched = useRef(false);
-  const isFetchingQuestions = useRef(false);
+  const initialDataFetched = React.useRef(false);
+  const isFetchingQuestions = React.useRef(false);
   
   // Fetch questions with current filters and pagination
-  const fetchQuestions = useCallback(async () => {
+  const fetchQuestions = React.useCallback(async () => {
     // Prevent multiple simultaneous fetches
     if (isFetchingQuestions.current) {
       return;
@@ -209,7 +211,7 @@ export default function BiologyQuestionReview() {
   }, [currentPage, pageSize, filters, isSignedIn]);
 
   // Fetch initial data (topics and subtopics)
-  const fetchInitialData = useCallback(async () => {
+  const fetchInitialData = React.useCallback(async () => {
     if (!isSignedIn || initialDataFetched.current) {
       return;
     }
@@ -244,21 +246,21 @@ export default function BiologyQuestionReview() {
   }, [fetchQuestions, isSignedIn]);
 
   // Redirect unauthenticated users
-  useEffect(() => {
+  React.useEffect(() => {
     if (isLoaded && !isSignedIn) {
       router.push("/sign-in");
     }
   }, [isLoaded, isSignedIn, router]);
   
   // Fetch initial data once when auth loads
-  useEffect(() => {
+  React.useEffect(() => {
     if (isLoaded && isSignedIn && !initialDataFetched.current) {
       fetchInitialData();
     }
   }, [isLoaded, isSignedIn, fetchInitialData]);
 
   // This effect controls when to fetch questions due to filter/pagination changes
-  useEffect(() => {
+  React.useEffect(() => {
     // Only run if we're authenticated and initial data is already loaded
     if (isLoaded && isSignedIn && initialDataFetched.current && !isFetchingQuestions.current) {
       // Use a short timeout to debounce multiple rapid changes
@@ -271,15 +273,15 @@ export default function BiologyQuestionReview() {
   }, [currentPage, pageSize, filters, isLoaded, isSignedIn, fetchQuestions]);
   
   // Update filtered subtopics when topic changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (filters.topic_id) {
       const filtered = subtopics.filter(
-        (subtopic) => subtopic.topic_id === filters.topic_id
+        (subtopic: { topic_id: number }) => subtopic.topic_id === filters.topic_id
       );
       setFilteredSubtopics(filtered);
-      // Reset subtopic selection when topic changes
+      // Reset subtopic selection when topic changes  
       if (filters.subtopic_id) {
-        setFilters(prev => ({ ...prev, subtopic_id: null }));
+        setFilters((prev: Filters) => ({ ...prev, subtopic_id: null }));
       }
     } else {
       setFilteredSubtopics([]);
@@ -288,7 +290,7 @@ export default function BiologyQuestionReview() {
 
   // Handle filter changes
   const handleFilterChange = (key: keyof Filters, value: string | number | null) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters((prev: Filters) => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filters change
   };
   const handleEditClick = (question: Question) => {
@@ -309,10 +311,9 @@ export default function BiologyQuestionReview() {
       if (!response.ok) {
         throw new Error('Failed to update question');
       }
-      
       // Update the question in the local state
-      setQuestions(prevQuestions => 
-        prevQuestions.map(q => 
+      setQuestions((prevQuestions: Question[]) => 
+        prevQuestions.map((q: Question) => 
           q.question_id === updatedQuestion.question_id ? updatedQuestion : q
         )
       );
@@ -328,9 +329,8 @@ export default function BiologyQuestionReview() {
       throw error; // Re-throw to be handled by the modal
     }
   };
-  
   // Handle search - with explicit user action to prevent automatic refetching
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: { preventDefault: () => void, target: HTMLFormElement }) => {
     e.preventDefault();
     if (!isFetchingQuestions.current) {
       fetchQuestions();
@@ -341,7 +341,9 @@ export default function BiologyQuestionReview() {
   if (!isLoaded) {
     return (
       <div className="container mx-auto py-6 flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900" role="status">
+          <span className="sr-only">Loading...</span>
+        </div>
       </div>
     );
   }
@@ -478,14 +480,14 @@ export default function BiologyQuestionReview() {
               <Label htmlFor="topic">Topic</Label>
               <Select
                 value={filters.topic_id?.toString() || undefined}
-                onValueChange={(value) => handleFilterChange('topic_id', value === "all" ? null : parseInt(value))}
+                onValueChange={(value: string) => handleFilterChange('topic_id', value === "all" ? null : parseInt(value))}
               >
                 <SelectTrigger id="topic">
                   <SelectValue placeholder="Select a topic" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Topics</SelectItem>
-                  {topics.map((topic) => (
+                  {topics.map((topic: { topic_id: number; topic_name: string }) => (
                     <SelectItem key={topic.topic_id} value={topic.topic_id.toString()}>
                       {topic.topic_name}
                     </SelectItem>
@@ -498,7 +500,7 @@ export default function BiologyQuestionReview() {
               <Label htmlFor="subtopic">Subtopic</Label>
               <Select
                 value={filters.subtopic_id?.toString() || undefined}
-                onValueChange={(value) => handleFilterChange('subtopic_id', value === "all" ? null : parseInt(value))}
+                onValueChange={(value: string) => handleFilterChange('subtopic_id', value === "all" ? null : parseInt(value))}
                 disabled={!filters.topic_id}
               >
                 <SelectTrigger id="subtopic">
@@ -506,7 +508,7 @@ export default function BiologyQuestionReview() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Subtopics</SelectItem>
-                  {filteredSubtopics.map((subtopic) => (
+                  {filteredSubtopics.map((subtopic: { subtopic_id: number; subtopic_name: string }) => (
                     <SelectItem key={subtopic.subtopic_id} value={subtopic.subtopic_id.toString()}>
                       {subtopic.subtopic_name}
                     </SelectItem>
@@ -519,7 +521,7 @@ export default function BiologyQuestionReview() {
               <Label htmlFor="difficulty">Difficulty</Label>
               <Select
                 value={filters.difficulty_level || undefined}
-                onValueChange={(value) => handleFilterChange('difficulty_level', value === "any" ? null : value)}
+                onValueChange={(value: string) => handleFilterChange('difficulty_level', value === "any" ? null : value)}
               >
                 <SelectTrigger id="difficulty">
                   <SelectValue placeholder="Any difficulty" />
@@ -537,7 +539,7 @@ export default function BiologyQuestionReview() {
               <Label htmlFor="questionType">Question Type</Label>
               <Select
                 value={filters.question_type || undefined}
-                onValueChange={(value) => handleFilterChange('question_type', value === "any" ? null : value)}
+                onValueChange={(value: string) => handleFilterChange('question_type', value === "any" ? null : value)}
               >
                 <SelectTrigger id="questionType">
                   <SelectValue placeholder="Any type" />
@@ -561,7 +563,7 @@ export default function BiologyQuestionReview() {
                   id="search"
                   placeholder="Search questions..."
                   value={filters.searchTerm}
-                  onChange={(e) => handleFilterChange('searchTerm', e.target.value)}
+                  onChange={(e: { target: { value: string } }) => handleFilterChange('searchTerm', e.target.value)}
                 />
                 <Button type="submit" disabled={isFetchingQuestions.current}>Search</Button>
               </div>
@@ -605,7 +607,7 @@ export default function BiologyQuestionReview() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {questions.map((question) => (
+          {questions.map((question: Question) => (
             <Card key={question.question_id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -691,7 +693,7 @@ export default function BiologyQuestionReview() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  onClick={() => setCurrentPage((prev: number) => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1 || isLoading}
                 >
                   Previous
@@ -701,9 +703,7 @@ export default function BiologyQuestionReview() {
                   {Array.from({ length: Math.min(totalPages, 5) }).map((_, idx) => {
                     // Calculate the page number to display
                     let pageNum = currentPage;
-                    if (totalPages <= 5) {
-                      pageNum = idx + 1;
-                    } else if (currentPage <= 3) {
+                    if (totalPages <= 5 || currentPage <= 3) {
                       pageNum = idx + 1;
                     } else if (currentPage >= totalPages - 2) {
                       pageNum = totalPages - (4 - idx);
@@ -728,7 +728,7 @@ export default function BiologyQuestionReview() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  onClick={() => setCurrentPage((prev: number) => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages || isLoading}
                 >
                   Next
@@ -736,7 +736,7 @@ export default function BiologyQuestionReview() {
                 
                 <Select
                   value={pageSize.toString()}
-                  onValueChange={(value) => {
+                  onValueChange={(value: string) => {
                     setPageSize(parseInt(value));
                     setCurrentPage(1);
                   }}

@@ -143,9 +143,6 @@ export function usePracticeSession(
       
       const response = await fetch(`${apiUrl}?${queryParams.toString()}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
       });
       
       const data = await response.json();

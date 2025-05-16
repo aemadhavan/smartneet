@@ -59,9 +59,13 @@ async function getOrCreateTestUser(userType: 'free' | 'premium') {
     }
 
     // Create new test user if not found
+    if (!process.env.TEST_USER_PASSWORD) {
+      throw new Error('TEST_USER_PASSWORD environment variable is required');
+    }
+    
     const newUser = await clerkClient.users.createUser({
       emailAddress: [email],
-      password: process.env.TEST_USER_PASSWORD || 'TestPassword123!',
+      password: process.env.TEST_USER_PASSWORD,
       firstName: `Test${userType === 'premium' ? 'Premium' : 'Free'}`,
       lastName: 'User',
     });

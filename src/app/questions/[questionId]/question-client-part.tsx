@@ -11,12 +11,11 @@ interface QuestionClientPartProps {
 export default function QuestionClientPart({ questionId }: QuestionClientPartProps) {
   const { toast } = useToast();
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
-
+  
   // Function to validate an answer
   const submitAnswer = async (): Promise<boolean> => {
-    // _id and _selectedOption parameters were removed as they are unused.
-    // We use questionId from props for the actual logic.
-    const numericQuestionId = Number(questionId); 
+    // We use questionId from props for the actual logic
+    const numericQuestionId = Number(questionId);
     try {
       // Simulate API call with delay
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -40,7 +39,9 @@ export default function QuestionClientPart({ questionId }: QuestionClientPartPro
         description: "Failed to submit your answer. Please try again.",
         variant: "destructive",
       });
-      return false;
+      // Don't return false as it doesn't prevent default behavior in React
+      // Instead, we'll throw the error to be handled by the component using this function
+      throw error;
     }
   };
   

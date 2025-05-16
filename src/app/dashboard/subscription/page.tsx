@@ -164,8 +164,29 @@ export default function SubscriptionDashboard() {
       
       const { url } = await response.json();
       
-      // Redirect to Stripe Customer Portal
-      window.location.href = url;
+      // Validate the URL is a legitimate Stripe URL before redirecting
+      try {
+        if (url) {
+          const parsedUrl = new URL(url);
+          // Ensure the URL is a valid Stripe domain with https protocol
+          if (
+            parsedUrl.protocol === 'https:' && 
+            (parsedUrl.hostname === 'billing.stripe.com' || parsedUrl.hostname === 'checkout.stripe.com') &&
+            // Validate URL path starts with expected Stripe paths
+            (parsedUrl.pathname.startsWith('/p/') || parsedUrl.pathname.startsWith('/c/') || parsedUrl.pathname.startsWith('/b/'))
+          ) {
+            // Redirect to Stripe Customer Portal using a safer approach
+            window.location.assign(parsedUrl.toString());
+          } else {
+            throw new Error('Invalid Stripe URL in redirect response');
+          }
+        } else {
+          throw new Error('No redirect URL received');
+        }
+      } catch (error) {
+        const urlErrorMessage = error instanceof Error ? error.message : 'Unknown URL error';
+        throw new Error(`Invalid redirect URL: ${urlErrorMessage}`);
+      }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
@@ -494,15 +515,52 @@ export default function SubscriptionDashboard() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                           {payment.receipt_url ? (
-                            <a
-                              href={payment.receipt_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center"
-                            >
-                              View
-                              <ExternalLink className="h-3 w-3 ml-1" />
-                            </a>
+                            (() => {
+                              // Validate URL is safe before rendering
+                              try {
+                                const url = new URL(payment.receipt_url);
+                                // Ensure the URL is a valid Stripe domain with https protocol
+                                if (
+                                  url.protocol === 'https:' && 
+                                  (url.hostname === 'invoice.stripe.com' || 
+                                   url.hostname === 'checkout.stripe.com' || 
+                                   url.hostname === 'receipts.stripe.com')
+                                ) {
+                                  return (
+                                    <a
+                                      // Use a static string for href to prevent XSS
+                                      href="#"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        // Validate URL is safe before opening in new window
+                                        if (
+                                          url.protocol === 'https:' && 
+                                          ['invoice.stripe.com', 'checkout.stripe.com', 'receipts.stripe.com'].includes(url.hostname)
+                                        ) {
+                                          // Use window.open with validated URL for better security
+                                          window.open(url.href, '_blank', 'noopener,noreferrer');
+                                        } else {
+                                          console.error('Blocked navigation to unsafe URL');
+                                        }
+                                      }}
+                                    >
+                                      View
+                                      <ExternalLink className="h-3 w-3 ml-1" />
+                                    </a>
+                                  );
+                                }
+                                return <span>Invalid Domain</span>; // Return for invalid domains
+                              } catch (e) {
+                                // Invalid URL, don't render link
+                                console.error("Invalid receipt URL:", e);
+                                return <span>Invalid URL</span>;
+                              }
+                              // This line should never be reached, but adding as a fallback
+                              return <span>Invalid Receipt</span>;
+                            })()
                           ) : (
                             'N/A'
                           )}

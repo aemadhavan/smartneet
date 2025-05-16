@@ -152,12 +152,15 @@ async function safeMigrate() {
       
       // CRITICAL: Remove CREATE TYPE statements for existing enums
       for (const enumName of enumNames) {
-        const createTypeRegex = new RegExp(`CREATE TYPE ${enumName} AS ENUM \\([^)]+\\);`, 'g');
+        // Sanitize enumName for use in regex
+        const safeEnumName = enumName.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+
+        const createTypeRegex = new RegExp(`CREATE TYPE ${safeEnumName} AS ENUM \\([^)]+\\);`, 'g');
         sqlContent = sqlContent.replace(createTypeRegex, 
           `-- Skipped: CREATE TYPE ${enumName} (already exists)`);
         
         // Also remove any DROP TYPE statements for these enums
-        const dropTypeRegex = new RegExp(`DROP TYPE ${enumName};`, 'g');
+        const dropTypeRegex = new RegExp(`DROP TYPE ${safeEnumName};`, 'g');
         sqlContent = sqlContent.replace(dropTypeRegex, 
           `-- Skipped: DROP TYPE ${enumName} (already exists)`);
       }

@@ -12,7 +12,7 @@ export async function GET(
   try {
     // Get the topic ID from params
     const topicId = Number((await params).id);
-    if (isNaN(topicId)) {
+    if (Number.isNaN(topicId)) {
       return NextResponse.json({ 
         success: false,
         error: 'Invalid topic ID' 

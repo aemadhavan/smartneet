@@ -1,157 +1,114 @@
+// src/app/practice-sessions/[sessionId]/review/components/questions/index.tsx
+
+import { QuestionAttempt } from '../interfaces';
 import { 
-  FlexibleAnswerType,
-  QuestionAttempt as BaseQuestionAttempt,
+  MultipleChoiceDetails, 
   MultipleChoiceAnswer,
+  MatchingDetails,
   MatchingAnswer,
+  AssertionReasonDetails,
+  AssertionReasonAnswer,
+  MultipleCorrectDetails,
   MultipleCorrectAnswer,
+  SequenceOrderingDetails,
   SequenceOrderingAnswer,
+  DiagramBasedDetails,
   DiagramBasedAnswer
 } from '../interfaces';
 
-// Option interfaces for each question type
-type Option = { key: string; text: string };
-type Item = { key: string; text: string };
-type Statement = { key: string; text: string };
-type SequenceItem = { key: string; text: string };
-
-// Utility type to convert details to a compatible type
-type DetailsWithOptions<T> = {
-  [K in keyof T]: T[K];
-} & {
-  [key: string]: unknown; // More type-safe than 'any'
-}
-
-// Utility function kept for potential future use or logging
-// function convertToFlexibleAnswer(answer: Record<string, unknown> | null): FlexibleAnswerType {
-//   if (answer === null) return null;
-  
-//   // Create a new object that spreads the original answer
-//   // This helps preserve the original structure while making it flexibly typed
-//   return { ...answer };
-// }
-
-interface BaseQuestionAttemptWithAnswer extends BaseQuestionAttempt {
-  userAnswer: FlexibleAnswerType;
-  correctAnswer: FlexibleAnswerType;
-}
-
-// Specific typed question attempts
-interface MultipleChoiceQuestionAttempt extends BaseQuestionAttempt {
-  details: DetailsWithOptions<{ options?: Option[] }>;
-  userAnswer: MultipleChoiceAnswer | null;
-  correctAnswer: MultipleChoiceAnswer | null;
-  isImageBased: boolean | null | undefined;
-}
-
-interface MatchingQuestionAttempt extends BaseQuestionAttempt {
-  details: DetailsWithOptions<{ items?: Item[], options?: Option[] }>;
-  userAnswer: MatchingAnswer | null;
-  correctAnswer: MatchingAnswer | null;
-  isImageBased: boolean | null | undefined;
-}
-
-interface MultipleCorrectQuestionAttempt extends BaseQuestionAttempt {
-  details: DetailsWithOptions<{ statements?: Statement[] }>;
-  userAnswer: MultipleCorrectAnswer | null;
-  correctAnswer: MultipleCorrectAnswer | null;
-  isImageBased: boolean | null | undefined;
-}
-
-interface DiagramBasedQuestionAttempt extends BaseQuestionAttempt {
-  details: DetailsWithOptions<{ options?: Option[] }>;
-  userAnswer: DiagramBasedAnswer | null;
-  correctAnswer: DiagramBasedAnswer | null;
-  isImageBased: boolean | null | undefined;
-}
-
-interface SequenceOrderingQuestionAttempt extends BaseQuestionAttempt {
-  details: DetailsWithOptions<{ items?: SequenceItem[] }>;
-  userAnswer: SequenceOrderingAnswer | null;
-  correctAnswer: SequenceOrderingAnswer | null;
-  isImageBased: boolean | null | undefined;
-}
-
-// Helper function to convert specific question attempt to base type
-function prepareQuestionAttempt<T extends BaseQuestionAttemptWithAnswer>(
-  attempt: T
-): T {
-    const processAnswer = (answer: FlexibleAnswerType): FlexibleAnswerType => {
-      if (answer === null) return null;
-
-      // If it's a string, try to parse it as JSON
-      if (typeof answer === 'string') {
-        try {
-          return JSON.parse(answer);
-        } catch {
-          // If parsing fails, return the original string
-          return answer;
-        }
-      }
-
-      // If it's an object, create a new object that maintains the original properties
-      if (typeof answer === 'object' && answer !== null) {
-        const newAnswer = { ...answer };
-        return newAnswer;
-      }
-
-      return answer;
-    };
-
-  return {
-    ...attempt,
-    userAnswer: processAnswer(attempt.userAnswer),
-    correctAnswer: processAnswer(attempt.correctAnswer),
-  } as T;
-}
-
+// Import all question type components
 import MultipleChoice from './MultipleChoice';
 import Matching from './Matching';
 import MultipleCorrect from './MultipleCorrect';
 import AssertionReason from './AssertionReason';
-import DiagramBased from './DiagramBased';
 import SequenceOrdering from './SequenceOrdering';
+import DiagramBased from './DiagramBased';
+
+interface QuestionContentProps {
+  attempt: QuestionAttempt;
+}
 
 /**
- * Renders the appropriate question component based on question type
+ * Component that renders the appropriate question component based on question type
  */
-export default function QuestionContent({ attempt }: { attempt: BaseQuestionAttemptWithAnswer }) {
+export default function QuestionContent({ attempt }: QuestionContentProps) {
   switch (attempt.questionType) {
     case 'MultipleChoice':
-      return <MultipleChoice 
-        attempt={prepareQuestionAttempt(attempt as MultipleChoiceQuestionAttempt)} 
-      />;
+      return (
+        <MultipleChoice
+          details={attempt.details as MultipleChoiceDetails}
+          userAnswer={attempt.userAnswer as MultipleChoiceAnswer}
+          correctAnswer={attempt.correctAnswer as MultipleChoiceAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );
+      
     case 'Matching':
-      return <Matching 
-        attempt={prepareQuestionAttempt(attempt as MatchingQuestionAttempt)} 
-      />;
-    case 'MultipleCorrectStatements':
-      return <MultipleCorrect 
-        attempt={prepareQuestionAttempt(attempt as MultipleCorrectQuestionAttempt)} 
-      />;
+      return (
+        <Matching
+          details={attempt.details as MatchingDetails}
+          userAnswer={attempt.userAnswer as MatchingAnswer}
+          correctAnswer={attempt.correctAnswer as MatchingAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );
+
     case 'AssertionReason':
-      // Create a compatible attempt object for AssertionReason
-      const assertionAttempt = {
-        ...attempt,
-        userAnswer: typeof attempt.userAnswer === 'string' ? attempt.userAnswer : 
-                    attempt.userAnswer && typeof attempt.userAnswer === 'object' ? 
-                    { ...attempt.userAnswer } : null,
-        correctAnswer: typeof attempt.correctAnswer === 'string' ? attempt.correctAnswer : 
-                      attempt.correctAnswer && typeof attempt.correctAnswer === 'object' ? 
-                      { ...attempt.correctAnswer } : null
-      };
-      return <AssertionReason attempt={assertionAttempt} />;
-    case 'DiagramBased':
-      return <DiagramBased 
-        attempt={prepareQuestionAttempt(attempt as DiagramBasedQuestionAttempt)} 
-      />;
+      return (
+        <AssertionReason
+          details={attempt.details as AssertionReasonDetails}
+          userAnswer={attempt.userAnswer as AssertionReasonAnswer}
+          correctAnswer={attempt.correctAnswer as AssertionReasonAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );
+      
+    case 'MultipleCorrectStatements':
+      return (
+        <MultipleCorrect
+          details={attempt.details as MultipleCorrectDetails}
+          userAnswer={attempt.userAnswer as MultipleCorrectAnswer}
+          correctAnswer={attempt.correctAnswer as MultipleCorrectAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );
+      
     case 'SequenceOrdering':
-      return <SequenceOrdering 
-        attempt={prepareQuestionAttempt(attempt as SequenceOrderingQuestionAttempt)} 
-      />;
+      return (
+        <SequenceOrdering
+          details={attempt.details as SequenceOrderingDetails}
+          userAnswer={attempt.userAnswer as SequenceOrderingAnswer}
+          correctAnswer={attempt.correctAnswer as SequenceOrderingAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );      
+      
+    case 'DiagramBased':
+      return (
+        <DiagramBased
+          details={attempt.details as DiagramBasedDetails}
+          userAnswer={attempt.userAnswer as DiagramBasedAnswer}
+          correctAnswer={attempt.correctAnswer as DiagramBasedAnswer}
+          isImageBased={attempt.isImageBased === true}
+          imageUrl={attempt.imageUrl || undefined}
+          questionText={attempt.questionText}
+        />
+      );
+      
     default:
       return (
         <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
-          <p>Question type &quot;{attempt.questionType}&quot; rendering not implemented</p>
+          <p>Question type &ldquo;{attempt.questionType}&rdquo; rendering not implemented</p>
         </div>
       );
   }

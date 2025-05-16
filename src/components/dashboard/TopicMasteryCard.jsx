@@ -3,22 +3,22 @@ import { ChevronRight, AlertCircle, CheckCircle2, Clock, Award } from 'lucide-re
 
 const getMasteryColor = (level) => {
   switch(level) {
-    case 'notStarted': return '#f3f4f6'; // gray-100
     case 'beginner': return '#fee2e2'; // red-100
     case 'intermediate': return '#fef3c7'; // yellow-100
     case 'advanced': return '#dbeafe'; // blue-100
     case 'mastered': return '#d1fae5'; // green-100
+    case 'notStarted':
     default: return '#f3f4f6'; // gray-100
   }
 };
 
 const getMasteryIcon = (level) => {
   switch(level) {
-    case 'notStarted': return <Clock size={16} className="text-gray-500" />;
     case 'beginner': return <AlertCircle size={16} className="text-red-500" />;
     case 'intermediate': return <Clock size={16} className="text-yellow-500" />;
     case 'advanced': return <CheckCircle2 size={16} className="text-blue-500" />;
     case 'mastered': return <Award size={16} className="text-emerald-500" />;
+    case 'notStarted':
     default: return <Clock size={16} className="text-gray-500" />;
   }
 };

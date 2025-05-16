@@ -59,7 +59,7 @@ const CTASection = dynamic(
 // Define metadata for better SEO
 export const metadata: Metadata = {
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
-  description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics.',
+  description: 'Ace your NEET exam with personalized AI-generated practice questions, adaptive tests, and detailed performance analytics to maximize your score.',
   keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank',
   openGraph: {
     title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',

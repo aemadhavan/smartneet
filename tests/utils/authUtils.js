@@ -1,6 +1,10 @@
 // tests/utils/authUtils.js - Alternative approach using API
 import { expect } from '@playwright/test';
 
+/**
+ * Signs in a user via API.
+ * @param page - The Playwright page object.
+ */
 export async function signInViaApi(page) {
   // Make API call to get authenticated session token
   const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/test/auth`, {

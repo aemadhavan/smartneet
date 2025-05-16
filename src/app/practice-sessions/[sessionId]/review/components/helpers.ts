@@ -1,11 +1,16 @@
 import { 
   QuestionAttempt, 
   QuestionType, 
-  FlexibleAnswerType, 
-  QuestionDetails,
+  NormalizedAnswer, 
+  BaseQuestionDetails,
   MultipleChoiceAnswer,
   AssertionReasonAnswer,
-  //OptionFormat
+  MatchingAnswer,
+  DiagramBasedAnswer,
+  SequenceOrderingAnswer,
+  MultipleCorrectAnswer,
+  BaseOption,
+  NormalizedQuestionDetails
 } from './interfaces';
 
 // Define a generic option/statement type
@@ -19,13 +24,6 @@ interface OptionBase {
   statement_text?: string;
 }
 
-// Normalized option type with explicit string key
-interface NormalizedOption {
-  key: string;
-  text: string;
-  isCorrect: boolean;
-}
-
 // Define possible formats for diagram-based options
 interface DiagramOption {
   key?: string;
@@ -37,11 +35,11 @@ interface DiagramOption {
 }
 
 // Normalize options structure for consistency
-export const normalizeOptions = (options: OptionBase[]): NormalizedOption[] => {
+export const normalizeOptions = (options: OptionBase[]): BaseOption[] => {
   if (!Array.isArray(options)) return [];
   
   return options.map(option => ({
-    key: String(option.option_number || option.key || ''),
+    id: String(option.option_number || option.key || ''),
     text: option.option_text || option.text || option.statement_text || 
           (typeof option === 'string' ? option : JSON.stringify(option)),
     isCorrect: option.is_correct || option.isCorrect || false
@@ -49,11 +47,11 @@ export const normalizeOptions = (options: OptionBase[]): NormalizedOption[] => {
 };
 
 // Normalize statements structure for consistency
-export const normalizeStatements = (statements: OptionBase[]): NormalizedOption[] => {
+export const normalizeStatements = (statements: OptionBase[]): BaseOption[] => {
   if (!Array.isArray(statements)) return [];
   
   return statements.map(statement => ({
-    key: String(statement.option_number || statement.key || ''),
+    id: String(statement.option_number || statement.key || ''),
     text: statement.statement_text || statement.option_text || statement.text || '',
     isCorrect: statement.is_correct || statement.isCorrect || false
   }));
@@ -115,7 +113,7 @@ export const normalizeDiagramOptions = (rawOptions: unknown): { key: string; tex
 };
 
 // Modify the interface to make options more flexible
-interface ExtendedQuestionDetails extends Omit<QuestionDetails, 'options' | 'items'> {
+interface ExtendedQuestionDetails extends Omit<BaseQuestionDetails, 'options' | 'items'> {
   options?: Array<{
     key?: string;
     text?: string;
@@ -124,6 +122,7 @@ interface ExtendedQuestionDetails extends Omit<QuestionDetails, 'options' | 'ite
     is_correct?: boolean;
     isCorrect?: boolean;
     matchesTo?: string;
+    id?: string;
   }>;
   items?: Array<{
     key?: string;
@@ -132,14 +131,18 @@ interface ExtendedQuestionDetails extends Omit<QuestionDetails, 'options' | 'ite
     option_number?: string | number;
     is_correct?: boolean;
     isCorrect?: boolean;
+    id?: string;
   }>;
+  statement1?: string;
+  statement2?: string;
+  correctSequence?: string[];
 }
 
 // Gets the correct answer based on question type
 export function getCorrectAnswer(
-  details: QuestionDetails | null, 
+  details: BaseQuestionDetails | null, 
   questionType: QuestionType
-): FlexibleAnswerType | null {
+): NormalizedAnswer | null {
   if (!details) return null;
 
   // Cast to extended details to access additional properties
@@ -151,10 +154,12 @@ export function getCorrectAnswer(
         const correctOption = extendedDetails.options?.find(
           (opt) => opt.is_correct === true || opt.isCorrect === true
         );
-        return { 
-          selection: correctOption ? 
-            (correctOption.option_number?.toString() || correctOption.key?.toString() || '') : 
-            '' 
+        const selectedOption = correctOption ? 
+          (correctOption.option_number?.toString() || correctOption.key?.toString() || '') : 
+          '';
+        return {
+          type: 'MultipleChoice',
+          selectedOption: selectedOption
         } as MultipleChoiceAnswer;
       }
       
@@ -165,33 +170,43 @@ export function getCorrectAnswer(
             matches[String(item.key)] = String(item.matchesTo);
           }
         });
-        return matches;
+        return {
+          type: 'Matching',
+          selectedOption: JSON.stringify(matches)
+        } as MatchingAnswer;
       }
       
       case 'MultipleCorrectStatements': {
         const correctStatements = extendedDetails.options?.filter(
           (statement) => statement.is_correct === true || statement.isCorrect === true
         ).map((statement) => String(statement.key || statement.option_number || '')) || [];
-        return correctStatements;
+        return {
+          type: 'MultipleCorrectStatements',
+          selectedStatements: correctStatements
+        } as MultipleCorrectAnswer;
       }
       
       case 'AssertionReason': {
         const correctOption = extendedDetails.options?.find(
           (opt) => opt.is_correct === true || opt.isCorrect === true
         );
-        return { 
-          selection: correctOption ? 
-            (correctOption.option_number?.toString() || correctOption.key?.toString() || '') : 
-            '',
-          statement1: details.statement1,
-          statement2: details.statement2
+        const selectedOption = correctOption ? 
+          (correctOption.option_number?.toString() || correctOption.key?.toString() || '') : 
+          '';
+        return {
+          type: 'AssertionReason',
+          selectedOption: selectedOption
         } as AssertionReasonAnswer;
       }
       
       case 'SequenceOrdering': {
         // Handle direct sequence array if available
-        if (details.correctSequence && Array.isArray(details.correctSequence)) {
-          return details.correctSequence.map(item => String(item));
+        if (extendedDetails.correctSequence && Array.isArray(extendedDetails.correctSequence)) {
+          return {
+            type: 'SequenceOrdering',
+            selectedOption: '',
+            sequence: extendedDetails.correctSequence.map((item: string) => String(item))
+          } as SequenceOrderingAnswer;
         }
         
         // Handle sequence ordering presented as multiple choice options
@@ -204,19 +219,28 @@ export function getCorrectAnswer(
             // If option_text contains dashes, it's likely a sequence like "E-C-A-D-B"
             const optionText = correctOption.option_text || correctOption.text;
             if (optionText && typeof optionText === 'string' && optionText.includes('-')) {
-              return parseSequenceString(optionText);
+              return {
+                type: 'SequenceOrdering',
+                selectedOption: '',
+                sequence: parseSequenceString(optionText)
+              } as SequenceOrderingAnswer;
             }
             
-            return { 
-              selection: correctOption.option_number?.toString() || 
-                         correctOption.key?.toString() || 
-                         '' 
-            };
+            return {
+              type: 'SequenceOrdering',
+              selectedOption: correctOption.option_number?.toString() || 
+                           correctOption.key?.toString() || 
+                           ''
+            } as SequenceOrderingAnswer;
           }
         }
         
         // Default empty sequence
-        return [];
+        return {
+          type: 'SequenceOrdering',
+          selectedOption: '',
+          sequence: []
+        } as SequenceOrderingAnswer;
       }
       
       case 'DiagramBased': {
@@ -225,10 +249,11 @@ export function getCorrectAnswer(
         );
         
         return { 
+          type: 'DiagramBased',
           selectedOption: correctOption ? 
             (correctOption.option_number?.toString() || correctOption.key?.toString() || '') : 
             '' 
-        };
+        } as DiagramBasedAnswer;
       }
       
       default:
@@ -259,32 +284,46 @@ export function parseSequenceString(sequenceStr: string | undefined): string[] {
 
 // This function standardizes the format of retrieved question attempts
 export const normalizeQuestionAttempt = (attempt: Record<string, unknown>): QuestionAttempt => {
-  // Safely type-cast with required properties
-  const normalizedAttempt = {
+  // Use type assertion more safely
+  const details = attempt.details as NormalizedQuestionDetails | null || null;
+  
+  // Create a properly typed QuestionAttempt object
+  const normalizedAttempt: QuestionAttempt = {
     questionId: attempt.questionId as number || 0,
     questionNumber: attempt.questionNumber as number || 0,
     timeSpentSeconds: attempt.timeSpentSeconds as number || 0,
     questionText: attempt.questionText as string || '',
     questionType: attempt.questionType as QuestionType || 'MultipleChoice',
-    details: attempt.details as QuestionDetails | null || null,
+    details: details || {} as NormalizedQuestionDetails, // Default to empty object if null
     explanation: attempt.explanation as string | null || null,
-    userAnswer: attempt.userAnswer as FlexibleAnswerType || null,
+    userAnswer: attempt.userAnswer as NormalizedAnswer || null,
     isCorrect: attempt.isCorrect as boolean || false,
-    correctAnswer: attempt.correctAnswer as FlexibleAnswerType || null,
+    correctAnswer: attempt.correctAnswer as NormalizedAnswer || null,
     marksAwarded: attempt.marksAwarded as number || 0,
     maxMarks: attempt.maxMarks as number || 0,
     topic: attempt.topic as { topicId: number; topicName: string } || { topicId: 0, topicName: '' },
     subtopic: attempt.subtopic as { subtopicId: number; subtopicName: string } | undefined,
-    isImageBased: attempt.isImageBased as boolean | null | undefined,
-    imageUrl: attempt.imageUrl as string | null | undefined
+    isImageBased: attempt.isImageBased as boolean | null || false,
+    imageUrl: attempt.imageUrl as string | null || null
   };
 
   // Handle question type-specific normalization
-  if (normalizedAttempt.questionType === 'MultipleChoice') {
-    // Normalize options if present
-    if (normalizedAttempt.details?.options) {
-      const normalizedOptions = normalizeOptions(normalizedAttempt.details.options as OptionBase[]);
-      normalizedAttempt.details.options = normalizedOptions;
+  if (normalizedAttempt.questionType === 'MultipleChoice' && normalizedAttempt.details?.options) {
+    try {
+      // Create a new normalized details object
+      const optionsArray = Array.isArray(normalizedAttempt.details.options) 
+        ? normalizedAttempt.details.options 
+        : [];
+      
+      const normalizedOptions = normalizeOptions(optionsArray as unknown as OptionBase[]);
+      
+      // Create a new details object with normalized options
+      normalizedAttempt.details = {
+        ...normalizedAttempt.details,
+        options: normalizedOptions
+      };
+    } catch (error) {
+      console.error('Error normalizing options:', error);
     }
   }
   

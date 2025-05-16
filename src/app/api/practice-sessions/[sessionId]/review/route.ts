@@ -12,9 +12,9 @@ import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { getCorrectAnswer } from '@/app/practice-sessions/[sessionId]/review/components/helpers';
 import { 
-  QuestionDetails, 
+  NormalizedQuestionDetails, 
   QuestionType, 
-  FlexibleAnswerType 
+  NormalizedAnswer 
 } from '@/app/practice-sessions/[sessionId]/review/components/interfaces';
 
 export async function GET(
@@ -152,12 +152,12 @@ export async function GET(
         timeSpentSeconds: orderInfo.timeSpent,
         questionText: attempt.question.question_text,
         questionType: attempt.question.question_type as QuestionType,
-        details: attempt.question.details as QuestionDetails | null,
+        details: attempt.question.details as NormalizedQuestionDetails | null,
         explanation: attempt.question.explanation,
-        userAnswer: attempt.user_answer as FlexibleAnswerType,
+        userAnswer: attempt.user_answer as NormalizedAnswer,
         isCorrect: attempt.is_correct,
         correctAnswer: getCorrectAnswer(
-          attempt.question.details as QuestionDetails, 
+          attempt.question.details as NormalizedQuestionDetails, 
           attempt.question.question_type as QuestionType
         ),
         marksAwarded: attempt.marks_awarded || 0,

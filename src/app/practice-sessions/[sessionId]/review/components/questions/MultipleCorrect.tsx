@@ -1,103 +1,63 @@
+// src/app/practice-sessions/[sessionId]/review/components/questions/MultipleCorrect.tsx
+
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
-
-// Define statement interface
-interface Statement {
-  key: string;
-  text: string;
-}
-
-// Create more specific types to avoid using 'any'
-type StatementsArray = string[];
-interface StatementsAnswerObject {
-  selectedStatements?: StatementsArray;
-  [key: string]: unknown; // More type-safe than 'any'
-}
-
-// Define a more flexible QuestionAttempt interface
-interface QuestionAttempt {
-  questionText?: string;
-  details?: {
-    statements?: Statement[] | unknown[];
-  } | null;
-  isImageBased?: boolean | null | undefined;
-  imageUrl?: string | null | undefined;
-  userAnswer?: StatementsAnswerObject | string | null;
-  correctAnswer?: StatementsAnswerObject | string | null;
-}
+import { MultipleCorrectDetails, MultipleCorrectAnswer } from '../interfaces';
 
 interface MultipleCorrectProps {
-  attempt: QuestionAttempt;
+  details: MultipleCorrectDetails;
+  userAnswer: MultipleCorrectAnswer;
+  correctAnswer: MultipleCorrectAnswer;
+  isImageBased?: boolean;
+  imageUrl?: string;
+  questionText?: string;
 }
 
-// Normalize statements utility function
-function normalizeStatements(rawStatements: unknown): Statement[] {
-  // If rawStatements is already an array of objects with key and text, return it
-  if (Array.isArray(rawStatements) && rawStatements.every(s => 
-    typeof s === 'object' && s !== null && 'key' in s && 'text' in s)) {
-    return rawStatements as Statement[];
-  }
-  
-  // If it's an array of strings or other types, convert to Statement
-  return (Array.isArray(rawStatements) ? rawStatements : []).map((statement, index: number) => ({
-    key: String.fromCharCode(65 + index), // A, B, C, etc.
-    text: String(statement)
-  }));
-}
+/**
+ * Component for rendering Multiple Correct Statements questions
+ */
+export default function MultipleCorrect({ 
+  details, 
+  userAnswer, 
+  correctAnswer, 
+  isImageBased,
+  imageUrl,
+  questionText
+}: MultipleCorrectProps) {
+  // Get direct values from normalized data
+  const userSelectedStatements = userAnswer.selectedStatements || [];
+  const correctSelectedStatements = correctAnswer.selectedStatements || [];
+  const options = details.options;
+  const statements = details.statements || [];
+  const introText = details.introText || '';
 
-// Helper function to extract selected statements from various formats
-function extractSelectedStatements(answer: unknown): string[] {
-  if (!answer) return [];
+  // For multiple correct statements, we might have text like "B and D only" as the option
+  // Let's extract which statements are mentioned in each option
+  const parseOptionText = (optionText: string): string[] => {
+    // Look for patterns like "A, B and C only" or "B and D only"
+    const letterMatches = optionText.match(/[A-Z]/g);
+    return letterMatches || [];
+  };
   
-  // If answer is already an array, return it
-  if (Array.isArray(answer)) return answer;
+  // Find which statements are mentioned in the user's selected option
+  const userSelectedOptionObj = options.find(opt => 
+    userSelectedStatements.includes(opt.id)
+  );
   
-  // If answer is an object with a selectedStatements property
-  if (typeof answer === 'object' && answer !== null && 'selectedStatements' in answer) {
-    const selectedStatements = (answer as StatementsAnswerObject).selectedStatements;
-    return Array.isArray(selectedStatements) ? selectedStatements : [];
-  }
-  
-  // If answer is a string that might be JSON
-  if (typeof answer === 'string') {
-    try {
-      const parsed = JSON.parse(answer);
-      if (Array.isArray(parsed)) return parsed;
-      if (typeof parsed === 'object' && parsed !== null && 'selectedStatements' in parsed) {
-        const selectedStatements = parsed.selectedStatements;
-        return Array.isArray(selectedStatements) ? selectedStatements : [];
-      }
-    } catch (e) {
-      console.error('Error parsing user answer:', e);
-      // Not a valid JSON string, ignore
-    }
-  }
-  
-  return [];
-}
-
-export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
-  // Add null checks for all potentially undefined properties
-  const rawStatements = attempt?.details?.statements ?? [];
-  const statements = normalizeStatements(rawStatements);
-  const userSelections = extractSelectedStatements(attempt?.userAnswer);
-  const correctSelections = extractSelectedStatements(attempt?.correctAnswer);
-  
-  // Render nothing if no attempt data
-  if (!attempt) {
-    return null;
-  }
+  // Extract statements referenced in the selected option
+  const statementsInUserSelection = userSelectedOptionObj ? 
+    parseOptionText(userSelectedOptionObj.text) : [];
 
   return (
     <div className="space-y-4">
       <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {attempt.questionText ?? 'No question text available'}
+        {questionText ?? introText ?? 'No question text available'}
       </div>
       
-      {attempt.isImageBased && attempt.imageUrl && (
+      {isImageBased && imageUrl && (
         <div className="my-4">
           <Image
-            src={attempt.imageUrl}
+            src={imageUrl}
             alt="Question diagram"
             className="max-w-full max-h-96 mx-auto border border-gray-200 dark:border-gray-700 rounded-md"
             width={500}
@@ -110,74 +70,150 @@ export default function MultipleCorrect({ attempt }: MultipleCorrectProps) {
         </div>
       )}
       
-      <div className="space-y-2 mt-4">
-        {statements.map((statement, idx) => {
-          const userSelected = userSelections.includes(statement.key);
-          const shouldBeSelected = correctSelections.includes(statement.key);
-          const isCorrectSelection = (userSelected && shouldBeSelected) || (!userSelected && !shouldBeSelected);
-          
-          return (
-            <div 
-              key={idx}
-              className={`p-3 rounded-md border-2 ${
-                userSelected && shouldBeSelected
-                  ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
-                  : userSelected && !shouldBeSelected
-                  ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700'
-                  : !userSelected && shouldBeSelected
-                  ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-700'
-                  : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-              }`}
-            >
-              <div className="flex items-start">
-                <div className="flex-shrink-0 mr-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    userSelected && shouldBeSelected
-                      ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300'
-                      : userSelected && !shouldBeSelected
-                      ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-300'
-                      : !userSelected && shouldBeSelected
-                      ? 'bg-amber-100 dark:bg-amber-800 text-amber-700 dark:text-amber-300'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}>
-                    {statement.key}
+      {/* Display statements */}
+      {statements.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Statements:</h3>
+          <div className="space-y-2">
+            {statements.map((statement, idx) => {
+              // Check if this statement is selected directly or through option
+              const isSelected = statementsInUserSelection.includes(statement.id);
+              const isCorrect = statement.isCorrect;
+              
+              return (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-md border-2 ${
+                    isSelected && isCorrect 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                      : isSelected && !isCorrect 
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700' 
+                      : isCorrect 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mr-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                        isSelected && isCorrect 
+                          ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
+                          : isSelected && !isCorrect 
+                          ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-300' 
+                          : isCorrect 
+                          ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}>
+                        {statement.id}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className={`font-medium ${
+                        isSelected && isCorrect 
+                          ? 'text-green-800 dark:text-green-300' 
+                          : isSelected && !isCorrect 
+                          ? 'text-red-800 dark:text-red-300' 
+                          : isCorrect 
+                          ? 'text-green-800 dark:text-green-300' 
+                          : 'text-gray-700 dark:text-gray-300'
+                      }`}>
+                        {statement.text}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
+                      {isCorrect && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                          Correct
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">
+                          Selected
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <p className={`font-medium ${
-                    userSelected && shouldBeSelected
-                      ? 'text-green-800 dark:text-green-300'
-                      : userSelected && !shouldBeSelected
-                      ? 'text-red-800 dark:text-red-300'
-                      : !userSelected && shouldBeSelected
-                      ? 'text-amber-800 dark:text-amber-300'
-                      : 'text-gray-700 dark:text-gray-300'
-                  }`}>
-                    {statement.text}
-                  </p>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
+      {/* Display options section */}
+      {options.length > 0 && (
+        <div className="mt-6">
+          <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Your Selection:</h3>
+          <div className="space-y-2">
+            {options.map((option, idx) => {
+              const isSelected = userSelectedStatements.includes(option.id);
+              const isCorrect = correctSelectedStatements.includes(option.id) || option.isCorrect;
+              
+              return (
+                <div
+                  key={idx}
+                  className={`p-3 rounded-md border-2 ${
+                    isSelected && isCorrect 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                      : isSelected && !isCorrect 
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700' 
+                      : isCorrect 
+                      ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700' 
+                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                  }`}
+                >
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0 mr-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                        isSelected && isCorrect 
+                          ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
+                          : isSelected && !isCorrect 
+                          ? 'bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-300' 
+                          : isCorrect 
+                          ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300' 
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                      }`}>
+                        {option.id}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className={`font-medium ${
+                        isSelected && isCorrect 
+                          ? 'text-green-800 dark:text-green-300' 
+                          : isSelected && !isCorrect 
+                          ? 'text-red-800 dark:text-red-300' 
+                          : isCorrect 
+                          ? 'text-green-800 dark:text-green-300' 
+                          : 'text-gray-700 dark:text-gray-300'
+                      }`}>
+                        {option.text}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
+                      {isSelected && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">
+                          Your answer
+                        </span>
+                      )}
+                      {isCorrect && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                          Correct answer
+                        </span>
+                      )}
+                      {isSelected && isCorrect && (
+                        <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
+                      )}
+                      {isSelected && !isCorrect && (
+                        <XCircle className="text-red-600 dark:text-red-400" size={20} />
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
-                  {userSelected && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                      Selected
-                    </span>
-                  )}
-                  {shouldBeSelected && (
-                    <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-                      Should select
-                    </span>
-                  )}
-                  {isCorrectSelection ? (
-                    <CheckCircle className="text-green-600 dark:text-green-400" size={20} />
-                  ) : (
-                    <XCircle className="text-red-600 dark:text-red-400" size={20} />
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

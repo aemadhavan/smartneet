@@ -1,7 +1,8 @@
-//File: /src/app/practice-sessions/[sessionId]/review/hooks/useSessionReview.ts
+// src/app/practice-sessions/[sessionId]/review/hooks/useSessionReview.ts
+
 import { useState, useEffect } from 'react';
 import { QuestionAttempt, SessionSummary } from '../components/interfaces';
-import { normalizeQuestionAttempt } from '../components/helpers';
+import { processQuestionAttempts } from '../services/questionProcessor';
 
 interface UseSessionReviewResult {
   loading: boolean;
@@ -15,6 +16,11 @@ interface UseSessionReviewResult {
   goToQuestion: (index: number) => void;
 }
 
+/**
+ * Hook to manage practice session review data
+ * @param sessionId The session ID to retrieve
+ * @returns Session review state and navigation controls
+ */
 export default function useSessionReview(sessionId: number): UseSessionReviewResult {
   const [loading, setLoading] = useState(true);
   const [attempts, setAttempts] = useState<QuestionAttempt[]>([]);
@@ -36,10 +42,10 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
           throw new Error(errorData.error || 'Failed to fetch session review data');
         }
         
-        const reviewData = await reviewResponse.json();      
-        console.log('Review Data:', reviewData); // Debugging line
-        // Normalize the data format to handle API changes
-        const normalizedAttempts = reviewData.attempts.map(normalizeQuestionAttempt);
+        const reviewData = await reviewResponse.json();
+        
+        // Use our new processor to normalize the question attempts
+        const normalizedAttempts = processQuestionAttempts(reviewData.attempts || []);
         setAttempts(normalizedAttempts);
         
         // Fetch summary data
@@ -51,7 +57,7 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
           setSessionSummary(summaryData);
         } else {
           // Fallback to summary from review data if available
-          setSessionSummary(reviewData.summary);
+          setSessionSummary(reviewData.summary || null);
         }
         
         setLoading(false);
@@ -65,6 +71,7 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
     fetchAttempts();
   }, [sessionId]);
 
+  // Navigation functions
   const goToNext = () => {
     if (currentIndex < attempts.length - 1) {
       setCurrentIndex(prevIndex => prevIndex + 1);
@@ -80,8 +87,10 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
   };
 
   const goToQuestion = (index: number) => {
-    setCurrentIndex(index);
-    window.scrollTo(0, 0);
+    if (index >= 0 && index < attempts.length) {
+      setCurrentIndex(index);
+      window.scrollTo(0, 0);
+    }
   };
 
   return {

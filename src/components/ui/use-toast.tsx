@@ -78,21 +78,33 @@ const reducer = (state: State, action: Action): State => {
       // ! Side effects ! - This could be extracted into a dismissToast() action,
       // but I'll keep it here for simplicity
       if (toastId) {
-        toastTimeouts.set(
-          toastId,
-          setTimeout(() => {
-            toastTimeouts.delete(toastId)
-          }, TOAST_REMOVE_DELAY)
-        )
+        const timeoutId = setTimeout(() => {
+          toastTimeouts.delete(toastId);
+        }, TOAST_REMOVE_DELAY);
+        toastTimeouts.set(toastId, timeoutId);
       } else {
         state.toasts.forEach((toast) => {
-          toastTimeouts.set(
-            toast.id,
-            setTimeout(() => {
-              toastTimeouts.delete(toast.id)
-            }, TOAST_REMOVE_DELAY)
-          )
-        })
+          const timeoutId = setTimeout(() => {
+            toastTimeouts.delete(toast.id);
+          }, TOAST_REMOVE_DELAY);
+          toastTimeouts.set(toast.id, timeoutId);
+        });
+      }
+
+      if (toastId) {
+        const timeoutId = toastTimeouts.get(toastId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        toastTimeouts.delete(toastId);
+      } else {
+        state.toasts.forEach((toast) => {
+          const timeoutId = toastTimeouts.get(toast.id);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          toastTimeouts.delete(toast.id);
+        });
       }
 
       return {
@@ -104,7 +116,7 @@ const reducer = (state: State, action: Action): State => {
               }
             : t
         ),
-      }
+      };
     }
     case actionTypes.REMOVE_TOAST:
       if (action.toastId === undefined) {
