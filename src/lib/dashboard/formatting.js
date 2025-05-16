@@ -11,7 +11,7 @@ export const getMasteryColor = (level) => {
       case 'intermediate': return '#fef3c7'; // yellow-100
       case 'advanced': return '#dbeafe'; // blue-100
       case 'mastered': return '#d1fae5'; // green-100
-      default: return '#f3f4f6'; // gray-100
+      default: return '#e5e7eb'; // gray-200
     }
   };
   

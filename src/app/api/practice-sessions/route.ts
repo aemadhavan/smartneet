@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         Number(searchParams.get('subject_id')) : undefined;
       
       // Check if subject_id is a valid number
-      if (subject_id === undefined || isNaN(subject_id)) {
+      if (subject_id === undefined || Number.isNaN(subject_id)) {
         return NextResponse.json({ 
           error: 'Invalid subject_id parameter: must be a valid number' 
         }, { status: 400 });
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       
       if (searchParams.has('topic_id')) {
         topic_id = Number(searchParams.get('topic_id'));
-        if (isNaN(topic_id)) {
+        if (Number.isNaN(topic_id)) {
           return NextResponse.json({ 
             error: 'Invalid topic_id parameter: must be a valid number' 
           }, { status: 400 });
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
       
       if (searchParams.has('subtopic_id')) {
         subtopic_id = Number(searchParams.get('subtopic_id'));
-        if (isNaN(subtopic_id)) {
+        if (Number.isNaN(subtopic_id)) {
           return NextResponse.json({ 
             error: 'Invalid subtopic_id parameter: must be a valid number' 
           }, { status: 400 });
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       
       if (searchParams.has('duration_minutes')) {
         duration_minutes = Number(searchParams.get('duration_minutes'));
-        if (isNaN(duration_minutes)) {
+        if (Number.isNaN(duration_minutes)) {
           return NextResponse.json({ 
             error: 'Invalid duration_minutes parameter: must be a valid number' 
           }, { status: 400 });
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
       
       if (searchParams.has('question_count')) {
         question_count = Number(searchParams.get('question_count'));
-        if (isNaN(question_count)) {
+        if (Number.isNaN(question_count)) {
           return NextResponse.json({ 
             error: 'Invalid question_count parameter: must be a valid number' 
           }, { status: 400 });

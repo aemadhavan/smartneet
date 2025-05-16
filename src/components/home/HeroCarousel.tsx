@@ -29,9 +29,13 @@ const HeroCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   useEffect(() => {
-    import("embla-carousel-autoplay").then((Autoplay) => {
-      setAutoplayPlugin(Autoplay.default({ delay: 5000, stopOnInteraction: true }));
-    });
+    import("embla-carousel-autoplay")
+      .then((Autoplay) => {
+        setAutoplayPlugin(Autoplay.default({ delay: 5000, stopOnInteraction: true }));
+      })
+      .catch((error) => {
+        console.error("Failed to load autoplay plugin", error);
+      });
   }, []);
 
   // Set up the slide change effect

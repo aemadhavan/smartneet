@@ -25,7 +25,7 @@ export async function GET(
     }
     
     const sessionId = Number((await params).sessionId);
-    if (isNaN(sessionId)) {
+    if (Number.isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
@@ -108,7 +108,7 @@ export async function PATCH(
     }
 
     const sessionId = Number((await params).sessionId);
-    if (isNaN(sessionId)) {
+    if (Number.isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
@@ -159,7 +159,7 @@ export async function DELETE(
     }
 
     const sessionId = Number((await params).sessionId);
-    if (isNaN(sessionId)) {
+    if (Number.isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 

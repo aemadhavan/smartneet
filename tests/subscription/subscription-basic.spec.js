@@ -12,7 +12,7 @@ test.beforeAll(async () => {
 
 test('free user should see upgrade option', async ({ page }) => {
   // Sign in as a free user
-  await signInViaApi(page, 'free');
+await signInViaApi(page);
   
   // Navigate to pricing/subscription page
   await page.goto('/pricing');
@@ -26,7 +26,7 @@ test('free user should see upgrade option', async ({ page }) => {
 
 test('free user should have limited test access', async ({ page }) => {
   // Sign in as a free user
-  await signInViaApi(page, 'free');
+  await signInViaApi(page);
   
   // Navigate to practice page
   await page.goto('/practice');

@@ -70,16 +70,21 @@ async function applyFutureMigrations() {
       let sqlContent = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
       
       // Skip enum creation for existing enums
+      function escapeRegExp(string: string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+      }
+
       for (const enumName of enumNames) {
+        const escapedEnumName = escapeRegExp(enumName);
         // Replace CREATE TYPE statements
         sqlContent = sqlContent.replace(
-          new RegExp(`CREATE TYPE ${enumName} AS ENUM \\([^)]+\\);`, 'g'),
+          new RegExp(`CREATE TYPE ${escapedEnumName} AS ENUM \\([^)]+\\);`, 'g'),
           `-- Skipped enum creation for existing enum: ${enumName}`
         );
         
         // Replace DROP TYPE statements
         sqlContent = sqlContent.replace(
-          new RegExp(`DROP TYPE ${enumName};`, 'g'),
+          new RegExp(`DROP TYPE ${escapedEnumName};`, 'g'),
           `-- Skipped enum deletion for existing enum: ${enumName}`
         );
       }

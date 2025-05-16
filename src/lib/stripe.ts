@@ -13,7 +13,7 @@ if (typeof window === 'undefined') {
 
   if (secretKey) {
     stripe = new Stripe(secretKey, {
-      apiVersion: '2025-03-31.basil', // Use the latest API version
+      apiVersion: '2025-04-30.basil', // Use the latest API version
       appInfo: {
         name: 'NEET Exam Prep Platform',
         version: '1.0.0',

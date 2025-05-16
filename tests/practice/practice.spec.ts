@@ -129,7 +129,7 @@ test.describe('Practice Module', () => {
   // Test subscription limits for free users
   test('should show subscription limits for free users', async ({ page }) => {
     // Sign in as a free user
-    await signInViaApi(page, 'free');
+    await signInViaApi(page);
     practicePage = new PracticePage(page);
     
     // Navigate to the practice page
@@ -172,7 +172,7 @@ test.describe('Advanced Practice Features', () => {
   test('should handle session limit reached', async ({ page }) => {
     // Sign in as a limited user who has reached their session limit
     // This requires special test user setup or mocking
-    await signInViaApi(page, 'limitReached');
+    await signInViaApi(page);
     const practicePage = new PracticePage(page);
     
     // Navigate to the practice page

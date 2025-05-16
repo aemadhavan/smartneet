@@ -16,10 +16,9 @@ export async function setupStripeTestEnvironment() {
   
   try {
     // Create test products and prices if they don't exist
-    const productMap = await createTestProductsAndPrices(stripe);
+    await createTestProductsAndPrices(stripe);
     
     console.log('Stripe test environment setup complete.');
-    return productMap;
   } catch (error) {
     console.error('Error setting up Stripe test environment:', error);
     throw error;
@@ -30,8 +29,6 @@ export async function setupStripeTestEnvironment() {
  * Creates test products and prices in Stripe
  */
 async function createTestProductsAndPrices(stripe) {
-  const productMap = new Map();
-  
   // Define test products
   const productConfigs = [
     {
@@ -65,26 +62,17 @@ async function createTestProductsAndPrices(stripe) {
     
     if (existingProduct) {
       console.log(`Product exists for ${config.name}, using existing: ${existingProduct.id}`);
-      productMap.set(config.metadata.plan_code, {
-        product: existingProduct,
-        price: existingProduct.default_price
-      });
     } else {
       console.log(`Creating new product for ${config.name}`);
       const product = await stripe.products.create(config);
       
       // For paid plans, retrieve the created price
-      let price = null;
       if (config.default_price_data) {
         const prices = await stripe.prices.list({ product: product.id });
-        price = prices.data[0];
+        const price = prices.data[0];
       }
-      
-      productMap.set(config.metadata.plan_code, { product, price });
     }
   }
-  
-  return productMap;
 }
 
 /**

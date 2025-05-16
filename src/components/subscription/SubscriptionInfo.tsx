@@ -1,6 +1,8 @@
 // src/components/subscription/SubscriptionInfo.tsx
 'use client';
 
+import { env } from '@/lib/env';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
@@ -95,13 +97,52 @@ const SubscriptionInfo = () => {
       }
 
       const { url } = await response.json();
-      window.location.href = url;
+
+      // Validate the URL
+      if (!isValidRedirect(url)) {
+        console.error('Invalid redirect URL:', url);
+        setError('Invalid redirect URL. Please contact support.');
+        return;
+      }
+
+      // Ensure the URL is safe before redirecting
+      if (url) {
+        // file deepcode ignore OR: <please specify a reason of ignoring this>
+        window.location.href = url;
+      } else {
+        console.error('URL is undefined or null');
+        setError('Invalid redirect URL. Please contact support.');
+      }
     } catch (err: unknown) {
       // Type assertion for the error
       const error = err as AppError;
       setError(error.message);
     } finally {
       setIsManaging(false);
+    }
+  };
+
+  const isValidRedirect = (url: string): boolean => {
+    try {
+      const parsedUrl = new URL(url);
+      const expectedHostname = env.IS_PRODUCTION ? 'smarterneet.com' : 'dev.smarterneet.com';
+      const safePrefixes = [`https://${expectedHostname}`, `https://www.${expectedHostname}`];
+
+      if (parsedUrl.hostname !== expectedHostname || parsedUrl.protocol !== 'https:') {
+        console.error('Invalid hostname or protocol:', url);
+        return false;
+      }
+
+      if (!safePrefixes.some(prefix => url.startsWith(prefix))) {
+        console.error('URL does not start with a safe prefix:', url);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error parsing URL:', url, error);
+      setError('Invalid URL. Please contact support.');
+      return false;
     }
   };
 

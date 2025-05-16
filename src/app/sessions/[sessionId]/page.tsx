@@ -221,8 +221,6 @@ export default function SessionResultsPage({ params }: { params: Promise<{ sessi
               .join(', ');
           }
           return String(answer);
-        case 'AssertionReason':
-          return String(answer);
         default:
           return String(answer);
       }

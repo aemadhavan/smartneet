@@ -273,22 +273,22 @@ export default function TopicsPage() {
   // Helper functions for UI formatting
   const getMasteryColor = (level: string) => {
     switch(level) {
-      case 'notStarted': return '#f3f4f6'; // gray-100
       case 'beginner': return '#fee2e2'; // red-100
       case 'intermediate': return '#fef3c7'; // yellow-100
       case 'advanced': return '#dbeafe'; // blue-100
       case 'mastered': return '#d1fae5'; // green-100
+      case 'notStarted':
       default: return '#f3f4f6'; // gray-100
     }
   };
   
   const getMasteryTextColor = (level: string) => {
     switch(level) {
-      case 'notStarted': return '#6b7280'; // gray-500
       case 'beginner': return '#b91c1c'; // red-700
       case 'intermediate': return '#b45309'; // yellow-700
       case 'advanced': return '#1e40af'; // blue-800
       case 'mastered': return '#047857'; // green-700
+      case 'notStarted':
       default: return '#6b7280'; // gray-500
     }
   };

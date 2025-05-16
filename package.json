@@ -21,7 +21,7 @@
     "db:migrate:safe": "tsx src/db/safe-migrate.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.13.0",
+    "@clerk/nextjs": "^6.19.3",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-dialog": "^1.1.11",
     "@radix-ui/react-label": "^2.1.4",
@@ -35,8 +35,8 @@
     "@types/recharts": "^1.8.29",
     "@upstash/redis": "^1.34.8",
     "@vercel/speed-insights": "^1.2.0",
-    "@xata.io/cli": "^0.16.12",
     "@xata.io/client": "^0.30.1",
+    "autoprefixer": "^10.4.14",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -44,12 +44,15 @@
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "framer-motion": "^12.6.3",
+    "lightningcss": "^1.30.1",
+    "lightningcss-win32-x64-msvc": "^1.30.1",
     "lru-cache": "^10.4.3",
     "lucide-react": "^0.488.0",
     "next": "15.2.4",
+    "postcss": "^8.5.3",
     "postgres": "^3.4.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
     "react-hook-form": "^7.56.1",
     "react-markdown": "^10.1.0",
     "recharts": "^2.15.2",
@@ -59,25 +62,42 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.52.0",
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.1.7",
+    "@tailwindcss/upgrade": "^4.1.7",
     "@types/node": "^20.17.30",
     "@types/pg": "^8.11.13",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.1.4",
+    "@types/react-dom": "^19.1.5",
     "@types/stripe": "^8.0.416",
     "dotenv": "^16.5.0",
-    "drizzle-kit": "^0.30.6",
+    "drizzle-kit": "^0.31.1",
     "drizzle-orm": "^0.41.0",
+    "esbuild": "^0.25.4",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
     "node-fetch": "^3.3.2",
     "pg": "^8.14.1",
     "stripe": "^18.0.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.7",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
     "tw-animate-css": "^1.2.8",
-    "typescript": "^5",
+    "typescript": "^5.8.3",
     "uuid": "^11.1.0"
+  },
+  "overrides": {
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-reconciler": "0.29.0",
+    "ink": {
+      "react": "19.0.0"
+    },
+    "@oclif/plugin-update": {
+      "@oclif/table": {
+        "ink": {
+          "react": "19.0.0"
+        }
+      }
+    }
   }
 }
