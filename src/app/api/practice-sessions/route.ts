@@ -534,6 +534,7 @@ async function getPersonalizedQuestions(
   
   return selectedQuestions;
 }
+
 // Helper function to invalidate all session cache entries for a user
 async function invalidateUserSessionCaches(userId: string) {
   // Delete the main cache key
@@ -563,44 +564,4 @@ async function invalidateUserSessionCaches(userId: string) {
     // Silently handle if revalidation functions are not available
     console.log('Revalidation not available:', error);
   }
-}
-
-// Improve the withRetry function to handle specific errors differently
-export async function withRetry<T>(
-  fn: () => Promise<T>, 
-  maxRetries = 3, 
-  delay = 1000
-): Promise<T> {
-  let lastError: Error;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error as Error;
-      
-      // Don't retry on certain errors
-      if (error instanceof Error) {
-        // Don't retry on constraint violations
-        if (error.message.includes('23505')) {
-          throw error;
-        }
-      }
-      
-      // Only retry on connection issues
-      if (attempt < maxRetries && 
-          (error instanceof Error && 
-           (error.message.includes('connection') || 
-            error.message.includes('timeout')))) {
-        console.log(`Connection limit exceeded, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        // Exponential backoff
-        delay *= 2;
-      } else {
-        throw error;
-      }
-    }
-  }
-  
-  throw lastError!;
 }
