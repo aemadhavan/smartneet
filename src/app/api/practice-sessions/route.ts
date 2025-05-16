@@ -1,6 +1,6 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db, withRetry } from '@/db';
+import { db } from '@/db';
 import { sql } from 'drizzle-orm';
 import { 
   practice_sessions, 
@@ -51,6 +51,17 @@ export async function POST(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Generate idempotency key from request or headers
+    const idempotencyKey = request.headers.get('x-idempotency-key') || 
+                          crypto.randomUUID();
+    
+    // Check if we've already processed this request
+    const cacheKey = `idempotency:${userId}:${idempotencyKey}`;
+    const cachedResponse = await cache.get(cacheKey);
+    if (cachedResponse) {
+      return NextResponse.json(cachedResponse, { status: 200 });
     }
 
     // Check subscription limits before creating a new session
@@ -158,9 +169,10 @@ export async function POST(request: NextRequest) {
       const validatedData = createSessionSchema.parse(requestData);
       console.log('Validated data:', validatedData);
       
-      // Create new session in database
-      const [newSession] = await withRetry(async () => {
-        return db.insert(practice_sessions).values({
+      // Use a transaction for the entire session creation process
+      const result = await db.transaction(async (tx) => {
+        // Create new session in database
+        const [newSession] = await tx.insert(practice_sessions).values({
           user_id: userId,
           subject_id: validatedData.subject_id,
           topic_id: validatedData.topic_id,
@@ -173,32 +185,21 @@ export async function POST(request: NextRequest) {
           is_completed: false,
           start_time: new Date()
         }).returning();
-      });
 
-      // Get personalized questions
-      const sessionQuestions = await withRetry(async () => {
-        return getPersonalizedQuestions(
+        // Get personalized questions
+        const sessionQuestions = await getPersonalizedQuestions(
           userId, 
           validatedData.subject_id, 
           validatedData.topic_id, 
           validatedData.subtopic_id, 
           validatedData.question_count
         );
-      });
 
-      // Check if we have enough questions
-      if (sessionQuestions.length === 0) {
-        // Clean up the created session since we don't have questions
-        await db.delete(practice_sessions)
-          .where(eq(practice_sessions.session_id, newSession.session_id));
-        
-        return NextResponse.json({ 
-          error: 'No questions available for the selected criteria' 
-        }, { status: 404 });
-      }
+        // Check if we have enough questions
+        if (sessionQuestions.length === 0) {
+          throw new Error('No questions available for the selected criteria');
+        }
 
-      // Add questions to the session
-      await withRetry(async () => {
         // Use a Set to track question IDs and prevent duplicates
         const questionIdSet = new Set<number>();
         const valuesToInsert: {
@@ -229,12 +230,15 @@ export async function POST(request: NextRequest) {
           });
         });
         
-        // Use a transaction to ensure atomicity
-        return db.transaction(async (tx) => {
-          for (const values of valuesToInsert) {
-            await tx.insert(session_questions).values(values);
-          }
-        });
+        // Insert questions sequentially within the transaction
+        for (const values of valuesToInsert) {
+          await tx.insert(session_questions).values(values);
+        }
+
+        return {
+          sessionId: newSession.session_id,
+          questions: sessionQuestions
+        };
       });
 
       // Increment test usage for subscription tracking
@@ -243,10 +247,10 @@ export async function POST(request: NextRequest) {
       // Invalidate user's practice sessions list cache
       await invalidateUserSessionCaches(userId);
 
-      return NextResponse.json({
-        sessionId: newSession.session_id,
-        questions: sessionQuestions
-      });
+      // Store the result in the idempotency cache
+      await cache.set(cacheKey, result, 3600); // Cache for 1 hour
+
+      return NextResponse.json(result);
       
     } catch (e) {
       console.error('Validation error:', e);
@@ -281,6 +285,18 @@ export async function POST(request: NextRequest) {
     }
   } catch (e) {
     console.error('Unexpected error in practice session creation:', e);
+    
+    // Check if it's a database constraint error
+    if (e instanceof Error && e.message.includes('23505')) {
+      return NextResponse.json(
+        { 
+          message: "Duplicate session or questions detected",
+          error: "A constraint violation occurred. Please try again."
+        },
+        { status: 409 }, // Conflict status code
+      );
+    }
+    
     return NextResponse.json(
       { 
         message: "Failed to create practice session",
@@ -547,4 +563,44 @@ async function invalidateUserSessionCaches(userId: string) {
     // Silently handle if revalidation functions are not available
     console.log('Revalidation not available:', error);
   }
+}
+
+// Improve the withRetry function to handle specific errors differently
+export async function withRetry<T>(
+  fn: () => Promise<T>, 
+  maxRetries = 3, 
+  delay = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on certain errors
+      if (error instanceof Error) {
+        // Don't retry on constraint violations
+        if (error.message.includes('23505')) {
+          throw error;
+        }
+      }
+      
+      // Only retry on connection issues
+      if (attempt < maxRetries && 
+          (error instanceof Error && 
+           (error.message.includes('connection') || 
+            error.message.includes('timeout')))) {
+        console.log(`Connection limit exceeded, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        // Exponential backoff
+        delay *= 2;
+      } else {
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError!;
 }
