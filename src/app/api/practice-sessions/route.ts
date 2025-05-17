@@ -1,7 +1,7 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { sql, count } from 'drizzle-orm';
+import {  count } from 'drizzle-orm';
 import { 
   practice_sessions, 
   questions, 
@@ -662,7 +662,7 @@ async function invalidateUserSessionCaches(userId: string) {
 
 // When creating a new cache entry, track it for later invalidation
 // This function would be called whenever a new cache entry is created
-async function trackCacheKey(userId: string, cacheKey: string) {
+/*async function trackCacheKey(userId: string, cacheKey: string) {
   try {
     const userKeysSetKey = `user:${userId}:cache-keys`;
     const existingKeys = await cache.get(userKeysSetKey) || [];
@@ -681,3 +681,4 @@ async function trackCacheKey(userId: string, cacheKey: string) {
     // Non-critical operation, continue execution
   }
 }
+*/

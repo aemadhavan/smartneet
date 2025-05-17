@@ -133,9 +133,30 @@ class Cache implements CacheProvider {
     return deletedCount;
   }
 
-  // Add the tracking method if you're using that approach
+  /**
+   * Track a cache key for a specific user
+   * This helps with user-specific cache invalidation
+   */
   async trackKey(userId: string, key: string): Promise<void> {
-    // Implementation of trackKey method
+    try {
+      const userKeysSetKey = `user:${userId}:cache-keys`;
+      
+      if (redisClient) {
+        // Add the key to the user's set in Redis
+        await redisClient.sadd(userKeysSetKey, key);
+        // Set expiry on the set to prevent unbounded growth
+        await redisClient.expire(userKeysSetKey, 86400); // 24 hours TTL
+      } else {
+        // For memory cache, maintain a simple set of keys
+        const userKeys = await this.get<string[]>(userKeysSetKey) || [];
+        if (!userKeys.includes(key)) {
+          userKeys.push(key);
+          await this.set(userKeysSetKey, userKeys, 86400);
+        }
+      }
+    } catch (error) {
+      console.error('Cache trackKey error:', error);
+    }
   }
 }
 
