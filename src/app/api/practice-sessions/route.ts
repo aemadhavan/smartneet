@@ -8,9 +8,11 @@ import {
   topics, 
   subtopics, 
   subjects,
-  session_questions
+  session_questions,
+  user_subscriptions,
+  subscription_plans
 } from '@/db/schema';
-import { and, eq, desc } from 'drizzle-orm';
+import { and, eq, desc, isNull, inArray } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { cache } from '@/lib/cache';
@@ -513,15 +515,32 @@ async function getPersonalizedQuestions(
     question_type: "MultipleChoice" | "Matching" | "MultipleCorrectStatements" | "AssertionReason" | "DiagramBased" | "SequenceOrdering";
     details: unknown;
     explanation: string | null;
-    difficulty_level: string | null; // Make nullable to match database schema
+    difficulty_level: string | null;
     marks: number;
     negative_marks: number;
     topic_id: number;
     topic_name: string;
     subtopic_id: number | null;
     subtopic_name: string | null;
-    source_type: string; // Add source_type field
+    source_type: string;
   }
+  
+  // Check if this is a free user practicing botany
+  const isBotanySubject = subjectId === 3; // Biology subject ID
+  const userSubscription = await db
+    .select({
+      plan_code: subscription_plans.plan_code
+    })
+    .from(user_subscriptions)
+    .innerJoin(
+      subscription_plans,
+      eq(user_subscriptions.plan_id, subscription_plans.plan_id)
+    )
+    .where(eq(user_subscriptions.user_id, userId))
+    .limit(1)
+    .then(rows => rows[0]);
+  
+  const isFreemiumUser = !userSubscription || userSubscription.plan_code === 'free';
   
   // Cache key for the potential questions pool - include source_type in cache key
   const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}:source:AI_Generated`;
@@ -531,7 +550,6 @@ async function getPersonalizedQuestions(
   
   if (!potentialQuestions) {
     // Cache miss - execute query to get potential questions
-    // Query to build the set of questions
     // Base query: include questions from the specified subject
     const baseQuery = db.select({
       question_id: questions.question_id,
@@ -546,7 +564,7 @@ async function getPersonalizedQuestions(
       topic_name: topics.topic_name,
       subtopic_id: subtopics.subtopic_id,
       subtopic_name: subtopics.subtopic_name,
-      source_type: questions.source_type, // Select source_type field
+      source_type: questions.source_type,
     })
     .from(questions)
     .innerJoin(topics, eq(questions.topic_id, topics.topic_id))
@@ -555,7 +573,7 @@ async function getPersonalizedQuestions(
     // Build conditions array
     const conditions = [
       eq(questions.subject_id, subjectId),
-      eq(questions.source_type, 'AI_Generated') // Add filter for AI_Generated questions
+      eq(questions.source_type, 'AI_Generated')
     ];
     
     // Add topic filter if specified
@@ -566,6 +584,32 @@ async function getPersonalizedQuestions(
     // Add subtopic filter if specified
     if (subtopicId) {
       conditions.push(eq(questions.subtopic_id, subtopicId));
+    }
+    
+    // For free users practicing botany, restrict to first two topics
+    if (isBotanySubject && isFreemiumUser && !topicId) {
+      // Get the first two topic IDs
+      const freemiumTopics = await db
+        .select({ topic_id: topics.topic_id })
+        .from(topics)
+        .where(
+          and(
+            eq(topics.subject_id, subjectId),
+            eq(topics.is_active, true),
+            isNull(topics.parent_topic_id)
+          )
+        )
+        .orderBy(topics.topic_id)
+        .limit(2);
+      
+      if (freemiumTopics.length > 0) {
+        conditions.push(
+          inArray(
+            questions.topic_id, 
+            freemiumTopics.map(t => t.topic_id)
+          )
+        );
+      }
     }
     
     // Apply all conditions with 'and'
@@ -579,21 +623,29 @@ async function getPersonalizedQuestions(
     }));
     
     // Cache the potential questions pool for future use
-    // Questions change less frequently, so we can cache longer
     await cache.set(poolCacheKey, potentialQuestions, 3600); // Cache for 1 hour
   }
   
-  // Now that we have the potential questions (either from cache or database),
-  // we need to personalize them for this specific user
+  // For free users practicing botany without a specific topic,
+  // filter cached questions to only include first two topics
+  if (isBotanySubject && isFreemiumUser && !topicId && potentialQuestions) {
+    const freemiumTopics = await db
+      .select({ topic_id: topics.topic_id })
+      .from(topics)
+      .where(
+        and(
+          eq(topics.subject_id, subjectId),
+          eq(topics.is_active, true),
+          isNull(topics.parent_topic_id)
+        )
+      )
+      .orderBy(topics.topic_id)
+      .limit(2);
+    
+    const freemiumTopicIds = new Set(freemiumTopics.map(t => t.topic_id));
+    potentialQuestions = potentialQuestions.filter(q => freemiumTopicIds.has(q.topic_id));
+  }
   
-  // In a real implementation, we would apply more sophisticated logic:
-  // 1. Check user's question_attempts to identify weak areas
-  // 2. Balance questions across difficulty levels
-  // 3. Prioritize topics with lower mastery_level
-  // 4. Include some previously incorrect questions for reinforcement
-  
-  // For now, we'll just randomize the order and take the requested count
-  // Note: We don't cache this personalized selection since it should be different each time
   // Make sure potentialQuestions is an array before spreading
   const questionsArray = Array.isArray(potentialQuestions) ? potentialQuestions : [];
   const shuffled = [...questionsArray].sort(() => 0.5 - Math.random());
