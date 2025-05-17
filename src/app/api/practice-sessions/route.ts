@@ -1,7 +1,7 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { sql } from 'drizzle-orm';
+import { sql, count } from 'drizzle-orm';
 import { 
   practice_sessions, 
   questions, 
@@ -18,8 +18,17 @@ import {
   checkSubscriptionLimitServerAction, 
   incrementTestUsage 
 } from '@/lib/middleware/subscriptionMiddleware';
+// Add rate limiting imports
+import { RateLimiter } from '@/lib/rate-limiter';
 // Optional - only if you're using Next.js App Router
 import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Define rate limit configurations
+const RATE_LIMITS = {
+  CREATE_SESSION: { points: 10, duration: 60 * 60 }, // 10 requests per hour
+  GET_SESSIONS: { points: 60, duration: 60 }, // 60 requests per minute
+  UPDATE_SESSION: { points: 30, duration: 60 } // 30 requests per minute
+};
 
 // Schema for validating session creation request
 const createSessionSchema = z.object({
@@ -51,6 +60,22 @@ export async function POST(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Apply rate limiting
+    const rateLimiter = new RateLimiter(`create-session:${userId}`, RATE_LIMITS.CREATE_SESSION.points, RATE_LIMITS.CREATE_SESSION.duration);
+    const rateLimitResult = await rateLimiter.consume();
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        retryAfter: rateLimitResult.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimitResult.retryAfter)
+        }
+      });
     }
 
     // Generate idempotency key from request or headers
@@ -255,7 +280,7 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error('Validation error:', e);
       
-      // If it's a Zod error, provide more detailed information
+      // If it's a Zod error, provide more focused information
       if (e instanceof z.ZodError) {
         console.error('Failed fields:', e.errors.map(err => ({
           path: err.path.join('.'),
@@ -268,8 +293,8 @@ export async function POST(request: NextRequest) {
             details: e.errors.map(err => ({
               field: err.path.join('.'),
               message: err.message
-            })),
-            requestData: requestData // Include this for debugging
+            }))
+            // Remove requestData from response
           }, 
           { status: 400 }
         );
@@ -279,6 +304,7 @@ export async function POST(request: NextRequest) {
         { 
           error: 'Invalid session parameters',
           message: e instanceof Error ? e.message : String(e)
+          // Remove detailed error stack traces
         }, 
         { status: 400 }
       );
@@ -292,15 +318,18 @@ export async function POST(request: NextRequest) {
         { 
           message: "Duplicate session or questions detected",
           error: "A constraint violation occurred. Please try again."
+          // Generic message instead of raw DB error
         },
         { status: 409 }, // Conflict status code
       );
     }
     
+    // Provide generic error message without exposing implementation details
     return NextResponse.json(
       { 
         message: "Failed to create practice session",
-        error: e instanceof Error ? e.message : "Unknown error"
+        error: "An unexpected error occurred"
+        // Don't include raw error message in production
       },
       { status: 500 },
     );
@@ -313,6 +342,22 @@ export async function GET(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Apply rate limiting
+    const rateLimiter = new RateLimiter(`get-sessions:${userId}`, RATE_LIMITS.GET_SESSIONS.points, RATE_LIMITS.GET_SESSIONS.duration);
+    const rateLimitResult = await rateLimiter.consume();
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        retryAfter: rateLimitResult.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimitResult.retryAfter)
+        }
+      });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -355,15 +400,15 @@ export async function GET(request: NextRequest) {
     .limit(limit)
     .offset(offset);
 
-    // Get total count using SQL count function
+    // SAFER APPROACH: Replace the raw SQL count with Drizzle's count function
     const countResult = await db
       .select({
-        count: sql<number>`count(*)`
+        count: count(practice_sessions.session_id)
       })
       .from(practice_sessions)
       .where(eq(practice_sessions.user_id, userId));
 
-    const total: number = countResult[0]?.count || 0;
+    const total: number = Number(countResult[0]?.count) || 0;
     
     const result = {
       sessions,
@@ -383,7 +428,10 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching practice sessions:', error);
-    return NextResponse.json({ error: 'Failed to fetch practice sessions' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to fetch practice sessions'
+      // Don't include raw error details
+    }, { status: 500 });
   }
 }
 
@@ -393,6 +441,22 @@ export async function PATCH(request: NextRequest) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Apply rate limiting
+    const rateLimiter = new RateLimiter(`update-session:${userId}`, RATE_LIMITS.UPDATE_SESSION.points, RATE_LIMITS.UPDATE_SESSION.duration);
+    const rateLimitResult = await rateLimiter.consume();
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json({
+        error: 'Rate limit exceeded',
+        retryAfter: rateLimitResult.retryAfter
+      }, { 
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimitResult.retryAfter)
+        }
+      });
     }
 
     let body;
@@ -427,7 +491,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating practice session:', error);
-    return NextResponse.json({ error: 'Failed to update practice session' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to update practice session'
+      // Don't include raw error details
+    }, { status: 500 });
   }
 }
 
@@ -537,19 +604,43 @@ async function getPersonalizedQuestions(
 
 // Helper function to invalidate all session cache entries for a user
 async function invalidateUserSessionCaches(userId: string) {
-  // Delete the main cache key
-  await cache.delete(`api:practice-sessions:user:${userId}`);
-  
-  // Delete common pagination variants
-  await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
-  await cache.delete(`api:practice-sessions:user:${userId}:limit:10:offset:0`);
-  
-  // Invalidate subscription-related caches
-  await cache.delete(`user:${userId}:subscription`);
-  await cache.delete(`user:${userId}:tests:today`);
-  
-  // If using Next.js App Router, use the imported functions for revalidation
   try {
+    // Instead of deleting individual keys, use a pattern-based approach
+    // This assumes your cache implementation supports pattern deletion
+    // If using Redis, this would use the SCAN + DEL commands
+    
+    // Define patterns for different types of user-related caches
+    const patterns = [
+      `api:practice-sessions:user:${userId}:*`, // All session list caches with any pagination
+      `session:${userId}:*`,                    // Individual session caches
+      `user:${userId}:subscription`,            // Subscription info
+      `user:${userId}:tests:*`,                 // Test usage metrics
+      `idempotency:${userId}:*`                 // Idempotency keys
+    ];
+    
+    // Delete all matching cache entries for each pattern
+    const deletePromises = patterns.map(pattern => cache.deletePattern(pattern));
+    await Promise.all(deletePromises);
+    
+    // If your cache implementation doesn't support pattern deletion,
+    // you can implement a key tracking mechanism:
+    // 1. Maintain a set of keys for each user in the cache
+    // 2. When creating a cache entry, add the key to the user's set
+    // 3. When invalidating, get all keys from the set and delete them
+    
+    // Example of key tracking approach (uncomment if needed):
+    /*
+    const userKeysSetKey = `user:${userId}:cache-keys`;
+    const userCacheKeys = await cache.get(userKeysSetKey) || [];
+    if (Array.isArray(userCacheKeys) && userCacheKeys.length > 0) {
+      const deletePromises = userCacheKeys.map(key => cache.delete(key));
+      await Promise.all(deletePromises);
+      // Reset the tracking set
+      await cache.set(userKeysSetKey, [], 86400); // 24 hours TTL
+    }
+    */
+    
+    // If using Next.js App Router, use the imported functions for revalidation
     if (typeof revalidatePath === 'function') {
       revalidatePath('/dashboard');
       revalidatePath('/practice');
@@ -560,8 +651,33 @@ async function invalidateUserSessionCaches(userId: string) {
       revalidateTag('user-sessions');
       revalidateTag('subscription');
     }
+    
+    console.log(`Cache invalidated for user ${userId}`);
   } catch (error) {
-    // Silently handle if revalidation functions are not available
-    console.log('Revalidation not available:', error);
+    // Log the error but don't fail the operation
+    console.error('Error invalidating cache:', error);
+    // The main operation should still succeed even if cache invalidation fails
+  }
+}
+
+// When creating a new cache entry, track it for later invalidation
+// This function would be called whenever a new cache entry is created
+async function trackCacheKey(userId: string, cacheKey: string) {
+  try {
+    const userKeysSetKey = `user:${userId}:cache-keys`;
+    const existingKeys = await cache.get(userKeysSetKey) || [];
+    // Add the new key if it doesn't exist
+    if (Array.isArray(existingKeys)) {
+      if (!existingKeys.includes(cacheKey)) {
+        existingKeys.push(cacheKey);
+        await cache.set(userKeysSetKey, existingKeys, 86400); // 24 hours TTL
+      }
+    } else {
+      // Initialize as array if not already
+      await cache.set(userKeysSetKey, [cacheKey], 86400); // 24 hours TTL
+    }
+  } catch (error) {
+    console.error('Error tracking cache key:', error);
+    // Non-critical operation, continue execution
   }
 }

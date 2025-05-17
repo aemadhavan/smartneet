@@ -31,6 +31,8 @@ export interface CacheProvider {
   set: <T>(key: string, value: T, ttl?: number) => Promise<void>
   delete: (key: string) => Promise<void>
   flush: () => Promise<void>
+  deletePattern: (pattern: string) => Promise<number>
+  trackKey: (userId: string, key: string) => Promise<void>
 }
 
 /**
@@ -99,6 +101,41 @@ class Cache implements CacheProvider {
     } catch (error) {
       console.error('Cache flush error:', error)
     }
+  }
+
+  // Add pattern-based deletion to your cache implementation
+  async deletePattern(pattern: string): Promise<number> {
+    if (!redisClient) {
+      console.warn('Redis not available for pattern deletion');
+      return 0;
+    }
+    
+    let cursor = '0';
+    let deletedCount = 0;
+    
+    do {
+      // Use SCAN to find keys matching the pattern
+      const [nextCursor, keys] = await redisClient.scan(
+        cursor,
+        {
+          match: pattern,
+          count: 100
+        }
+      );
+      cursor = nextCursor;
+      // Delete the found keys
+      if (keys.length > 0) {
+        const deleted = await redisClient.del(...keys);
+        deletedCount += deleted;
+      }
+    } while (cursor !== '0');
+    
+    return deletedCount;
+  }
+
+  // Add the tracking method if you're using that approach
+  async trackKey(userId: string, key: string): Promise<void> {
+    // Implementation of trackKey method
   }
 }
 
