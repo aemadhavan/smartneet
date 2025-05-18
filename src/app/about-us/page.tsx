@@ -21,12 +21,12 @@ const AboutUs = () => {
         <div className="p-8 sm:p-10">
           <div className="bg-purple-50 p-6 rounded-lg border-l-4 border-purple-500 mb-8">
             <p className="text-lg leading-relaxed">
-              At <span className="font-bold text-purple-700">SmarterNeet</span>, we believe every NEET aspirant deserves access to high-quality preparation—no matter where they live or what their background is. That's why we've built an AI-powered, self-learning platform that levels the playing field for all.
+              At <span className="font-bold text-purple-700">SmarterNeet</span>, we believe every NEET aspirant deserves access to high-quality preparation—no matter where they live or what their background is. That&apos;s why we&apos;ve built an AI-powered, self-learning platform that levels the playing field for all.
             </p>
           </div>
           
           <p className="text-lg leading-relaxed mb-8">
-            Rooted in the vision of <em className="text-purple-600 font-medium">democratizing NEET preparation</em>, SmarterNeet is more than just another test platform. It's a smart, affordable, and deeply personalized way to practice, improve, and succeed—with the help of data-driven insights and a growing NEET-aligned question bank.
+            Rooted in the vision of <em className="text-purple-600 font-medium">democratizing NEET preparation</em>, SmarterNeet is more than just another test platform. It&apos;s a smart, affordable, and deeply personalized way to practice, improve, and succeed—with the help of data-driven insights and a growing NEET-aligned question bank.
           </p>
           
           {/* Decorative Divider */}
@@ -48,7 +48,7 @@ const AboutUs = () => {
                 Our Vision
               </h3>
               <p className="text-lg leading-relaxed">
-                To <strong>empower every NEET aspirant</strong> by making world-class test readiness available to all—<em>bridging the learning gap</em> with intelligent tools that adapt to each learner's journey.
+                To <strong>empower every NEET aspirant</strong> by making world-class test readiness available to all—<em>bridging the learning gap</em> with intelligent tools that adapt to each learner&apos;s journey.
               </p>
             </div>
             
@@ -62,7 +62,7 @@ const AboutUs = () => {
                 Our Mission
               </h3>
               <p className="text-lg leading-relaxed">
-                We're on a mission to make NEET success achievable for every student in India through <strong>AI-powered question generation</strong>, <strong>personalized practice routines</strong>, and <strong>real-time performance analytics</strong>.
+                We&apos;re on a mission to make NEET success achievable for every student in India through <strong>AI-powered question generation</strong>, <strong>personalized practice routines</strong>, and <strong>real-time performance analytics</strong>.
               </p>
             </div>
           </div>
@@ -137,7 +137,7 @@ const AboutUs = () => {
           
           {/* Who We're For - Enhanced Section */}
           <div className="mt-12 bg-gradient-to-r from-purple-50 to-indigo-50 p-8 rounded-lg">
-            <h3 className="text-2xl font-bold text-purple-800 mb-6 text-center">Who We're For</h3>
+            <h3 className="text-2xl font-bold text-purple-800 mb-6 text-center">Who We&apos;re For</h3>
             <div className="grid md:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300">
                 <div className="flex flex-col items-center text-center">
@@ -171,7 +171,7 @@ const AboutUs = () => {
                     </svg>
                   </div>
                   <h4 className="font-bold text-purple-900 mb-3">Parents</h4>
-                  <p>Who want affordable, quality support for their child's NEET dreams</p>
+                  <p>Who want affordable, quality support for their child&apos;s NEET dreams</p>
                 </div>
               </div>
             </div>
@@ -181,10 +181,10 @@ const AboutUs = () => {
           <div className="mt-12 bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8 rounded-lg text-center">
             <h3 className="text-2xl font-bold mb-4">Join the Movement</h3>
             <p className="text-lg mb-4">
-              We're not just building a product—we're building a movement. A future where <strong>any student with a dream can become a doctor</strong>, regardless of circumstances.
+              We&apos;re not just building a product—we&apos;re building a movement. A future where <strong>any student with a dream can become a doctor</strong>, regardless of circumstances.
             </p>
             <p className="text-lg mb-6">
-              Whether you're a student, parent, educator, or partner—<strong>let's democratize NEET success, together.</strong>
+              Whether you&apos;re a student, parent, educator, or partner—<strong>let&apos;s democratize NEET success, together.</strong>
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <button className="bg-white text-purple-700 font-bold py-3 px-8 rounded-full hover:bg-purple-50 transition-colors duration-300">
