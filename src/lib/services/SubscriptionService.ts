@@ -456,6 +456,109 @@ export class SubscriptionService {
       300 // 5 minutes TTL
     )(userId);
   }
+  /**
+ * Check if user can access a topic based on the topic index
+ * Free users can only access the first N topics per subject
+ */
+async canAccessTopic(userId: string, subjectId: number, topicIndex: number): Promise<{ canAccess: boolean; reason?: string }> {
+  const MAX_FREE_TOPICS = 2; // Number of free topics per subject
+  
+  try {
+    const subscription = await this.getUserSubscription(userId);
+    
+    // Get the plan details
+    const plan = await this.getPlanById(subscription.plan_id);
+    
+    // Premium users can access all topics
+    if (plan.plan_code === 'premium') {
+      return { canAccess: true };
+    }
+    
+    // Free users can only access MAX_FREE_TOPICS per subject
+    if (topicIndex < MAX_FREE_TOPICS) {
+      return { canAccess: true };
+    }
+    
+    return { 
+      canAccess: false, 
+      reason: `Free users can only access ${MAX_FREE_TOPICS} topics per subject. Upgrade to premium for unlimited access.`
+    };
+  } catch (error) {
+    console.error('Error checking topic access:', error);
+    // Default to allowing access if there's an error checking
+    return { canAccess: true };
+  }
+}
+/**
+ * Get the total number of topics a user can access per subject
+ * This is unlimited for premium users and limited for free users
+ */
+async getAccessibleTopicsCount(userId: string): Promise<number> {
+  const MAX_FREE_TOPICS = 2; // Number of free topics per subject
+  
+  try {
+    const subscription = await this.getUserSubscription(userId);
+    const plan = await this.getPlanById(subscription.plan_id);
+    
+    // Premium users can access unlimited topics
+    if (plan.plan_code === 'premium') {
+      return Infinity;
+    }
+    
+    // Free users can access MAX_FREE_TOPICS per subject
+    return MAX_FREE_TOPICS;
+  } catch (error) {
+    console.error('Error getting accessible topics count:', error);
+    // Default to free plan limit if there's an error
+    return MAX_FREE_TOPICS;
+  }
+}
+/**
+ * Check if a user has a premium subscription
+ * This is a convenience method to quickly check premium status
+ */
+async isPremiumUser(userId: string): Promise<boolean> {
+  const cacheKey = `user:${userId}:is-premium`;
+  
+  return withCache(
+    async (uid: string) => {
+      const subscription = await this.getUserSubscription(uid);
+      const plan = await this.getPlanById(subscription.plan_id);
+      
+      return plan.plan_code === 'premium';
+    },
+    cacheKey,
+    300 // 5 minutes TTL
+  )(userId);
+}
+/**
+ * Get user subscription details with plan information
+ * This combines subscription and plan data in one convenient method
+ */
+async getSubscriptionWithPlan(userId: string) {
+  const cacheKey = `user:${userId}:subscription-with-plan`;
+  
+  return withCache(
+    async (uid: string) => {
+      const subscription = await this.getUserSubscription(uid);
+      const plan = await this.getPlanById(subscription.plan_id);
+      
+      return {
+        subscription,
+        plan,
+        isPremium: plan.plan_code === 'premium',
+        maxTopicsPerSubject: plan.plan_code === 'premium' ? Infinity : 2,
+        maxTestsPerDay: plan.test_limit_daily || Infinity,
+        remainingTests: plan.test_limit_daily 
+          ? Math.max(0, plan.test_limit_daily - (subscription.tests_used_today || 0))
+          : Infinity
+      };
+    },
+    cacheKey,
+    300 // 5 minutes TTL
+  )(userId);
+}
+
 }
 
 export const subscriptionService = new SubscriptionService();
