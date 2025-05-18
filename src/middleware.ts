@@ -5,6 +5,7 @@ const publicRoutes = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/about(.*)",
   "/privacy(.*)",
   "/terms(.*)",
   "/unsubscribe(.*)",

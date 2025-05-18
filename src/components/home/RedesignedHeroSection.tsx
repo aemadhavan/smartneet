@@ -3,6 +3,9 @@
 import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
+// Removed invalid import since @/hooks/useAuth doesn't exist
+// import { useAuth } from "@/hooks/useAuth";
 
 // Import HeroCarousel with lazy loading
 const HeroCarousel = lazy(() => import("./HeroCarousel"));
@@ -56,8 +59,9 @@ const DNAHelixBackground = () => {
     </div>
   );
 };
-
 export const RedesignedHeroSection = () => {
+  const { userId } = useAuth();
+  const isAuthenticated = !!userId;
   // Simple stats with reduced processing
   const stats = [
     { number: "500+", label: "Biology Questions" },
@@ -92,10 +96,10 @@ export const RedesignedHeroSection = () => {
             
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
               <Link 
-                href="/sign-up" 
+                href={isAuthenticated ? "/practice" : "/sign-up"}
                 className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg transition-all text-center"
               >
-                Sign up for Biology
+                {isAuthenticated ? "Practice Now" : "Sign up for Biology"}
               </Link>
               <Link 
                 href="/biology" 
