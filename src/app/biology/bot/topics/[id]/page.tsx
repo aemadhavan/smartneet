@@ -40,10 +40,10 @@ export default function TopicDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSubtopicId, setActiveSubtopicId] = useState<number | null>(null);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const { subscription } = useSubscriptionLimits();
+  const { subscription, isPremium: apiIsPremium } = useSubscriptionLimits();
   
-  // Check if user has premium access
-  const isPremium = subscription?.planCode !== 'free';
+  // Check if user has premium access - use the explicit isPremium flag from the hook
+  const isPremium = apiIsPremium;
   
   // Check if this is a free topic (one of the first two)
   const [isFreeTopic, setIsFreeTopic] = useState<boolean>(true);
@@ -69,10 +69,12 @@ export default function TopicDetailPage() {
         
         // Check if this topic is one of the first two (free topics)
         const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id.toString() === topicId);
-        setIsFreeTopic(topicIndex === 0 || topicIndex === 1);
+        const foundIndex = topicIndex === -1 ? 999 : topicIndex; // Use a high index if not found to require premium
+        setIsFreeTopic(foundIndex === 0 || foundIndex === 1);
         
         // If premium content and user doesn't have access, redirect to pricing
-        if (topicIndex > 1 && !isPremium) {
+        if (foundIndex > 1 && !isPremium) {
+          console.log("Redirecting to pricing - topic index:", foundIndex, "isPremium:", isPremium);
           router.push(`/pricing?from=biology-topic-${topicId}`);
           return;
         }
@@ -144,7 +146,7 @@ export default function TopicDetailPage() {
         </Link>
       </div>
       
-      {/* Subscription Notice */}
+      {/* Subscription Notice - always show for non-premium users */}
       {!isPremium && (
         <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
           <p className="text-blue-700">
@@ -191,7 +193,8 @@ export default function TopicDetailPage() {
             )}
             
             <div className="mt-6 pt-4 border-t">
-              {isPremium || isFreeTopic ? (
+              {/* Use explicit boolean checks for premium access */}
+              {Boolean(isPremium) || isFreeTopic ? (
                 <Link 
                   href={`/practice?subject=botany&topicId=${topic.topic_id}`}
                   className="bg-emerald-600 text-white w-full py-2 px-4 rounded-md hover:bg-emerald-700 flex items-center justify-center"
@@ -242,7 +245,8 @@ export default function TopicDetailPage() {
               </div>
               
               <div className="mt-8 flex justify-end">
-                {isPremium || isFreeTopic ? (
+                {/* Use explicit boolean checks for premium access */}
+                {Boolean(isPremium) || isFreeTopic ? (
                   <Link
                     href={`/practice?subject=botany&topicId=${topic.topic_id}&subtopicId=${activeSubtopic.subtopic_id}`}
                     className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-md"
@@ -274,6 +278,7 @@ export default function TopicDetailPage() {
           <div className="bg-gray-50 rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-800 mb-4">Related NEET Topics</h3>
             <div className="grid grid-cols-2 gap-4">
+              {/* Free topics are always accessible to everyone */}
               {allTopics.slice(0, 2).map((relatedTopic) => (
                 relatedTopic.topic_id.toString() !== topicId && (
                   <Link 
@@ -286,6 +291,8 @@ export default function TopicDetailPage() {
                   </Link>
                 )
               ))}
+              
+              {/* Premium topics are only accessible to premium users */}
               {isPremium && allTopics.slice(2, 4).map((relatedTopic) => (
                 relatedTopic.topic_id.toString() !== topicId && (
                   <Link 
@@ -298,6 +305,8 @@ export default function TopicDetailPage() {
                   </Link>
                 )
               ))}
+              
+              {/* Show premium badges and redirect to pricing for non-premium users */}
               {!isPremium && allTopics.slice(2, 4).map((relatedTopic) => (
                 relatedTopic.topic_id.toString() !== topicId && (
                   <Link 
