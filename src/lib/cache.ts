@@ -31,6 +31,8 @@ export interface CacheProvider {
   set: <T>(key: string, value: T, ttl?: number) => Promise<void>
   delete: (key: string) => Promise<void>
   flush: () => Promise<void>
+  deletePattern: (pattern: string) => Promise<number>
+  trackKey: (userId: string, key: string) => Promise<void>
 }
 
 /**
@@ -98,6 +100,62 @@ class Cache implements CacheProvider {
       memoryCache.clear()
     } catch (error) {
       console.error('Cache flush error:', error)
+    }
+  }
+
+  // Add pattern-based deletion to your cache implementation
+  async deletePattern(pattern: string): Promise<number> {
+    if (!redisClient) {
+      console.warn('Redis not available for pattern deletion');
+      return 0;
+    }
+    
+    let cursor = '0';
+    let deletedCount = 0;
+    
+    do {
+      // Use SCAN to find keys matching the pattern
+      const [nextCursor, keys] = await redisClient.scan(
+        cursor,
+        {
+          match: pattern,
+          count: 100
+        }
+      );
+      cursor = nextCursor;
+      // Delete the found keys
+      if (keys.length > 0) {
+        const deleted = await redisClient.del(...keys);
+        deletedCount += deleted;
+      }
+    } while (cursor !== '0');
+    
+    return deletedCount;
+  }
+
+  /**
+   * Track a cache key for a specific user
+   * This helps with user-specific cache invalidation
+   */
+  async trackKey(userId: string, key: string): Promise<void> {
+    try {
+      const userKeysSetKey = `user:${userId}:cache-keys`;
+      
+      if (redisClient) {
+        // Add the key to the user's set in Redis
+        await redisClient.sadd(userKeysSetKey, key);
+        // Set expiry on the set to prevent unbounded growth
+        await redisClient.expire(userKeysSetKey, 86400); // 24 hours TTL
+      } else {
+        // For memory cache, maintain a simple set of keys
+        const userKeys = await this.get<string[]>(userKeysSetKey) || [];
+        if (!userKeys.includes(key)) {
+          userKeys.push(key);
+          await this.set(userKeysSetKey, userKeys, 86400);
+        }
+      }
+    } catch (error) {
+      console.error('Cache trackKey error:', error);
     }
   }
 }

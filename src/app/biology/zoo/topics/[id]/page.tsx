@@ -4,8 +4,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { ArrowLeft, BookOpen, CheckCircle } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { ArrowLeft, BookOpen, CheckCircle, Lock } from 'lucide-react';
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 
 interface Topic {
   topic_id: number;
@@ -30,6 +31,7 @@ interface Subtopic {
 
 export default function TopicDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const topicId = params.id as string;
   
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -37,11 +39,44 @@ export default function TopicDetailPage() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeSubtopicId, setActiveSubtopicId] = useState<number | null>(null);
+  const [allTopics, setAllTopics] = useState<Topic[]>([]);
+  const { isPremium: apiIsPremium } = useSubscriptionLimits();
+  
+  // Check if user has premium access - use the explicit isPremium from the hook
+  const isPremium = apiIsPremium;
+  // Check if this is a free topic (one of the first two)
+  const [isFreeTopic, setIsFreeTopic] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchTopicDetails = async () => {
+    const fetchTopics = async () => {
       try {
-        setIsLoading(true);
+        // Fetch all topic IDs to determine if this is a free topic
+        const zoologySubjectId = 4; // Zoology subject ID
+        const topicsResponse = await fetch(`/api/topics?subjectId=${zoologySubjectId}&isRootLevel=true&isActive=true`);
+        
+        if (!topicsResponse.ok) {
+          throw new Error('Failed to fetch topics list');
+        }
+        
+        const topicsData = await topicsResponse.json();
+        
+        if (!topicsData.success) {
+          throw new Error(topicsData.error || 'Failed to fetch topics list');
+        }
+
+        setAllTopics(topicsData.data);
+        
+        // Check if this topic is one of the first two (free topics)
+        const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id.toString() === topicId);
+        const foundIndex = topicIndex === -1 ? 999 : topicIndex; // Use a high index if not found to require premium
+        setIsFreeTopic(foundIndex === 0 || foundIndex === 1);
+        
+        // If premium content and user doesn't have access, redirect to pricing
+        if (foundIndex > 1 && !isPremium) {
+          console.log("Redirecting to pricing - topic index:", foundIndex, "isPremium:", isPremium);
+          router.push(`/pricing?from=zoology-topic-${topicId}`);
+          return;
+        }
         
         // Fetch topic details using the API
         const response = await fetch(`/api/topics/${topicId}`);
@@ -71,8 +106,8 @@ export default function TopicDetailPage() {
       }
     };
     
-    fetchTopicDetails();
-  }, [topicId]);
+    fetchTopics();
+  }, [topicId, isPremium, router]);
 
   // Find the active subtopic
   const activeSubtopic = subtopics.find(s => s.subtopic_id === activeSubtopicId);
@@ -109,6 +144,16 @@ export default function TopicDetailPage() {
           Back to Zoology Topics
         </Link>
       </div>
+      
+      {/* Subscription Notice */}
+      {!isPremium && (
+        <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <p className="text-blue-700">
+            <span className="font-semibold">Free access:</span> You can access the first two topics for free. 
+            <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> for full access to all topics.
+          </p>
+        </div>
+      )}
       
       {/* Topic Header */}
       <header className="mb-8">
@@ -147,13 +192,23 @@ export default function TopicDetailPage() {
             )}
             
             <div className="mt-6 pt-4 border-t">
-              <Link 
-                href={`/practice?subject=zoology&topicId=${topic.topic_id}`}
-                className="bg-amber-600 text-white w-full py-2 px-4 rounded-md hover:bg-amber-700 flex items-center justify-center"
-              >
-                <BookOpen size={18} className="mr-2" />
-                Practice {topic.topic_name}
-              </Link>
+              {isPremium || isFreeTopic ? (
+                <Link 
+                  href={`/practice?subject=zoology&topicId=${topic.topic_id}`}
+                  className="bg-amber-600 text-white w-full py-2 px-4 rounded-md hover:bg-amber-700 flex items-center justify-center"
+                >
+                  <BookOpen size={18} className="mr-2" />
+                  Practice {topic.topic_name}
+                </Link>
+              ) : (
+                <Link 
+                  href={`/pricing?from=practice-zoology-${topic.topic_id}`}
+                  className="bg-amber-600 text-white w-full py-2 px-4 rounded-md hover:bg-amber-700 flex items-center justify-center"
+                >
+                  <Lock size={18} className="mr-2" />
+                  Unlock Premium Practice
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -188,18 +243,22 @@ export default function TopicDetailPage() {
               </div>
               
               <div className="mt-8 flex justify-end">
-                {/* <Link 
-                  href={`/notes/biology/${topic.topic_id}/${activeSubtopic.subtopic_id}`} 
-                  className="text-indigo-600 hover:text-indigo-800"
-                >
-                  View Study Notes
-                </Link> */}
-                <Link
-                  href={`/practice?subject=zoology&topicId=${topic.topic_id}&subtopicId=${activeSubtopic.subtopic_id}`}
-                  className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-4 py-2 rounded-md"
-                >
-                  Practice {activeSubtopic.subtopic_name} Questions
-                </Link>
+                {isPremium || isFreeTopic ? (
+                  <Link
+                    href={`/practice?subject=zoology&topicId=${topic.topic_id}&subtopicId=${activeSubtopic.subtopic_id}`}
+                    className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-4 py-2 rounded-md"
+                  >
+                    Practice {activeSubtopic.subtopic_name} Questions
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/pricing?from=practice-subtopic-${activeSubtopic.subtopic_id}`}
+                    className="bg-amber-50 text-amber-700 hover:bg-amber-100 px-4 py-2 rounded-md flex items-center"
+                  >
+                    <Lock size={16} className="mr-1" />
+                    Unlock Premium Practice
+                  </Link>
+                )}
               </div>
             </div>
           ) : (
@@ -216,20 +275,48 @@ export default function TopicDetailPage() {
           <div className="bg-gray-50 rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-800 mb-4">Related NEET Topics</h3>
             <div className="grid grid-cols-2 gap-4">
-              <Link 
-                href="/biology/zoo/topics/10" 
-                className="bg-white p-4 rounded border border-gray-200 hover:shadow-md transition-shadow"
-              >
-                <h4 className="font-medium text-gray-800">Structural Organization in Animals</h4>
-                <p className="text-sm text-gray-500 mt-1">Study of morphology and anatomy of animals</p>
-              </Link>
-              <Link 
-                href="/biology/zoo/topics/11" 
-                className="bg-white p-4 rounded border border-gray-200 hover:shadow-md transition-shadow"
-              >
-                <h4 className="font-medium text-gray-800">Cell Structure and Function</h4>
-                <p className="text-sm text-gray-500 mt-1">Study of cell organelles and cellular processes in animal cells</p>
-              </Link>
+              {allTopics.slice(0, 2).map((relatedTopic) => (
+                relatedTopic.topic_id.toString() !== topicId && (
+                  <Link 
+                    key={relatedTopic.topic_id}
+                    href={`/biology/zoo/topics/${relatedTopic.topic_id}`} 
+                    className="bg-white p-4 rounded border border-gray-200 hover:shadow-md transition-shadow"
+                  >
+                    <h4 className="font-medium text-gray-800">{relatedTopic.topic_name}</h4>
+                    <p className="text-sm text-gray-500 mt-1">{relatedTopic.description || 'Explore this related topic'}</p>
+                  </Link>
+                )
+              ))}
+              {isPremium && allTopics.slice(2, 4).map((relatedTopic) => (
+                relatedTopic.topic_id.toString() !== topicId && (
+                  <Link 
+                    key={relatedTopic.topic_id}
+                    href={`/biology/zoo/topics/${relatedTopic.topic_id}`} 
+                    className="bg-white p-4 rounded border border-gray-200 hover:shadow-md transition-shadow"
+                  >
+                    <h4 className="font-medium text-gray-800">{relatedTopic.topic_name}</h4>
+                    <p className="text-sm text-gray-500 mt-1">{relatedTopic.description || 'Explore this related topic'}</p>
+                  </Link>
+                )
+              ))}
+              {!isPremium && allTopics.slice(2, 4).map((relatedTopic) => (
+                relatedTopic.topic_id.toString() !== topicId && (
+                  <Link 
+                    key={relatedTopic.topic_id}
+                    href={`/pricing?from=related-topic-${relatedTopic.topic_id}`} 
+                    className="bg-white p-4 rounded border border-gray-200 hover:shadow-md transition-shadow relative"
+                  >
+                    <div className="absolute top-2 right-2 bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-xs font-medium z-10">
+                      Premium
+                    </div>
+                    <div className="relative z-0">
+                      <h4 className="font-medium text-gray-800">{relatedTopic.topic_name}</h4>
+                      <p className="text-sm text-gray-500 mt-1">{relatedTopic.description || 'Upgrade to unlock this topic'}</p>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-amber-50 opacity-25 pointer-events-none"></div>
+                  </Link>
+                )
+              ))}
             </div>
           </div>
         </div>

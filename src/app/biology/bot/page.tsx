@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 
 interface Topic {
   topic_id: number;
@@ -16,16 +17,6 @@ interface Topic {
   updated_at: string;
 }
 
-// interface Subtopic {
-//   subtopic_id: number;
-//   topic_id: number;
-//   subtopic_name: string;
-//   description: string | null;
-//   is_active: boolean;
-//   created_at: string;
-//   updated_at: string;
-// }
-
 interface TopicsWithSubtopicCount extends Topic {
   subtopicsCount: number;
 }
@@ -34,13 +25,17 @@ export default function BotanyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { isPremium: apiIsPremium } = useSubscriptionLimits();
+  
+  // Use the explicit isPremium flag from the hook
+  const isPremium = apiIsPremium;
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
       try {
         setIsLoading(true);
         
-        // Find botany subject ID (should be 1 based on your schema)
+        // Find botany subject ID (should be 3 based on your schema)
         const botanySubjectId = 3; // Biology subject ID
         
         // Fetch root-level topics for Botany
@@ -84,6 +79,11 @@ export default function BotanyPage() {
     fetchTopicsAndSubtopics();
   }, []);
 
+  // Function to determine if user can access the topic
+  const canAccessTopic = (index: number) => {
+    return Boolean(isPremium) || index < 2; // First two topics accessible for free users
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
@@ -119,7 +119,7 @@ export default function BotanyPage() {
         </p>
         <div className="mt-10 flex justify-center">
           <Link 
-            href="/practice?subject=botany"
+            href={isPremium ? "/practice?subject=botany" : "/practice?subject=botany&limit=free"}
             className="bg-emerald-600 text-white px-6 py-3 rounded-md hover:bg-emerald-700 text-lg font-medium shadow-sm"
           >
             Practice Botany Questions
@@ -145,29 +145,66 @@ export default function BotanyPage() {
         </div>
       </div>
 
+      {/* Free access notice - ensure it always shows for non-premium users */}
+      {!isPremium && (
+        <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <p className="text-blue-700">
+            <span className="font-semibold">Free plan:</span> You have access to the first two topics. 
+            <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> for full access to all topics.
+          </p>
+        </div>
+      )}
+
       {topics.length === 0 ? (
         <div className="bg-gray-50 p-8 rounded-lg text-center">
           <p className="text-gray-500">No topics available. Please check back later.</p>
         </div>
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
-          {topics.map((topic) => (
-            <div key={topic.topic_id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">{topic.topic_name}</h3>
-                <p className="text-gray-600 mb-4">{topic.description || 'No description available'}</p>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">{topic.subtopicsCount} subtopics</span>
-                  <Link 
-                    href={`/biology/bot/topics/${topic.topic_id}`}
-                    className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
-                  >
-                    Explore Topic →
-                  </Link>
+          {topics.map((topic, index) => {
+            // Use explicit boolean check for each topic's accessibility
+            const isTopicAccessible = canAccessTopic(index);
+            
+            return (
+              <div key={topic.topic_id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 relative">
+                <div className={`p-6 ${!isTopicAccessible && 'relative'}`}>
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{topic.topic_name}</h3>
+                  <p className="text-gray-600 mb-4">{topic.description || 'No description available'}</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">{topic.subtopicsCount} subtopics</span>
+                    {isTopicAccessible ? (
+                      <Link 
+                        href={`/biology/bot/topics/${topic.topic_id}`}
+                        className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center"
+                      >
+                        Explore Topic →
+                      </Link>
+                    ) : (
+                      <Link 
+                        href={`/pricing?from=biology-topic-${topic.topic_id}`}
+                        className="text-amber-600 hover:text-amber-800 font-medium text-sm flex items-center"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Unlock Premium Practice
+                      </Link>
+                    )}
+                  </div>
                 </div>
+                
+                {/* Premium indicators for premium topics */}
+                {!isTopicAccessible && (
+                  <>
+                    <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-medium shadow-sm">
+                      Premium Practice
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-amber-50 opacity-25 pointer-events-none"></div>
+                  </>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
