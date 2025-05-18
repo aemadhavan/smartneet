@@ -99,7 +99,7 @@ export const RedesignedHeroSection = () => {
                 href={isAuthenticated ? "/practice" : "/sign-up"}
                 className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg transition-all text-center"
               >
-                {isAuthenticated ? "Practice" : "Sign up for Biology"}
+                {isAuthenticated ? "Practice Now" : "Sign up for Biology"}
               </Link>
               <Link 
                 href="/biology" 
