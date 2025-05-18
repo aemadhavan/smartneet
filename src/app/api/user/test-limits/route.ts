@@ -30,16 +30,37 @@ interface TestLimitResponse {
   subscription: SubscriptionInfo;
 }
 
+// Default free subscription data to use in case of errors
+const DEFAULT_FREE_SUBSCRIPTION: TestLimitResponse = {
+  limitStatus: {
+    canTake: true,
+    isUnlimited: false,
+    usedToday: 0,
+    limitPerDay: 3,
+    remainingToday: 3,
+    reason: null
+  },
+  subscription: {
+    id: 0,
+    planName: 'Free Plan',
+    planCode: 'free',
+    status: 'active',
+    lastTestDate: null
+  }
+};
+
 export async function GET(request: Request) {
   try {
     // Check authentication
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      // Return default free access for unauthenticated users
+      return NextResponse.json({
+        ...DEFAULT_FREE_SUBSCRIPTION,
+        source: 'default-unauthenticated'
+      });
     }
+    
     // Get URL to check for cache-busting parameter
     const url = new URL(request.url);
     const skipCache = url.searchParams.has('t');
@@ -53,75 +74,84 @@ export async function GET(request: Request) {
     let source = skipCache ? 'forced-refresh' : 'cache';
     
     if (!response) {
-      // Get user subscription
-      const subscription = await subscriptionService.getUserSubscription(userId);
-      
-      if (!subscription) {
-        return NextResponse.json(
-          { error: 'No subscription found' },
-          { status: 404 }
-        );
-      }
-      
-      // Get subscription plan
-      const plans = await db
-        .select()
-        .from(subscription_plans)
-        .where(eq(subscription_plans.plan_id, subscription.plan_id))
-        .limit(1);
-      
-      const plan = plans.length > 0 ? plans[0] : null;
-      
-      if (!plan) {
-        return NextResponse.json(
-          { error: 'Subscription plan not found' },
-          { status: 404 }
-        );
-      }
-      
       try {
-        // Check if user can take a test
-        const { canTake, reason } = await subscriptionService.canUserTakeTest(userId);
+        // Set a timeout for database operations (5 seconds)
+        const dbTimeoutPromise = new Promise<TestLimitResponse>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Database operation timeout'));
+          }, 5000);
+        });
         
-        // Determine if unlimited tests
-        const isUnlimited = plan.test_limit_daily === null;
-        
-        // Calculate remaining tests
-        const testsUsedToday = subscription.tests_used_today || 0;
-        const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
-        const remainingToday = isUnlimited ? Infinity : Math.max(0, limitPerDay - testsUsedToday);
-        
-        // Build response
-        const limitStatus: LimitStatus = {
-          canTake,
-          isUnlimited,
-          usedToday: testsUsedToday,
-          limitPerDay: isUnlimited ? null : limitPerDay,
-          remainingToday,
-          reason: canTake ? null : (reason || null) // Ensure reason is never undefined
-        };
-        
-        response = {
-          limitStatus,
-          subscription: {
-            id: subscription.subscription_id,
-            planName: plan.plan_name,
-            planCode: plan.plan_code,
-            status: subscription.status,
-            lastTestDate: subscription.last_test_date ? new Date(subscription.last_test_date).toISOString() : null
+        // Database query promise
+        const dbQueryPromise = async (): Promise<TestLimitResponse> => {
+          // Get user subscription with timeout protection
+          const subscription = await subscriptionService.getUserSubscription(userId);
+          
+          if (!subscription) {
+            console.log(`No subscription found for user ${userId}, using free plan`);
+            return DEFAULT_FREE_SUBSCRIPTION;
           }
+          
+          // Get subscription plan
+          const plans = await db
+            .select()
+            .from(subscription_plans)
+            .where(eq(subscription_plans.plan_id, subscription.plan_id))
+            .limit(1);
+          
+          const plan = plans.length > 0 ? plans[0] : null;
+          
+          if (!plan) {
+            console.log(`No plan found for subscription ${subscription.subscription_id}, using free plan`);
+            return DEFAULT_FREE_SUBSCRIPTION;
+          }
+          
+          // Check if user can take a test
+          const { canTake, reason } = await subscriptionService.canUserTakeTest(userId);
+          
+          // Determine if unlimited tests
+          const isUnlimited = plan.test_limit_daily === null;
+          
+          // Calculate remaining tests
+          const testsUsedToday = subscription.tests_used_today || 0;
+          const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
+          const remainingToday = isUnlimited ? Infinity : Math.max(0, limitPerDay - testsUsedToday);
+          
+          // Build response
+          return {
+            limitStatus: {
+              canTake,
+              isUnlimited,
+              usedToday: testsUsedToday,
+              limitPerDay: isUnlimited ? null : limitPerDay,
+              remainingToday,
+              reason: canTake ? null : (reason || null) // Ensure reason is never undefined
+            },
+            subscription: {
+              id: subscription.subscription_id,
+              planName: plan.plan_name,
+              planCode: plan.plan_code,
+              status: subscription.status,
+              lastTestDate: subscription.last_test_date ? new Date(subscription.last_test_date).toISOString() : null
+            }
+          };
         };
+        
+        // Race between database query and timeout
+        response = await Promise.race([dbQueryPromise(), dbTimeoutPromise]);
+        
+        // Cache for a short time (30 seconds)
+        await cache.set(cacheKey, response, 30);
+        source = 'database';
       } catch (error) {
-        console.error('Error checking test limits:', error);
-        return NextResponse.json(
-          { error: 'Failed to check test limits' },
-          { status: 500 }
-        );
+        console.error('Database or timeout error:', error);
+        // Use default free plan on error
+        response = DEFAULT_FREE_SUBSCRIPTION;
+        source = 'error-default';
+        
+        // Only cache error response for 5 seconds to allow quick retry
+        await cache.set(cacheKey, response, 5);
       }
-      
-      // Cache for a short time (30 seconds)
-      await cache.set(cacheKey, response, 30);
-      source = 'database';
     }
     
     // Make sure response is defined as an object before spreading
@@ -132,16 +162,17 @@ export async function GET(request: Request) {
       });
     } else {
       // Handle the case where response might not be an object
+      console.error('Invalid response format', response);
       return NextResponse.json({ 
-        error: 'Invalid response format',
-        source
-      }, { status: 500 });
+        ...DEFAULT_FREE_SUBSCRIPTION,
+        source: 'invalid-format-default'
+      });
     }
   } catch (error) {
-    console.error('Error fetching test limits:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch test limits' },
-      { status: 500 }
-    );
+    console.error('Unhandled error in test limits API:', error);
+    return NextResponse.json({
+      ...DEFAULT_FREE_SUBSCRIPTION,
+      source: 'unhandled-error-default'
+    });
   }
 }

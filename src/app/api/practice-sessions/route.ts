@@ -538,9 +538,13 @@ async function getPersonalizedQuestions(
     )
     .where(eq(user_subscriptions.user_id, userId))
     .limit(1)
-    .then(rows => rows[0]);
+    .then(rows => rows[0])
+    .catch(error => {
+      console.error("Error fetching user subscription:", error);
+      return null; // Or some other appropriate default value
+    });
   
-  const isFreemiumUser = !userSubscription || userSubscription.plan_code === 'free';
+  const isFreemiumUser = !userSubscription || (userSubscription && userSubscription.plan_code === 'free');
   
   // Cache key for the potential questions pool - include source_type in cache key
   const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}:source:AI_Generated`;
