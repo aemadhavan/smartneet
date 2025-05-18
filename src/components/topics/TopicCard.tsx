@@ -25,7 +25,7 @@ const TopicCard: React.FC<TopicCardProps> = ({
   onPremiumClick
 }) => {
   const isAccessible = isPremium || index < maxTopicsPerSubject;
-  const isPremiumLocked = !isPremium && index >= maxTopicsPerSubject;
+  const isPremiumLocked = !isAccessible;
 
   // Premium locked topic with indigo/blue design instead of black
   if (isPremiumLocked) {
@@ -57,10 +57,10 @@ const TopicCard: React.FC<TopicCardProps> = ({
           <h3 className="text-lg font-semibold text-gray-800">{topicName}</h3>
           
           {/* Topic badge - Shows "Free" or "Premium" based on access */}
-          {!isPremium && index < maxTopicsPerSubject && (
+          {!isPremium && isAccessible && (
             <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Free</span>
           )}
-          {(isPremium || index >= maxTopicsPerSubject) && (
+          {isPremium && (
             <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">Premium</span>
           )}
         </div>

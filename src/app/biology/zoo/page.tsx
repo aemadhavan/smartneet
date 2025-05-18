@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 
 interface Topic {
@@ -26,26 +25,11 @@ export default function ZoologyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isSignedIn } = useAuth();
-  const { subscription, loading: subscriptionLoading, isPremium: apiIsPremium } = useSubscriptionLimits();
+  const { isPremium: apiIsPremium } = useSubscriptionLimits();
   
   // Determine if the user has premium access
   // Default to showing only first two topics free (safest approach)
   const isPremium = apiIsPremium;
-
-  // Function to determine if user can access the topic with explicit boolean conversion
-  const canAccessTopic = (index: number) => {
-    return Boolean(isPremium) || index < 2; // First two topics accessible for free users
-  };
-  
-  // Function to get the appropriate link based on access
-  const getTopicLink = (topic: TopicsWithSubtopicCount, index: number) => {
-    if (canAccessTopic(index)) {
-      return `/biology/zoo/topics/${topic.topic_id}`;
-    } else {
-      return `/pricing?from=zoology-topic-${topic.topic_id}`;
-    }
-  };
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {

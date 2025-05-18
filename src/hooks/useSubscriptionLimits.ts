@@ -67,8 +67,8 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsResult {
         setIsPremium(parsedData.subscription?.planCode !== 'free');
         console.log('Initial render using cached data:', parsedData.subscription?.planCode);
       }
-    } catch (e) {
-      console.warn('Could not load cached subscription data on initial render');
+    } catch (error) {
+      console.warn('Could not load cached subscription data on initial render:', error);
     }
   }, []);
 
@@ -137,12 +137,12 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsResult {
             timestamp: Date.now()
           }));
           console.log('Updated cached subscription data, source:', data.source);
-        } catch (e) {
-          console.warn('Failed to update subscription cache');
+        } catch (error) {
+          console.warn('Failed to update subscription cache:', error);
         }
-      } catch (e) {
+      } catch (error) {
         // Just log errors but don't change UI state
-        console.warn('Error fetching subscription data:', e);
+        console.warn('Error fetching subscription data:', error);
       } finally {
         if (isMounted) {
           setLoading(false);

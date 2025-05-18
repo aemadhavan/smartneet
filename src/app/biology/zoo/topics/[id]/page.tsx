@@ -40,7 +40,7 @@ export default function TopicDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSubtopicId, setActiveSubtopicId] = useState<number | null>(null);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const { subscription, isPremium: apiIsPremium } = useSubscriptionLimits();
+  const { isPremium: apiIsPremium } = useSubscriptionLimits();
   
   // Check if user has premium access - use the explicit isPremium from the hook
   const isPremium = apiIsPremium;

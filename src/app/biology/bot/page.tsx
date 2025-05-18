@@ -4,7 +4,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@clerk/nextjs';
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 
 interface Topic {
@@ -26,8 +25,7 @@ export default function BotanyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isSignedIn } = useAuth();
-  const { subscription, isPremium: apiIsPremium } = useSubscriptionLimits();
+  const { isPremium: apiIsPremium } = useSubscriptionLimits();
   
   // Use the explicit isPremium flag from the hook
   const isPremium = apiIsPremium;
@@ -84,15 +82,6 @@ export default function BotanyPage() {
   // Function to determine if user can access the topic
   const canAccessTopic = (index: number) => {
     return Boolean(isPremium) || index < 2; // First two topics accessible for free users
-  };
-  
-  // Function to get the appropriate link based on access
-  const getTopicLink = (topic: TopicsWithSubtopicCount, index: number) => {
-    if (canAccessTopic(index)) {
-      return `/biology/bot/topics/${topic.topic_id}`;
-    } else {
-      return `/pricing?from=biology-topic-${topic.topic_id}`;
-    }
   };
 
   if (isLoading) {
