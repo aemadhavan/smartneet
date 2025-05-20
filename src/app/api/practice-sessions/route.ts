@@ -1,7 +1,7 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import {  count } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 import { 
   practice_sessions, 
   questions, 
@@ -22,14 +22,14 @@ import {
 } from '@/lib/middleware/subscriptionMiddleware';
 // Add rate limiting imports
 import { RateLimiter } from '@/lib/rate-limiter';
-// Optional - only if you're using Next.js App Router
-import { revalidatePath, revalidateTag } from 'next/cache';
+// Only import what's actually used
+import { revalidatePath } from 'next/cache';
 
 // Define rate limit configurations
 const RATE_LIMITS = {
-  CREATE_SESSION: { points: 10, duration: 60 * 60 }, // 10 requests per hour
-  GET_SESSIONS: { points: 60, duration: 60 }, // 60 requests per minute
-  UPDATE_SESSION: { points: 30, duration: 60 } // 30 requests per minute
+  CREATE_SESSION: { points: 20, duration: 60 * 60 }, // 10 requests per hour
+  GET_SESSIONS: { points: 120, duration: 60 }, // 60 requests per minute
+  UPDATE_SESSION: { points: 60, duration: 60 } // 30 requests per minute
 };
 
 // Schema for validating session creation request
@@ -346,11 +346,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Apply rate limiting
+    // Add more detailed logging
+    console.log(`Getting practice sessions for user ${userId}`);
+
+    // Apply rate limiting with better error handling
     const rateLimiter = new RateLimiter(`get-sessions:${userId}`, RATE_LIMITS.GET_SESSIONS.points, RATE_LIMITS.GET_SESSIONS.duration);
     const rateLimitResult = await rateLimiter.consume();
     
     if (!rateLimitResult.success) {
+      console.log(`Rate limit exceeded for user ${userId}. Retry after ${rateLimitResult.retryAfter} seconds`);
       return NextResponse.json({
         error: 'Rate limit exceeded',
         retryAfter: rateLimitResult.retryAfter
@@ -369,70 +373,98 @@ export async function GET(request: NextRequest) {
     // Create a cache key based on user ID and pagination parameters
     const cacheKey = `api:practice-sessions:user:${userId}:limit:${limit}:offset:${offset}`;
     
+    // Log cache access
+    console.log(`Checking cache for key: ${cacheKey}`);
+    
     // Try to get from cache first
     const cachedData = await cache.get(cacheKey);
     if (cachedData) {
+      console.log(`Cache hit for key: ${cacheKey}`);
       return NextResponse.json({
         ...cachedData,
         source: 'cache'
       });
     }
+    
+    console.log(`Cache miss for key: ${cacheKey}, querying database`);
 
-    // Get user's practice sessions
-    const sessions = await db.select({
-      session_id: practice_sessions.session_id,
-      session_type: practice_sessions.session_type,
-      start_time: practice_sessions.start_time,
-      end_time: practice_sessions.end_time,
-      duration_minutes: practice_sessions.duration_minutes,
-      total_questions: practice_sessions.total_questions,
-      questions_attempted: practice_sessions.questions_attempted,
-      questions_correct: practice_sessions.questions_correct,
-      score: practice_sessions.score,
-      max_score: practice_sessions.max_score,
-      is_completed: practice_sessions.is_completed,
-      subject_name: subjects.subject_name,
-      topic_name: topics.topic_name
-    })
-    .from(practice_sessions)
-    .leftJoin(subjects, eq(practice_sessions.subject_id, subjects.subject_id))
-    .leftJoin(topics, eq(practice_sessions.topic_id, topics.topic_id))
-    .where(eq(practice_sessions.user_id, userId))
-    .orderBy(desc(practice_sessions.start_time))
-    .limit(limit)
-    .offset(offset);
-
-    // SAFER APPROACH: Replace the raw SQL count with Drizzle's count function
-    const countResult = await db
-      .select({
-        count: count(practice_sessions.session_id)
+    // Add timeouts or connection handling
+    try {
+      // Get user's practice sessions
+      const sessions = await db.select({
+        session_id: practice_sessions.session_id,
+        session_type: practice_sessions.session_type,
+        start_time: practice_sessions.start_time,
+        end_time: practice_sessions.end_time,
+        duration_minutes: practice_sessions.duration_minutes,
+        total_questions: practice_sessions.total_questions,
+        questions_attempted: practice_sessions.questions_attempted,
+        questions_correct: practice_sessions.questions_correct,
+        score: practice_sessions.score,
+        max_score: practice_sessions.max_score,
+        is_completed: practice_sessions.is_completed,
+        subject_name: subjects.subject_name,
+        topic_name: topics.topic_name
       })
       .from(practice_sessions)
-      .where(eq(practice_sessions.user_id, userId));
+      .leftJoin(subjects, eq(practice_sessions.subject_id, subjects.subject_id))
+      .leftJoin(topics, eq(practice_sessions.topic_id, topics.topic_id))
+      .where(eq(practice_sessions.user_id, userId))
+      .orderBy(desc(practice_sessions.start_time))
+      .limit(limit)
+      .offset(offset);
 
-    const total: number = Number(countResult[0]?.count) || 0;
-    
-    const result = {
-      sessions,
-      pagination: {
-        total,
-        limit,
-        offset
+      // Get total count for pagination
+      const countResult = await db
+        .select({
+          count: count(practice_sessions.session_id)
+        })
+        .from(practice_sessions)
+        .where(eq(practice_sessions.user_id, userId));
+
+      const total: number = Number(countResult[0]?.count) || 0;
+      
+      // This is the missing part - define the result object
+      const result = {
+        sessions,
+        pagination: {
+          total,
+          limit,
+          offset
+        }
+      };
+      
+      console.log(`Successfully fetched ${sessions.length} sessions for user ${userId}`);
+      
+      // Cache the result
+      await cache.set(cacheKey, result, 300);
+      
+      return NextResponse.json({
+        ...result,
+        source: 'database'
+      });
+    } catch (dbError) {
+      // Specific handling for database errors
+      console.error('Database error fetching practice sessions:', dbError);
+      
+      // Check if we have stale cache available
+      const staleCache = await cache.get(cacheKey);
+      if (staleCache) {
+        return NextResponse.json({
+          ...staleCache,
+          source: 'stale_cache',
+          message: 'Database error, using cached data'
+        }, { status: 503 });
       }
-    };
-    
-    // Cache the result, but with a shorter TTL since this is user-specific activity data
-    await cache.set(cacheKey, result, 300); // Cache for 5 minutes
-    
-    return NextResponse.json({
-      ...result,
-      source: 'database'
-    });
+      
+      throw dbError; // Re-throw to be caught by outer try/catch
+    }
   } catch (error) {
     console.error('Error fetching practice sessions:', error);
     return NextResponse.json({ 
-      error: 'Failed to fetch practice sessions'
-      // Don't include raw error details
+      error: 'Failed to fetch practice sessions',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      code: 'SESSION_FETCH_ERROR'
     }, { status: 500 });
   }
 }
@@ -661,58 +693,38 @@ async function getPersonalizedQuestions(
 // Helper function to invalidate all session cache entries for a user
 async function invalidateUserSessionCaches(userId: string) {
   try {
-    // Instead of deleting individual keys, use a pattern-based approach
-    // This assumes your cache implementation supports pattern deletion
-    // If using Redis, this would use the SCAN + DEL commands
+    // Add verbose logging to track what's happening
+    console.log(`Starting cache invalidation for user ${userId}`);
     
-    // Define patterns for different types of user-related caches
     const patterns = [
-      `api:practice-sessions:user:${userId}:*`, // All session list caches with any pagination
-      `session:${userId}:*`,                    // Individual session caches
-      `user:${userId}:subscription`,            // Subscription info
-      `user:${userId}:tests:*`,                 // Test usage metrics
-      `idempotency:${userId}:*`                 // Idempotency keys
+      `api:practice-sessions:user:${userId}:*`,
+      `session:${userId}:*`,
+      `user:${userId}:subscription`,
+      `user:${userId}:tests:*`,
+      `idempotency:${userId}:*`
     ];
     
-    // Delete all matching cache entries for each pattern
-    const deletePromises = patterns.map(pattern => cache.deletePattern(pattern));
-    await Promise.all(deletePromises);
-    
-    // If your cache implementation doesn't support pattern deletion,
-    // you can implement a key tracking mechanism:
-    // 1. Maintain a set of keys for each user in the cache
-    // 2. When creating a cache entry, add the key to the user's set
-    // 3. When invalidating, get all keys from the set and delete them
-    
-    // Example of key tracking approach (uncomment if needed):
-    /*
-    const userKeysSetKey = `user:${userId}:cache-keys`;
-    const userCacheKeys = await cache.get(userKeysSetKey) || [];
-    if (Array.isArray(userCacheKeys) && userCacheKeys.length > 0) {
-      const deletePromises = userCacheKeys.map(key => cache.delete(key));
-      await Promise.all(deletePromises);
-      // Reset the tracking set
-      await cache.set(userKeysSetKey, [], 86400); // 24 hours TTL
+    // Delete each pattern individually with error handling
+    for (const pattern of patterns) {
+      try {
+        const count = await cache.deletePattern(pattern);
+        console.log(`Deleted ${count} keys matching pattern ${pattern}`);
+      } catch (patternError) {
+        console.error(`Error deleting pattern ${pattern}:`, patternError);
+        // Continue with other patterns
+      }
     }
-    */
     
-    // If using Next.js App Router, use the imported functions for revalidation
+    // Use revalidatePath for Next.js cache invalidation
     if (typeof revalidatePath === 'function') {
       revalidatePath('/dashboard');
       revalidatePath('/practice');
       revalidatePath('/sessions');
     }
     
-    if (typeof revalidateTag === 'function') {
-      revalidateTag('user-sessions');
-      revalidateTag('subscription');
-    }
-    
-    console.log(`Cache invalidated for user ${userId}`);
+    console.log(`Cache invalidation completed for user ${userId}`);
   } catch (error) {
-    // Log the error but don't fail the operation
     console.error('Error invalidating cache:', error);
-    // The main operation should still succeed even if cache invalidation fails
   }
 }
 

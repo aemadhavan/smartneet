@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     // Define cache key for test limit status
     const cacheKey = `user:${userId}:test-limits`;
     
-    // Try to get from cache first (short TTL as this changes frequently)
+    // Try to get from cache first (longer TTL as it changes less frequently)
     // Only if skipCache is false
     let response = skipCache ? null : await cache.get<TestLimitResponse>(cacheKey);
     let source = skipCache ? 'forced-refresh' : 'cache';
@@ -76,8 +76,9 @@ export async function GET(request: Request) {
     if (!response) {
       try {
         // Set a timeout for database operations (5 seconds)
+        let timeoutId: NodeJS.Timeout | null = null;
         const dbTimeoutPromise = new Promise<TestLimitResponse>((_, reject) => {
-          setTimeout(() => {
+          timeoutId = setTimeout(() => {
             reject(new Error('Database operation timeout'));
           }, 5000);
         });
@@ -115,7 +116,7 @@ export async function GET(request: Request) {
           // Calculate remaining tests
           const testsUsedToday = subscription.tests_used_today || 0;
           const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
-          const remainingToday = isUnlimited ? Infinity : Math.max(0, limitPerDay - testsUsedToday);
+          const remainingToday = isUnlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limitPerDay - testsUsedToday);
           
           // Build response
           return {
@@ -139,9 +140,10 @@ export async function GET(request: Request) {
         
         // Race between database query and timeout
         response = await Promise.race([dbQueryPromise(), dbTimeoutPromise]);
+        if (timeoutId) clearTimeout(timeoutId);
         
-        // Cache for a short time (30 seconds)
-        await cache.set(cacheKey, response, 30);
+        // Cache for a longer time (2 minutes) since this doesn't change that often
+        await cache.set(cacheKey, response, 120);
         source = 'database';
       } catch (error) {
         console.error('Database or timeout error:', error);
@@ -149,8 +151,11 @@ export async function GET(request: Request) {
         response = DEFAULT_FREE_SUBSCRIPTION;
         source = 'error-default';
         
-        // Only cache error response for 5 seconds to allow quick retry
-        await cache.set(cacheKey, response, 5);
+        // Only cache error response for 15 seconds to allow quick retry
+        await cache.set(cacheKey, response, 15);
+        
+        // Add delay before returning to prevent rapid retries
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
     
@@ -170,6 +175,10 @@ export async function GET(request: Request) {
     }
   } catch (error) {
     console.error('Unhandled error in test limits API:', error);
+    
+    // Add delay before returning to prevent rapid retries
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     return NextResponse.json({
       ...DEFAULT_FREE_SUBSCRIPTION,
       source: 'unhandled-error-default'

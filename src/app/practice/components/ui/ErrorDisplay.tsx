@@ -1,29 +1,67 @@
-// File: src/app/practice/components/ui/ErrorDisplay.tsx
+// src/app/practice/components/ui/ErrorDisplay.tsx
+'use client';
+
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import Link from 'next/link';
+
 interface ErrorDisplayProps {
-    message: string;
-    onRetry: () => void;
-  }
-  
-  export function ErrorDisplay({ message, onRetry }: ErrorDisplayProps) {
-    return (
-      <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="text-red-500 mb-6">
-          <svg className="w-20 h-20 mx-auto" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clipRule="evenodd"
-            />
-          </svg>
+  message: string;
+  onRetry?: () => void;
+  additionalInfo?: string;
+  showHomeLink?: boolean;
+}
+
+export function ErrorDisplay({ 
+  message, 
+  onRetry, 
+  additionalInfo,
+  showHomeLink = true 
+}: ErrorDisplayProps) {
+  return (
+    <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
+      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div className="bg-red-50 dark:bg-red-900/30 p-4 border-b border-red-100 dark:border-red-800">
+          <div className="flex items-center">
+            <AlertCircle className="h-6 w-6 text-red-500 dark:text-red-400 mr-2" />
+            <h2 className="text-lg font-semibold text-red-800 dark:text-red-300">
+              Failed to load practice session
+            </h2>
+          </div>
         </div>
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Failed to load practice session</h2>
-        <p className="text-gray-600 mb-8">{message}</p>
-        <button
-          onClick={onRetry}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition duration-200"
-        >
-          Retry
-        </button>
+        
+        <div className="p-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-4">
+            {message}
+          </p>
+          
+          {additionalInfo && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              {additionalInfo}
+            </p>
+          )}
+          
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md flex items-center justify-center transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </button>
+            )}
+            
+            {showHomeLink && (
+              <Link
+                href="/"
+                className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 text-center transition-colors"
+              >
+                Back to Home
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}

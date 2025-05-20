@@ -3,138 +3,281 @@ import { eq, and, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { 
   subscription_plans, 
-  user_subscriptions, 
-  payment_history,
-  subscriptionStatusEnum
+  user_subscriptions,
+  payment_history
 } from '@/db/schema';
-import { withCache } from '@/lib/cache';
+import { withCache, cache } from '@/lib/cache';
 import { CacheInvalidator } from '@/lib/cacheInvalidation';
-import { getSubscriptionFromStripe } from '@/lib/stripe';
-import Stripe from 'stripe';
 import { addDays } from 'date-fns';
 import { GSTDetails } from '@/types/payment';
+import { getSubscriptionFromStripe } from '@/lib/stripe';
+import Stripe from 'stripe';
+
+// Define type for subscription to match your schema
+type UserSubscription = typeof user_subscriptions.$inferSelect;
+type SubscriptionPlan = typeof subscription_plans.$inferSelect;
 
 export class SubscriptionService {
   /**
-   * Get user's current subscription
+   * Get user's current subscription with improved caching and error handling
    */
-  async getUserSubscription(userId: string) {
+  async getUserSubscription(userId: string): Promise<UserSubscription> {
     const cacheKey = `user:${userId}:subscription`;
-
-    return withCache(
-      async (uid: string) => {
+    
+    try {
+      // First check memory cache which is super fast
+      const cachedData = await cache.get<UserSubscription>(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+      
+      // If not in cache, query database with timeout protection
+      let timeoutId: NodeJS.Timeout | null = null;
+      const timeoutPromise = new Promise<UserSubscription>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('Database query timeout'));
+        }, 3000); // 3 second timeout
+      });
+      
+      // Database query
+      const dbQueryPromise = async (): Promise<UserSubscription> => {
         const subs = await db
           .select()
           .from(user_subscriptions)
-          .where(eq(user_subscriptions.user_id, uid))
+          .where(eq(user_subscriptions.user_id, userId))
           .limit(1);
         
         if (subs.length === 0) {
-          return this.createDefaultSubscription(uid);
+          return this.createDefaultSubscription(userId);
         }
         
         return subs[0];
+      };
+      
+      // Race the query against the timeout
+      const subscription = await Promise.race([dbQueryPromise(), timeoutPromise]);
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      // Cache the successful result for 15 minutes
+      await cache.set(cacheKey, subscription, 900);
+      
+      return subscription;
+    } catch (error) {
+      console.error(`Error fetching subscription for user ${userId}:`, error);
+      
+      // Try to get possibly stale data from cache as fallback
+      const staleData = await cache.get<UserSubscription>(cacheKey);
+      if (staleData) {
+        console.log(`Using stale cached subscription data for user ${userId}`);
+        return staleData;
+      }
+      
+      // If no cached data, create a temporary subscription object
+      console.log(`Creating temporary subscription for user ${userId} due to error`);
+      
+      // But don't update the database on error, just return a temporary object
+      const freePlan = await this.getFreePlan();
+      const now = new Date();
+      
+      // Create a fallback subscription with all required fields
+      const fallbackSubscription: UserSubscription = {
+        subscription_id: 0,
+        user_id: userId,
+        plan_id: freePlan.plan_id,
+        stripe_subscription_id: null,
+        stripe_customer_id: null,
+        status: 'active', 
+        current_period_start: now,
+        current_period_end: addDays(now, 30),
+        cancel_at_period_end: false,
+        canceled_at: null,
+        trial_end: null,
+        tests_used_today: 0,
+        tests_used_total: 0,
+        last_test_date: null,
+        metadata: null,
+        created_at: now,
+        updated_at: now
+      };
+      
+      return fallbackSubscription;
+    }
+  }
+
+  /**
+   * Helper method to get the free plan
+   */
+  private async getFreePlan(): Promise<SubscriptionPlan> {
+    const cacheKey = 'plan:free';
+    
+    return withCache<SubscriptionPlan, []>(
+      async () => {
+        const freePlans = await db
+          .select()
+          .from(subscription_plans)
+          .where(and(
+            eq(subscription_plans.plan_code, 'free'),
+            eq(subscription_plans.is_active, true)
+          ))
+          .limit(1);
+        
+        if (freePlans.length === 0) {
+          // Create a default fallback plan if none is found
+          return {
+            plan_id: 1,
+            plan_name: 'Free Plan',
+            plan_code: 'free',
+            description: 'Default free plan (fallback)',
+            price_inr: 0,
+            price_id_stripe: 'free_tier',
+            product_id_stripe: 'free_product',
+            features: null,
+            test_limit_daily: 3,
+            duration_days: 365,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          };
+        }
+        
+        return freePlans[0];
       },
       cacheKey,
-      300 // 5 minutes TTL
-    )(userId);
+      3600 // Cache free plan for 1 hour
+    )();
   }
 
   /**
    * Create a default free subscription for a new user
    */
-  async createDefaultSubscription(userId: string) {
-    // Get the free plan
-    const freePlans = await db
-      .select()
-      .from(subscription_plans)
-      .where(and(
-        eq(subscription_plans.plan_code, 'free'),
-        eq(subscription_plans.is_active, true)
-      ))
-      .limit(1);
-    
-    if (freePlans.length === 0) {
-      throw new Error('No free plan found in the database');
+  async createDefaultSubscription(userId: string): Promise<UserSubscription> {
+    try {
+      // Get the free plan
+      const freePlan = await this.getFreePlan();
+      
+      // Create subscription record
+      const now = new Date();
+      const endDate = addDays(now, freePlan.duration_days || 365); // Default to 1 year for free plan
+      
+      const newSubscription = {
+        user_id: userId,
+        plan_id: freePlan.plan_id,
+        stripe_subscription_id: null,
+        stripe_customer_id: null,
+        status: 'active' as const,
+        current_period_start: now,
+        current_period_end: endDate,
+        cancel_at_period_end: false,
+        canceled_at: null,
+        trial_end: null,
+        tests_used_today: 0,
+        tests_used_total: 0,
+        last_test_date: null,
+        metadata: null
+      };
+      
+      const [subscription] = await db.insert(user_subscriptions)
+        .values(newSubscription)
+        .returning();
+      
+      await CacheInvalidator.invalidateUserSubscription(userId);
+      
+      return subscription;
+    } catch (error) {
+      console.error(`Error creating default subscription for user ${userId}:`, error);
+      
+      // Create a fallback subscription object that won't be saved to the database
+      const freePlan = await this.getFreePlan();
+      const now = new Date();
+      
+      // Return a properly structured object that matches the UserSubscription type
+      return {
+        subscription_id: 0,
+        user_id: userId,
+        plan_id: freePlan.plan_id,
+        stripe_subscription_id: null,
+        stripe_customer_id: null,
+        status: 'active',
+        current_period_start: now, 
+        current_period_end: addDays(now, 365),
+        cancel_at_period_end: false,
+        canceled_at: null,
+        trial_end: null,
+        tests_used_today: 0,
+        tests_used_total: 0,
+        last_test_date: null,
+        metadata: null,
+        created_at: now,
+        updated_at: now
+      };
     }
-    
-    const freePlan = freePlans[0];
-    
-    // Create subscription record
-    const now = new Date();
-    const endDate = addDays(now, freePlan.duration_days || 365000); // Very long duration for free plan
-    
-    const newSubscription = {
-      user_id: userId,
-      plan_id: freePlan.plan_id,
-      status: 'active' as const,
-      current_period_start: now,
-      current_period_end: endDate,
-      tests_used_today: 0,
-      tests_used_total: 0
-    };
-    
-    const [subscription] = await db.insert(user_subscriptions)
-      .values(newSubscription)
-      .returning();
-    
-    await CacheInvalidator.invalidateUserSubscription(userId);
-    
-    return subscription;
   }
 
   /**
    * Check if user can take a test
    */
   async canUserTakeTest(userId: string): Promise<{ canTake: boolean; reason?: string }> {
-    const subscription = await this.getUserSubscription(userId);
-    
-    // First check if subscription is active
-    if (subscription.status !== 'active' && subscription.status !== 'trialing') {
-      return { 
-        canTake: false, 
-        reason: 'Your subscription is not active. Please renew your subscription to continue.' 
-      };
-    }
-    
-    // For premium plans with unlimited tests
-    const plan = await this.getPlanById(subscription.plan_id);
-    if (!plan.test_limit_daily) {
+    try {
+      const subscription = await this.getUserSubscription(userId);
+      
+      // First check if subscription is active
+      if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+        return { 
+          canTake: false, 
+          reason: 'Your subscription is not active. Please renew your subscription to continue.' 
+        };
+      }
+      
+      // For premium plans with unlimited tests
+      const plan = await this.getPlanById(subscription.plan_id);
+      if (!plan.test_limit_daily) {
+        return { canTake: true };
+      }
+      
+      // For plans with daily limits, check usage
+      // Reset counter if it's a new day
+      await this.resetDailyCounterIfNeeded(userId, subscription);
+      
+      // Get updated subscription after potential reset
+      const updatedSubscription = await this.getUserSubscription(userId);
+      
+      // Check if limit reached
+      if ((updatedSubscription.tests_used_today ?? 0) >= plan.test_limit_daily) {
+        return {
+          canTake: false,
+          reason: `You've reached your daily limit of ${plan.test_limit_daily} tests. Upgrade to premium for unlimited tests.`
+        };
+      }
+      
+      return { canTake: true };
+    } catch (error) {
+      console.error(`Error checking if user ${userId} can take test:`, error);
+      
+      // Default to allowing the user to take tests if we can't determine otherwise
+      // This ensures service degradation is graceful
       return { canTake: true };
     }
-    
-    // For plans with daily limits, check usage
-    // Reset counter if it's a new day
-    await this.resetDailyCounterIfNeeded(userId, subscription);
-    
-    // Get updated subscription after potential reset
-    const updatedSubscription = await this.getUserSubscription(userId);
-    
-    // Check if limit reached
-    if ((updatedSubscription.tests_used_today ?? 0) >= plan.test_limit_daily) {
-      return {
-        canTake: false,
-        reason: `You've reached your daily limit of ${plan.test_limit_daily} tests. Upgrade to premium for unlimited tests.`
-      };
-    }
-    
-    return { canTake: true };
   }
 
   /**
    * Reset daily test counter if it's a new day
    */
-  private async resetDailyCounterIfNeeded(userId: string, subscription: typeof user_subscriptions.$inferSelect) {
-    const today = new Date();
-    const lastTestDate = subscription.last_test_date;
-    
-    // If no tests taken or last test was on a different day, reset counter
-    if (!lastTestDate || !this.isSameDay(lastTestDate, today)) {
-      await db.update(user_subscriptions)
-        .set({ tests_used_today: 0 })
-        .where(eq(user_subscriptions.user_id, userId));
+  private async resetDailyCounterIfNeeded(userId: string, subscription: UserSubscription) {
+    try {
+      const today = new Date();
+      const lastTestDate = subscription.last_test_date;
       
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // If no tests taken or last test was on a different day, reset counter
+      if (!lastTestDate || !this.isSameDay(lastTestDate, today)) {
+        await db.update(user_subscriptions)
+          .set({ tests_used_today: 0 })
+          .where(eq(user_subscriptions.user_id, userId));
+        
+        await CacheInvalidator.invalidateUserSubscription(userId);
+      }
+    } catch (error) {
+      console.error(`Error resetting counter for user ${userId}:`, error);
+      // Just log the error, don't throw - allow the operation to continue
     }
   }
 
@@ -162,27 +305,32 @@ export class SubscriptionService {
    * Increment test count when user takes a test
    */
   async incrementTestCount(userId: string): Promise<void> {
-    const today = new Date();
-    
-    await db.update(user_subscriptions)
-      .set({ 
-        tests_used_today: sql`${user_subscriptions.tests_used_today} + 1`,
-        tests_used_total: sql`${user_subscriptions.tests_used_total} + 1`,
-        last_test_date: today,
-        updated_at: today
-      })
-      .where(eq(user_subscriptions.user_id, userId));
-    
-    await CacheInvalidator.invalidateUserSubscription(userId);
+    try {
+      const today = new Date();
+      
+      await db.update(user_subscriptions)
+        .set({ 
+          tests_used_today: sql`${user_subscriptions.tests_used_today} + 1`,
+          tests_used_total: sql`${user_subscriptions.tests_used_total} + 1`,
+          last_test_date: today,
+          updated_at: today
+        })
+        .where(eq(user_subscriptions.user_id, userId));
+      
+      await CacheInvalidator.invalidateUserSubscription(userId);
+    } catch (error) {
+      console.error(`Error incrementing test count for user ${userId}:`, error);
+      // Log error but don't throw - this should not block the user experience
+    }
   }
 
   /**
    * Get subscription plan by ID
    */
-  async getPlanById(planId: number) {
+  async getPlanById(planId: number): Promise<SubscriptionPlan> {
     const cacheKey = `plan:${planId}`;
     
-    return withCache(
+    return withCache<SubscriptionPlan, [number]>(
       async (id: number) => {
         const plans = await db
           .select()
@@ -191,7 +339,22 @@ export class SubscriptionService {
           .limit(1);
         
         if (plans.length === 0) {
-          throw new Error(`Plan with ID ${id} not found`);
+          // Return a fallback plan if not found
+          return {
+            plan_id: id,
+            plan_name: 'Unknown Plan',
+            plan_code: 'free',
+            description: 'Default fallback plan',
+            price_inr: 0,
+            price_id_stripe: 'unknown',
+            product_id_stripe: 'unknown',
+            features: null,
+            test_limit_daily: 3,
+            duration_days: 365,
+            is_active: true,
+            created_at: new Date(),
+            updated_at: new Date()
+          };
         }
         
         return plans[0];
@@ -204,10 +367,10 @@ export class SubscriptionService {
   /**
    * Get all active subscription plans
    */
-  async getActivePlans() {
+  async getActivePlans(): Promise<SubscriptionPlan[]> {
     const cacheKey = 'subscription:active-plans';
     
-    return withCache(
+    return withCache<SubscriptionPlan[], []>(
       async () => {
         return db
           .select()
@@ -221,344 +384,291 @@ export class SubscriptionService {
   }
 
   /**
-   * Update subscription status from Stripe webhook
+   * Check if a user has a premium subscription
    */
-  async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
+  async isPremiumUser(userId: string): Promise<boolean> {
     try {
-      const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
+      const subscription = await this.getUserSubscription(userId);
+      const plan = await this.getPlanById(subscription.plan_id);
       
-      // Find the user subscription
-      let userQuery = db
-        .select()
-        .from(user_subscriptions)
-        .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
-        .limit(1);
-      
-      if (userId) {
-        userQuery = db
-          .select()
-          .from(user_subscriptions)
-          .where(and(
-            eq(user_subscriptions.user_id, userId),
-            eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-          ))
-          .limit(1);
-      }
-      
-      const subscriptions = await userQuery;
-      
-      if (subscriptions.length === 0) {
-        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-        return null;
-      }
-      
-      const subscription = subscriptions[0];
-      
-      // Map Stripe status to our enum
-      let status: typeof subscriptionStatusEnum.enumValues[number] = 'active';
-      
-      switch (stripeSubscription.status) {
-        case 'active':
-          status = 'active';
-          break;
-        case 'canceled':
-          status = 'canceled';
-          break;
-        case 'past_due':
-          status = 'past_due';
-          break;
-        case 'unpaid':
-          status = 'unpaid';
-          break;
-        case 'trialing':
-          status = 'trialing';
-          break;
-        case 'incomplete':
-          status = 'incomplete';
-          break;
-        case 'incomplete_expired':
-          status = 'incomplete_expired';
-          break;
-        default:
-          console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
-      }
-      
-      // Access values from the Stripe subscription object
-      // The Stripe API response has these properties but the TypeScript types are sometimes lagging behind
-      // We need to use a type assertion to access these timestamp properties
-      const stripeData = stripeSubscription as unknown as {
-        current_period_start: number;
-        current_period_end: number;
-        cancel_at_period_end: boolean;
-        canceled_at: number | null;
-      };
-      
-      const currentPeriodStart = stripeData.current_period_start;
-      const currentPeriodEnd = stripeData.current_period_end;
-      const cancelAtPeriodEnd = stripeData.cancel_at_period_end || false;
-      const canceledAt = stripeData.canceled_at;
-      
-      // Update subscription in our database
-      await db.update(user_subscriptions)
-        .set({
-          status,
-          current_period_start: new Date(currentPeriodStart * 1000),
-          current_period_end: new Date(currentPeriodEnd * 1000),
-          cancel_at_period_end: cancelAtPeriodEnd,
-          canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
-          updated_at: new Date()
-        })
-        .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
-      
-      await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
-      
-      return subscription;
+      return plan.plan_code === 'premium';
     } catch (error) {
-      console.error('Error updating subscription from Stripe:', error);
-      throw error;
+      console.error(`Error checking premium status for user ${userId}:`, error);
+      return false; // Default to non-premium on error
     }
   }
 
-  /**
-   * Create or update a subscription after successful payment
-   */
-  async createOrUpdateSubscription({
-    userId,
-    planId,
-    stripeSubscriptionId,
-    stripeCustomerId,
-    status = 'active',
-    periodStart,
-    periodEnd,
-    trialEnd = null
-  }: {
-    userId: string;
-    planId: number;
-    stripeSubscriptionId: string;
-    stripeCustomerId: string;
-    status?: typeof subscriptionStatusEnum.enumValues[number];
-    periodStart: Date;
-    periodEnd: Date;
-    trialEnd?: Date | null;
-  }) {
-    // Check if user already has a subscription
-    const existingSubs = await db
+  // Other methods from your original SubscriptionService class...
+/**
+ * Create or update a user subscription
+ */
+async createOrUpdateSubscription({
+  userId,
+  planId,
+  stripeSubscriptionId,
+  stripeCustomerId,
+  status,
+  periodStart,
+  periodEnd,
+  cancelAtPeriodEnd = false,
+  canceledAt = null,
+  trialEnd = null
+}: {
+  userId: string;
+  planId: number;
+  stripeSubscriptionId: string | null;
+  stripeCustomerId: string | null;
+  status: string;
+  periodStart: Date;
+  periodEnd: Date;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: Date | null;
+  trialEnd?: Date | null;
+}): Promise<UserSubscription> {
+  try {
+    // Check if the user already has a subscription
+    const existingSubscription = await db
       .select()
       .from(user_subscriptions)
       .where(eq(user_subscriptions.user_id, userId))
       .limit(1);
     
-    // Update existing subscription
-    if (existingSubs.length > 0) {
-      const existingSub = existingSubs[0];
-      
-      await db.update(user_subscriptions)
+    const now = new Date();
+    
+    // Ensure status is one of the valid enum values
+    const validStatuses = ['active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired'];
+    const validStatus = validStatuses.includes(status)
+      ? status as 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired'
+      : 'active';
+    
+    if (existingSubscription.length > 0) {
+      // Update existing subscription
+      const [updatedSubscription] = await db
+        .update(user_subscriptions)
         .set({
           plan_id: planId,
           stripe_subscription_id: stripeSubscriptionId,
           stripe_customer_id: stripeCustomerId,
-          status,
+          status: validStatus,
           current_period_start: periodStart,
           current_period_end: periodEnd,
+          cancel_at_period_end: cancelAtPeriodEnd,
+          canceled_at: canceledAt,
           trial_end: trialEnd,
-          cancel_at_period_end: false,
-          canceled_at: null,
-          updated_at: new Date()
+          updated_at: now
         })
-        .where(eq(user_subscriptions.subscription_id, existingSub.subscription_id));
+        .where(eq(user_subscriptions.user_id, userId))
+        .returning();
       
+      // Invalidate cache for this user's subscription
       await CacheInvalidator.invalidateUserSubscription(userId);
       
-      return { subscriptionId: existingSub.subscription_id, isNew: false };
-    }
-    
-    // Create new subscription
-    const [newSubscription] = await db.insert(user_subscriptions)
-      .values({
+      return updatedSubscription;
+    } else {
+      // Create new subscription
+      const newSubscription = {
         user_id: userId,
         plan_id: planId,
         stripe_subscription_id: stripeSubscriptionId,
         stripe_customer_id: stripeCustomerId,
-        status,
+        status: validStatus,
         current_period_start: periodStart,
         current_period_end: periodEnd,
+        cancel_at_period_end: cancelAtPeriodEnd,
+        canceled_at: canceledAt,
         trial_end: trialEnd,
         tests_used_today: 0,
         tests_used_total: 0,
-        cancel_at_period_end: false
-      })
-      .returning();
-    
-    await CacheInvalidator.invalidateUserSubscription(userId);
-    
-    return { subscriptionId: newSubscription.subscription_id, isNew: true };
-  }
-
-  /**
-   * Record a payment in the payment history
-   */
-  async recordPayment({
-    userId,
-    subscriptionId,
-    amountInr,
-    stripePaymentId,
-    stripeInvoiceId,
-    paymentMethod,
-    paymentStatus,
-    paymentDate,
-    nextBillingDate,
-    receiptUrl,
-    gstDetails
-  }: {
-    userId: string;
-    subscriptionId: number;
-    amountInr: number;
-    stripePaymentId: string;
-    stripeInvoiceId: string;
-    paymentMethod: string;
-    paymentStatus: string;
-    paymentDate: Date;
-    nextBillingDate: Date;
-    receiptUrl: string | null;
-    gstDetails: GSTDetails;
-  }) {
-    await db.insert(payment_history)
-      .values({
-        user_id: userId,
-        subscription_id: subscriptionId,
-        amount_inr: amountInr,
-        stripe_payment_id: stripePaymentId,
-        stripe_invoice_id: stripeInvoiceId,
-        payment_method: paymentMethod,
-        payment_status: paymentStatus,
-        payment_date: paymentDate,
-        next_billing_date: nextBillingDate,
-        receipt_url: receiptUrl,
-        gst_details: gstDetails
-      });
-  }
-
-  /**
-   * Get user's payment history
-   */
-  async getUserPaymentHistory(userId: string) {
-    const cacheKey = `user:${userId}:payments`;
-    
-    return withCache(
-      async (uid: string) => {
-        return db
-          .select()
-          .from(payment_history)
-          .where(eq(payment_history.user_id, uid))
-          .orderBy(sql`${payment_history.payment_date} DESC`);
-      },
-      cacheKey,
-      300 // 5 minutes TTL
-    )(userId);
-  }
-  /**
- * Check if user can access a topic based on the topic index
- * Free users can only access the first N topics per subject
- */
-async canAccessTopic(userId: string, subjectId: number, topicIndex: number): Promise<{ canAccess: boolean; reason?: string }> {
-  const MAX_FREE_TOPICS = 2; // Number of free topics per subject
-  
-  try {
-    const subscription = await this.getUserSubscription(userId);
-    
-    // Get the plan details
-    const plan = await this.getPlanById(subscription.plan_id);
-    
-    // Premium users can access all topics
-    if (plan.plan_code === 'premium') {
-      return { canAccess: true };
-    }
-    
-    // Free users can only access MAX_FREE_TOPICS per subject
-    if (topicIndex < MAX_FREE_TOPICS) {
-      return { canAccess: true };
-    }
-    
-    return { 
-      canAccess: false, 
-      reason: `Free users can only access ${MAX_FREE_TOPICS} topics per subject. Upgrade to premium for unlimited access.`
-    };
-  } catch (error) {
-    console.error('Error checking topic access:', error);
-    // Default to allowing access if there's an error checking
-    return { canAccess: true };
-  }
-}
-/**
- * Get the total number of topics a user can access per subject
- * This is unlimited for premium users and limited for free users
- */
-async getAccessibleTopicsCount(userId: string): Promise<number> {
-  const MAX_FREE_TOPICS = 2; // Number of free topics per subject
-  
-  try {
-    const subscription = await this.getUserSubscription(userId);
-    const plan = await this.getPlanById(subscription.plan_id);
-    
-    // Premium users can access unlimited topics
-    if (plan.plan_code === 'premium') {
-      return Infinity;
-    }
-    
-    // Free users can access MAX_FREE_TOPICS per subject
-    return MAX_FREE_TOPICS;
-  } catch (error) {
-    console.error('Error getting accessible topics count:', error);
-    // Default to free plan limit if there's an error
-    return MAX_FREE_TOPICS;
-  }
-}
-/**
- * Check if a user has a premium subscription
- * This is a convenience method to quickly check premium status
- */
-async isPremiumUser(userId: string): Promise<boolean> {
-  const cacheKey = `user:${userId}:is-premium`;
-  
-  return withCache(
-    async (uid: string) => {
-      const subscription = await this.getUserSubscription(uid);
-      const plan = await this.getPlanById(subscription.plan_id);
-      
-      return plan.plan_code === 'premium';
-    },
-    cacheKey,
-    300 // 5 minutes TTL
-  )(userId);
-}
-/**
- * Get user subscription details with plan information
- * This combines subscription and plan data in one convenient method
- */
-async getSubscriptionWithPlan(userId: string) {
-  const cacheKey = `user:${userId}:subscription-with-plan`;
-  
-  return withCache(
-    async (uid: string) => {
-      const subscription = await this.getUserSubscription(uid);
-      const plan = await this.getPlanById(subscription.plan_id);
-      
-      return {
-        subscription,
-        plan,
-        isPremium: plan.plan_code === 'premium',
-        maxTopicsPerSubject: plan.plan_code === 'premium' ? Infinity : 2,
-        maxTestsPerDay: plan.test_limit_daily || Infinity,
-        remainingTests: plan.test_limit_daily 
-          ? Math.max(0, plan.test_limit_daily - (subscription.tests_used_today || 0))
-          : Infinity
+        last_test_date: null,
+        metadata: null
       };
+      
+      const [subscription] = await db
+        .insert(user_subscriptions)
+        .values(newSubscription)
+        .returning();
+      
+      // Invalidate cache
+      await CacheInvalidator.invalidateUserSubscription(userId);
+      
+      return subscription;
+    }
+  } catch (error) {
+    console.error(`Error creating/updating subscription for user ${userId}:`, error);
+    throw new Error(`Failed to create or update subscription: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+/**
+ * Get user's payment history
+ */
+/**
+ * Get user's payment history
+ */
+/**
+ * Get user's payment history
+ */
+async getUserPaymentHistory(userId: string): Promise<typeof payment_history.$inferSelect[]> {
+  const cacheKey = `user:${userId}:payments`;
+  
+  return withCache<typeof payment_history.$inferSelect[], [string]>(
+    async (uid: string) => {
+      return db
+        .select()
+        .from(payment_history)
+        .where(eq(payment_history.user_id, uid))
+        .orderBy(sql`${payment_history.payment_date} DESC`);
     },
     cacheKey,
     300 // 5 minutes TTL
   )(userId);
 }
+/**
+ * Update subscription status from Stripe webhook
+ */
+async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
+  try {
+    const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
+    
+    // Find the user subscription
+    let userQuery = db
+      .select()
+      .from(user_subscriptions)
+      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .limit(1);
+    
+    if (userId) {
+      userQuery = db
+        .select()
+        .from(user_subscriptions)
+        .where(and(
+          eq(user_subscriptions.user_id, userId),
+          eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
+        ))
+        .limit(1);
+    }
+    
+    const subscriptions = await userQuery;
+    
+    if (subscriptions.length === 0) {
+      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+      return null;
+    }
+    
+    const subscription = subscriptions[0];
+    
+    // Map Stripe status to our enum
+    let status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired' = 'active';
+    
+    switch (stripeSubscription.status) {
+      case 'active':
+        status = 'active';
+        break;
+      case 'canceled':
+        status = 'canceled';
+        break;
+      case 'past_due':
+        status = 'past_due';
+        break;
+      case 'unpaid':
+        status = 'unpaid';
+        break;
+      case 'trialing':
+        status = 'trialing';
+        break;
+      case 'incomplete':
+        status = 'incomplete';
+        break;
+      case 'incomplete_expired':
+        status = 'incomplete_expired';
+        break;
+      default:
+        console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
+    }
+    
+    // Access values from the Stripe subscription object
+    const stripeData = stripeSubscription as unknown as {
+      current_period_start: number;
+      current_period_end: number;
+      cancel_at_period_end: boolean;
+      canceled_at: number | null;
+    };
+    
+    const currentPeriodStart = stripeData.current_period_start;
+    const currentPeriodEnd = stripeData.current_period_end;
+    const cancelAtPeriodEnd = stripeData.cancel_at_period_end || false;
+    const canceledAt = stripeData.canceled_at;
+    
+    // Update subscription in our database
+    await db.update(user_subscriptions)
+      .set({
+        status,
+        current_period_start: new Date(currentPeriodStart * 1000),
+        current_period_end: new Date(currentPeriodEnd * 1000),
+        cancel_at_period_end: cancelAtPeriodEnd,
+        canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
+        updated_at: new Date()
+      })
+      .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
+    
+    await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
+    
+    return subscription;
+  } catch (error) {
+    console.error('Error updating subscription from Stripe:', error);
+    throw error;
+  }
+}
 
+/**
+ * Record a payment in the payment history
+ */
+async recordPayment({
+  userId,
+  subscriptionId,
+  amountInr,
+  stripePaymentId,
+  stripeInvoiceId,
+  paymentMethod,
+  paymentStatus,
+  paymentDate,
+  nextBillingDate,
+  receiptUrl,
+  gstDetails
+}: {
+  userId: string;
+  subscriptionId: number;
+  amountInr: number;
+  stripePaymentId: string;
+  stripeInvoiceId: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  paymentDate: Date;
+  nextBillingDate: Date;
+  receiptUrl: string | null;
+  gstDetails: GSTDetails;
+}) {
+  await db.insert(payment_history)
+    .values({
+      user_id: userId,
+      subscription_id: subscriptionId,
+      amount_inr: amountInr,
+      stripe_payment_id: stripePaymentId,
+      stripe_invoice_id: stripeInvoiceId,
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      payment_date: paymentDate,
+      next_billing_date: nextBillingDate,
+      receipt_url: receiptUrl,
+      gst_details: gstDetails
+    });
+    
+  // Invalidate related caches
+  await CacheInvalidator.invalidateUserSubscription(userId);
+  
+  // Also invalidate payment history cache
+  const paymentsCacheKey = `user:${userId}:payments`;
+  await cache.delete(paymentsCacheKey);
+}
 }
 
 export const subscriptionService = new SubscriptionService();

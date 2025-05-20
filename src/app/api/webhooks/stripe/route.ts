@@ -81,7 +81,8 @@ async function handleSubscriptionChange(subscription: StripeSubscription) {
       planId: plan.plan_id,
       stripeSubscriptionId,
       stripeCustomerId,
-      status: subscription.status as "active" | "canceled" | "past_due" | "unpaid" | "trialing" | "incomplete" | "incomplete_expired" | undefined,
+      // Ensure we have a valid status string
+      status: subscription.status || 'active', // Provide a default value when undefined
       periodStart: new Date(subscription.current_period_start * 1000),
       periodEnd: new Date(subscription.current_period_end * 1000),
       trialEnd: subscription.trial_end

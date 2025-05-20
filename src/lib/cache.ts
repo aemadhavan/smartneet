@@ -43,20 +43,29 @@ class Cache implements CacheProvider {
    * Get a value from cache
    */
   async get<T>(key: string): Promise<T | null> {
-    try {
-      // Try Redis first if available
-      if (redisClient) {
-        const value = await redisClient.get(key)
-        return value as T || null
+  try {
+    // Try Redis first if available
+    if (redisClient) {
+      try {
+        const value = await redisClient.get(key);
+        if (value !== null && value !== undefined) {
+          return value as T;
+        }
+        // If Redis fails, log and fall back to memory cache
+      } catch (redisError) {
+        console.error('Redis get error:', redisError);
+        console.log('Falling back to memory cache');
       }
-      
-      // Fall back to memory cache
-      return memoryCache.get(key) as T || null
-    } catch (error) {
-      console.error('Cache get error:', error)
-      return null
     }
+    
+    // Fall back to memory cache
+    const memoryValue = memoryCache.get(key);
+    return memoryValue as T || null;
+  } catch (error) {
+    console.error('Cache get error:', error);
+    return null;
   }
+}
 
   /**
    * Set a value in cache
@@ -222,5 +231,58 @@ export function Cached(keyPrefix: string, ttl?: number): MethodDecorator {
     };
 
     return descriptor;
+  };
+}
+
+/**
+ * Enhanced withCache that supports cache busting and better error handling
+ */
+export function withCacheAdvanced<T, Args extends unknown[]>(
+  fn: (...args: Args) => Promise<T>,
+  keyPrefix: string,
+  ttl = CACHE_TTL,
+  options: {
+    forceRefresh?: boolean;
+    onError?: (error: unknown) => Promise<T | null>;
+    extendTtlOnHit?: boolean;
+  } = {}
+) {
+  return async (...args: Args): Promise<T> => {
+    // Create a cache key based on the function name, prefix and arguments
+    const cacheKey = `${keyPrefix}:${JSON.stringify(args)}`;
+    
+    // Skip cache if forceRefresh is true
+    if (!options.forceRefresh) {
+      // Try to get from cache first
+      const cached = await cache.get<T>(cacheKey);
+      if (cached !== null) {
+        // Optionally extend TTL on cache hit to keep frequently used data fresh
+        if (options.extendTtlOnHit) {
+          await cache.set<T>(cacheKey, cached, ttl);
+        }
+        return cached;
+      }
+    }
+    
+    try {
+      // If not in cache or forceRefresh, call the function
+      const result = await fn(...args);
+      
+      // Cache the result
+      await cache.set<T>(cacheKey, result, ttl);
+      
+      return result;
+    } catch (error) {
+      // Handle error with custom callback if provided
+      if (options.onError) {
+        const fallbackData = await options.onError(error);
+        if (fallbackData !== null) {
+          return fallbackData;
+        }
+      }
+      
+      // Re-throw the error if no fallback
+      throw error;
+    }
   };
 }
