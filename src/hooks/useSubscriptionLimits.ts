@@ -1,5 +1,7 @@
+'use client';
+
 // src/hooks/useSubscriptionLimits.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export interface TestLimitStatus {
   canTake: boolean;
@@ -7,7 +9,7 @@ export interface TestLimitStatus {
   usedToday: number;
   remainingToday: number;
   limitPerDay: number | null;
-  reason?: string;
+  reason?: string | null; // Made nullable to match API response
 }
 
 export interface SubscriptionInfo {
@@ -15,6 +17,7 @@ export interface SubscriptionInfo {
   planName: string;
   planCode: string;
   status: string;
+  lastTestDate?: string | null; // Added to match API response
 }
 
 interface UseSubscriptionLimitsResult {
@@ -34,81 +37,123 @@ const DEFAULT_FREE_SUBSCRIPTION = {
     usedToday: 0,
     remainingToday: 3,
     limitPerDay: 3,
-    reason: undefined
+    reason: null
   },
   subscription: {
     id: 0,
     planName: 'Free Plan',
     planCode: 'free',
-    status: 'active'
+    status: 'active',
+    lastTestDate: null
   }
 };
 
 export function useSubscriptionLimits(): UseSubscriptionLimitsResult {
-  // Initialize with default data so UI can render immediately
+  // State for subscription data
   const [limitStatus, setLimitStatus] = useState<TestLimitStatus | null>(DEFAULT_FREE_SUBSCRIPTION.limitStatus);
   const [subscription, setSubscription] = useState<SubscriptionInfo | null>(DEFAULT_FREE_SUBSCRIPTION.subscription);
-  const [isPremium, setIsPremium] = useState<boolean>(false); // Default to non-premium
-  const [loading, setLoading] = useState(true); // Start with true to indicate initial loading
+  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshCounter, setRefreshCounter] = useState(0);
-  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
-  
-  // Load cached data on mount
+  const [refreshCounter, setRefreshCounter] = useState<number>(0);
+
+  // Refs for tracking request state
+  const fetchInProgress = useRef<boolean>(false);
+  const abortController = useRef<AbortController | null>(null);
+  const lastFetchTime = useRef<number>(0);
+  const mounted = useRef<boolean>(true);
+  const retryTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isRetrying = useRef<boolean>(false);
+
+  // Load cached data from localStorage on mount
   useEffect(() => {
-    // Immediately try to load from localStorage when component mounts
+    // Set the mounted ref
+    mounted.current = true;
+    
+    // Try to load cached data from localStorage
     try {
       const cachedData = localStorage.getItem('subscription_data');
       if (cachedData) {
         const parsedData = JSON.parse(cachedData);
         
-        // Check if cache is still valid (within 5 minutes)
+        // Check if cache is still valid (15 minutes)
         const cacheAge = Date.now() - (parsedData.timestamp || 0);
-        const cacheValid = cacheAge < 5 * 60 * 1000; // 5 minutes
+        const cacheValid = cacheAge < 15 * 60 * 1000; // 15 minutes
         
         if (cacheValid) {
-          // Always use cached data immediately to ensure UI is responsive
+          // Use cached data
           setLimitStatus(parsedData.limitStatus || DEFAULT_FREE_SUBSCRIPTION.limitStatus);
           setSubscription(parsedData.subscription || DEFAULT_FREE_SUBSCRIPTION.subscription);
           setIsPremium(parsedData.subscription?.planCode !== 'free');
-          console.log('Initial render using cached data:', parsedData.subscription?.planCode);
+          console.log('Using cached subscription data:', new Date(parsedData.timestamp).toISOString());
         }
       }
     } catch (error) {
-      console.warn('Could not load cached subscription data on initial render:', error);
+      console.warn('Error loading cached subscription data:', error);
     }
+    
+    // Cleanup function
+    return () => {
+      mounted.current = false;
+      
+      // Cancel any in-flight requests
+      if (abortController.current) {
+        abortController.current.abort();
+      }
+      
+      // Clear any retry timeouts
+      if (retryTimeout.current) {
+        clearTimeout(retryTimeout.current);
+      }
+    };
   }, []);
 
-  // Function to fetch fresh data
-  const fetchLimitStatus = useCallback(async () => {
-    // Don't re-fetch if we just did within the last second (debounce)
-    const now = Date.now();
-    if (now - lastRefreshTime < 1000) {
+  // Function to fetch subscription data
+  const fetchSubscriptionData = useCallback(async (forceRefresh: boolean = false) => {
+    // Don't fetch if a request is already in progress
+    if (fetchInProgress.current && !forceRefresh) {
       return;
     }
     
-    setLastRefreshTime(now);
-    setLoading(true);
+    // Implement debouncing - prevent frequent refetches
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime.current;
     
-    // Reference to abort controller for timeout handling
-    let controller: AbortController | null = new AbortController();
+    // Only allow a forced refresh every 3 seconds
+    if (forceRefresh && timeSinceLastFetch < 3000) {
+      console.log('Debouncing forced refresh - too soon since last fetch');
+      return;
+    }
+    
+    // Only allow automatic refresh every 30 seconds
+    if (!forceRefresh && timeSinceLastFetch < 30000) {
+      console.log('Skipping automatic refresh - too soon since last fetch');
+      return;
+    }
+    
+    // Cancel any existing request
+    if (abortController.current) {
+      abortController.current.abort();
+    }
+    
+    // Set up new request
+    abortController.current = new AbortController();
+    fetchInProgress.current = true;
+    lastFetchTime.current = now;
+    
+    // Only show loading for forced refreshes (user-initiated)
+    if (forceRefresh) {
+      setError(null);
+      setLoading(true);
+    }
+    
+    // Set up timeout to avoid hanging requests
     let timeoutId: NodeJS.Timeout | null = null;
     
-    // Use a short timeout (3 seconds) since we already have data to display
-    timeoutId = setTimeout(() => {
-      if (controller) {
-        controller.abort();
-        console.warn('Subscription API request timed out after 3 seconds');
-        setError('API not responding - using cached data');
-        setLoading(false);
-      }
-    }, 3000);
-    
     try {
-      const timeStamp = now;
-      // Attempt to fetch fresh data with cache-busting
-      const response = await fetch(`/api/user/test-limits?t=${timeStamp}`, {
-        signal: controller?.signal,
+      // Add a timestamp parameter to bust cache
+      const response = await fetch(`/api/user/test-limits?t=${now}`, {
+        signal: abortController.current.signal,
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
@@ -116,68 +161,99 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsResult {
         }
       });
       
-      if (timeoutId) clearTimeout(timeoutId);
+      // Set timeout to avoid hanging requests
+      timeoutId = setTimeout(() => {
+        if (abortController.current) {
+          abortController.current.abort();
+        }
+      }, 5000); // 5 second timeout
       
+      // Process response
       if (!response.ok) {
-        // Handle error response
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.warn('API returned error status:', response.status, errorText);
         throw new Error(`API error: ${response.status}`);
       }
       
       const data = await response.json();
+      if (timeoutId) clearTimeout(timeoutId);
       
-      // Update state with fresh data
-      setLimitStatus(data.limitStatus || DEFAULT_FREE_SUBSCRIPTION.limitStatus);
-      setSubscription(data.subscription || DEFAULT_FREE_SUBSCRIPTION.subscription);
-      
-      const premium = data.subscription?.planCode !== 'free';
-      setIsPremium(premium);
-      
-      // Clear any previous errors
-      setError(null);
-      
-      // Update localStorage cache
-      try {
-        localStorage.setItem('subscription_data', JSON.stringify({
-          ...data,
-          timestamp: now
-        }));
-        console.log('Updated cached subscription data, source:', data.source);
-      } catch (error) {
-        console.warn('Failed to update subscription cache:', error);
+      // Only update state if component is still mounted
+      if (mounted.current) {
+        // Update state with API data
+        setLimitStatus(data.limitStatus || DEFAULT_FREE_SUBSCRIPTION.limitStatus);
+        setSubscription(data.subscription || DEFAULT_FREE_SUBSCRIPTION.subscription);
+        setIsPremium(data.subscription?.planCode !== 'free');
+        setError(null);
+        
+        // Cache the response in localStorage
+        try {
+          localStorage.setItem('subscription_data', JSON.stringify({
+            ...data,
+            timestamp: now
+          }));
+          console.log('Updated subscription data cache, source:', data.source);
+        } catch (storageError) {
+          console.warn('Failed to cache subscription data:', storageError);
+        }
       }
     } catch (error) {
-      console.warn('Error fetching subscription data:', error);
-      
-      // Set error but keep using cached/default data
-      setError('Failed to fetch subscription data');
-      
-      // Make sure we have at least the default values
-      if (!limitStatus) {
-        setLimitStatus(DEFAULT_FREE_SUBSCRIPTION.limitStatus);
-      }
-      if (!subscription) {
-        setSubscription(DEFAULT_FREE_SUBSCRIPTION.subscription);
+      // Only update error state if this was a forced refresh (user-initiated)
+      if (forceRefresh && mounted.current) {
+        // Keep using previous data but show error
+        setError('Failed to fetch subscription data');
+        console.error('Error fetching subscription data:', error);
+        
+        // Schedule a retry after 5 seconds, but only if not already retrying
+        if (!isRetrying.current) {
+          isRetrying.current = true;
+          
+          if (retryTimeout.current) {
+            clearTimeout(retryTimeout.current);
+          }
+          
+          retryTimeout.current = setTimeout(() => {
+            if (mounted.current) {
+              console.log('Retrying failed subscription data fetch');
+              isRetrying.current = false;
+              fetchSubscriptionData(true);
+            }
+          }, 5000);
+        }
+      } else {
+        console.log('Background subscription fetch failed, using cached data');
       }
     } finally {
-      setLoading(false);
+      // Clean up
+      if (mounted.current) {
+        setLoading(false);
+      }
+      
       if (timeoutId) clearTimeout(timeoutId);
-      controller = null;
+      fetchInProgress.current = false;
+      abortController.current = null;
     }
-  }, [lastRefreshTime, limitStatus, subscription]);
+  }, []);
 
-  // Then fetch fresh data when component mounts or refreshCounter changes
+  // Fetch data when component mounts or refresh is triggered
   useEffect(() => {
-    // Only attempt to fetch if we're in a browser environment
-    if (typeof window !== 'undefined') {
-      fetchLimitStatus();
+    // Skip in SSR context
+    if (typeof window === 'undefined') {
+      return;
     }
     
-    // No cleanup needed as fetchLimitStatus handles its own abort controller
-  }, [fetchLimitStatus, refreshCounter]);
+    // Fetch on mount or refresh counter change
+    fetchSubscriptionData(refreshCounter > 0);
+    
+    // Also set up a periodic refresh every 5 minutes
+    const intervalId = setInterval(() => {
+      fetchSubscriptionData(false);
+    }, 5 * 60 * 1000);
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchSubscriptionData, refreshCounter]);
 
-  // Expose refetch function for manual refresh
+  // Function to manually trigger a refresh
   const refetch = useCallback(() => {
     setRefreshCounter(prev => prev + 1);
   }, []);

@@ -335,7 +335,7 @@ export default function PracticeClientPage() {
 
   // Render subject selection if no subject is selected
   if (!selectedSubject) {
-    return <SubjectSelector subjects={subjects} onSelect={handleSubjectSelect} />;
+    return <SubjectSelector subjects={subjects} onSelect={handleSubjectSelect} isPremium={isPremium} />;
   }
   
   // Render limit reached screen if user has hit their daily limit

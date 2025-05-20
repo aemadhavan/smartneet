@@ -11,12 +11,12 @@ interface ErrorDisplayProps {
   showHomeLink?: boolean;
 }
 
-const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ 
+export function ErrorDisplay({ 
   message, 
   onRetry, 
   additionalInfo,
   showHomeLink = true 
-}) => {
+}: ErrorDisplayProps) {
   return (
     <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
       <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
@@ -64,6 +64,4 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
       </div>
     </div>
   );
-};
-
-export default ErrorDisplay;
+}

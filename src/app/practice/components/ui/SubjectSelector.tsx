@@ -5,6 +5,7 @@ import { Subject } from '@/app/practice/types';
 interface SubjectSelectorProps {
   subjects: Subject[];
   onSelect: (subject: Subject) => void;
+  isPremium?: boolean; // Added isPremium prop to check premium status
 }
 
 // Subject icon and styling configuration
@@ -59,7 +60,7 @@ const subjectIcons: Record<string, {
   }
 };
 
-export function SubjectSelector({ subjects, onSelect }: SubjectSelectorProps) {
+export function SubjectSelector({ subjects, onSelect, isPremium = false }: SubjectSelectorProps) {
   const [hoveredSubject, setHoveredSubject] = useState<number | null>(null);
 
   const getIconConfig = (subjectCode: string) => {
@@ -146,7 +147,13 @@ export function SubjectSelector({ subjects, onSelect }: SubjectSelectorProps) {
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      onSelect(subject);
+                      // If it's botany and user is not premium, navigate to URL with limit=free parameter
+                      if (subject.subject_code === 'BOT' && !isPremium) {
+                        window.location.href = `/practice?subject=botany&limit=free`;
+                      } else {
+                        // For other subjects or premium users, use the normal selection
+                        onSelect(subject);
+                      }
                     }}
                     className={`px-4 py-2 ${
                       // Enhanced contrast for Chemistry and Zoology buttons
