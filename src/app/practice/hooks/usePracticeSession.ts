@@ -1,4 +1,4 @@
-// File: src/app/practice/hooks/usePracticeSession.ts
+// src/app/practice/hooks/usePracticeSession.ts - Modified version
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Subject, SessionResponse } from '../types';
 
@@ -21,12 +21,15 @@ const DEFAULT_QUESTION_COUNT = 10;
 // TTL for cached session data in milliseconds (5 minutes)
 const SESSION_CACHE_TTL = 5 * 60 * 1000;
 
+// Max retry attempts for session creation
+const MAX_RETRY_ATTEMPTS = 3;
+
 export function usePracticeSession(
   selectedSubject: Subject | null,
   onResetSubject?: (subject: Subject | null) => void, // Callback prop
   topicId?: number | null, // Parameter for topic ID
   subtopicId?: number | null, // Parameter for subtopic ID
-  onSessionError?: (error: SubscriptionError) => void // New callback for subscription errors
+  onSessionError?: (error: SubscriptionError) => void // Callback for subscription errors
 ) {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
@@ -34,6 +37,7 @@ export function usePracticeSession(
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   
   // Session caching reference
   const sessionCacheKey = useRef<string | null>(null);
@@ -76,26 +80,28 @@ export function usePracticeSession(
     },
     
     clearCache: (key: string): void => {
-      localStorage.removeItem(key);
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        console.warn('Failed to clear session cache:', e);
+      }
     }
   }), []); // Empty dependency array means this is created only once
 
   // Create a session function - made into a callback so it can be called manually
   const createSession = useCallback(async (subject: Subject) => {
-    if (!subject) return;
+    if (!subject) return null;
     
     try {
       setLoading(true);
       setError(null);
-      setSessionCompleted(false);
-      setUserAnswers({});
-      setCurrentQuestionIndex(0);
       
       // Generate a cache key based on subject/topic/subtopic
-      sessionCacheKey.current = `practice_session:${subject.subject_id}:${topicId || 'all'}:${subtopicId || 'all'}`;
+      const newCacheKey = `practice_session:${subject.subject_id}:${topicId || 'all'}:${subtopicId || 'all'}`;
+      sessionCacheKey.current = newCacheKey;
       
       // Check if we have a cached session
-      const cachedSession = sessionCache.getCache(sessionCacheKey.current);
+      const cachedSession = sessionCache.getCache(newCacheKey);
       
       if (cachedSession && !sessionCompleted) {
         // Restore session from cache
@@ -130,7 +136,11 @@ export function usePracticeSession(
         sessionPayload.subtopic_id = subtopicId;
       }
       
-      // Add an offline indicator to the URL to handle network issues
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      // Add timestamp to URL to avoid cache issues
       const apiUrl = '/api/practice-sessions';
       const queryParams = new URLSearchParams();
       
@@ -141,30 +151,54 @@ export function usePracticeSession(
         }
       });
       
+      // Add timestamp for cache busting
+      queryParams.append('t', Date.now().toString());
+      
       const response = await fetch(`${apiUrl}?${queryParams.toString()}`, {
         method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
       
-      const data = await response.json();
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          // If we can't parse JSON, use status text
+          errorData = { error: response.statusText };
+        }
+        
         // Check if this is a subscription limit error
-        if (response.status === 403 && (data.limitReached || data.upgradeRequired)) {
-          const errorMessage = data.error || "You've reached your daily practice limit. Upgrade to Premium for unlimited practice tests.";
+        if (response.status === 403 && (errorData.limitReached || errorData.upgradeRequired)) {
+          const errorMessage = errorData.error || "You've reached your daily practice limit. Upgrade to Premium for unlimited practice tests.";
           
           // Call the subscription error callback if provided
           if (onSessionError) {
             onSessionError({
               message: errorMessage,
-              requiresUpgrade: data.upgradeRequired,
-              limitReached: data.limitReached
+              requiresUpgrade: errorData.upgradeRequired,
+              limitReached: errorData.limitReached
             });
           }
           
           throw new Error(errorMessage);
         }
         
-        throw new Error(data.error || 'Failed to create practice session');
+        throw new Error(errorData.error || 'Failed to create practice session');
+      }
+      
+      const data = await response.json();
+      
+      // Validate that the data has the expected structure
+      if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error('Invalid session data: No questions returned');
       }
       
       // Cache the new session
@@ -177,14 +211,28 @@ export function usePracticeSession(
         });
       }
       
+      // Reset state for new session
       setSession(data);
+      setSessionCompleted(false);
+      setUserAnswers({});
+      setCurrentQuestionIndex(0);
+      
       return data;
     } catch (err) {
       console.error('Error creating session:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load practice session. Please try again.');
+      
+      // Specific handling for network errors
+      const isNetworkError = err instanceof Error && 
+        (err.name === 'AbortError' || err.message.includes('network') || err.message.includes('failed to fetch'));
+      
+      if (isNetworkError) {
+        setError('Network error: Please check your connection and try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load practice session. Please try again.');
+      }
       
       // If we have network issues, try to recover from cached session
-      if (sessionCacheKey.current) {
+      if (isNetworkError && sessionCacheKey.current) {
         const cachedSession = sessionCache.getCache(sessionCacheKey.current);
         if (cachedSession) {
           console.log('Using cached session due to network error');
@@ -201,22 +249,6 @@ export function usePracticeSession(
       setLoading(false);
     }
   }, [topicId, subtopicId, onSessionError, sessionCache, sessionCompleted]);
-
-  // Create a session when subject changes, but only if auto-creation is desired
-  useEffect(() => {
-    if (selectedSubject) {
-      createSession(selectedSubject);
-    }
-  }, [selectedSubject, createSession]);
-
-  // Reset selected option when changing questions
-  useEffect(() => {
-    // Only run this effect if we have a valid session and question
-    if (session && session.questions[currentQuestionIndex]) {
-      // We don't need to set or use questionId here
-      // Just confirming we have a valid question at the current index
-    }
-  }, [currentQuestionIndex, userAnswers, session]);
 
   // Update cache when session state changes
   useEffect(() => {
@@ -252,57 +284,6 @@ export function usePracticeSession(
       
       return updated;
     });
-    
-    // Debounced API call to save the answer - no need to wait for response
-    // const saveAnswer = () => {
-    //   if (!session) return;
-      
-    //   const currentQuestion = session.questions[currentQuestionIndex];
-    //   if (!currentQuestion) return;
-      
-    //   // First, look up the correct session_question_id
-    //   fetch(`/api/session-questions/lookup`, {
-    //     method: 'POST',
-    //     headers: {
-    //       'Content-Type': 'application/json',
-    //     },
-    //     body: JSON.stringify({
-    //       session_id: session.sessionId,
-    //       question_id: currentQuestion.question_id
-    //     }),
-    //   })
-    //   .then(response => response.json())
-    //   .then(data => {
-    //     // Now submit the attempt with the correct session_question_id
-    //     if (data.session_question_id) {
-    //       fetch(`/api/question-attempts`, {
-    //         method: 'POST',
-    //         headers: {
-    //           'Content-Type': 'application/json',
-    //         },
-    //         body: JSON.stringify({
-    //           session_id: session.sessionId,
-    //           session_question_id: data.session_question_id,
-    //           question_id: currentQuestion.question_id,
-    //           user_answer: {
-    //             selectedOption: optionNumber
-    //           },
-    //           time_taken_seconds: 30
-    //         }),
-    //       }).catch(err => {
-    //         console.warn('Failed to save answer, will retry later:', err);
-    //       });
-    //     } else {
-    //       console.warn('Could not find session_question_id for question', currentQuestion.question_id);
-    //     }
-    //   })
-    //   .catch(err => {
-    //     console.warn('Failed to look up session_question_id:', err);
-    //   });
-    // };
-    
-    // Add a small delay to avoid too many API calls when user is selecting different options
-    //setTimeout(saveAnswer, 500);
   }, [session, currentQuestionIndex, sessionCache]);
 
   // Handle completion of session
@@ -317,16 +298,14 @@ export function usePracticeSession(
         return;
       }
   
-      // Simplified answer payload format - just directly send the option as a string
+      // Simplified answer payload format
       const answersPayload: Record<number, string> = {};
       session.questions.forEach((question) => {
         const questionId = question.question_id;
         if (userAnswers[questionId]) {
-          // If the answer is an object, don't convert it to a string
           answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? userAnswers[questionId] : String(userAnswers[questionId]);
         }
       });
-      console.log('Submitting answers:', JSON.stringify(answersPayload, null, 2));
       
       const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
         method: 'POST',
@@ -356,6 +335,7 @@ export function usePracticeSession(
       alert('Failed to submit answers. Please try again.');
     }
   }, [session, userAnswers, sessionCache]);
+
   // Store the most recent version of handleCompleteSession in the ref
   useEffect(() => {
     handleCompleteSessionRef.current = handleCompleteSession;
@@ -398,6 +378,7 @@ export function usePracticeSession(
     setSessionCompleted(false);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
+    setError(null);
     
     // Use the callback to reset the subject in the parent component
     if (selectedSubject && onResetSubject) {
@@ -414,11 +395,15 @@ export function usePracticeSession(
 
   // Handle retry when there's an error
   const handleRetry = useCallback(() => {
+    setError(null);
+    setRetryAttempt(prev => prev + 1);
+    
     if (selectedSubject) {
       createSession(selectedSubject);
     }
   }, [selectedSubject, createSession]);
 
+  // Force complete session (for abandoning)
   const forceCompleteSession = useCallback(async () => {
     if (!session) return;
     

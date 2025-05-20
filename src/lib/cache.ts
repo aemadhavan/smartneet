@@ -43,20 +43,29 @@ class Cache implements CacheProvider {
    * Get a value from cache
    */
   async get<T>(key: string): Promise<T | null> {
-    try {
-      // Try Redis first if available
-      if (redisClient) {
-        const value = await redisClient.get(key)
-        return value as T || null
+  try {
+    // Try Redis first if available
+    if (redisClient) {
+      try {
+        const value = await redisClient.get(key);
+        if (value !== null && value !== undefined) {
+          return value as T;
+        }
+        // If Redis fails, log and fall back to memory cache
+      } catch (redisError) {
+        console.error('Redis get error:', redisError);
+        console.log('Falling back to memory cache');
       }
-      
-      // Fall back to memory cache
-      return memoryCache.get(key) as T || null
-    } catch (error) {
-      console.error('Cache get error:', error)
-      return null
     }
+    
+    // Fall back to memory cache
+    const memoryValue = memoryCache.get(key);
+    return memoryValue as T || null;
+  } catch (error) {
+    console.error('Cache get error:', error);
+    return null;
   }
+}
 
   /**
    * Set a value in cache

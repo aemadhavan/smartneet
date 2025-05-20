@@ -3,7 +3,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AlertCircle, Lock } from 'lucide-react';
 import SessionCompletePage from './complete';
 import { 
@@ -51,8 +51,19 @@ export default function PracticeClientPage() {
   const topicId = topicIdParam ? parseInt(topicIdParam) : null;
   const subtopicId = subtopicIdParam ? parseInt(subtopicIdParam) : null;
   
-  // Get subscription limit status
-  const { limitStatus, subscription, loading: limitsLoading, error: limitsError, refetch: refetchLimits } = useSubscriptionLimits();
+  // More detailed loading states
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const [sessionInitialized, setSessionInitialized] = useState(false);
+  
+  // Get subscription limit status 
+  const { 
+    limitStatus, 
+    subscription, 
+    loading: limitsLoading, 
+    error: limitsError, 
+    refetch: refetchLimits 
+  } = useSubscriptionLimits();
   
   // Check if user has premium access
   const isPremium = subscription?.planCode !== 'free';
@@ -70,6 +81,21 @@ export default function PracticeClientPage() {
     setSelectedSubject 
   } = useSubjects(subjectParam);
   
+  interface SessionError {
+  limitReached?: boolean;
+  message: string;
+  [key: string]: any; // For any other properties the error might have
+}
+  // Create a wrapper function for handling session errors
+  const handleSessionError = useCallback((error: SessionError) => {
+    if (error.limitReached) {
+      setLimitMessage(error.message);
+      setShowLimitNotification(true);
+    } else {
+      console.error('Session error:', error);
+    }
+  }, []);
+  
   const {
     session,
     loading: sessionLoading,
@@ -82,20 +108,15 @@ export default function PracticeClientPage() {
     handleNextQuestion,
     handleCompleteSession,
     handleStartNewSession,
-    createSession
+    createSession,
+    handleRetry: sessionRetry
   } = usePracticeSession(
     // Don't automatically create session until we check limits
     null, 
     setSelectedSubject, 
     topicId, 
     subtopicId,
-    // Handle subscription limit errors
-    (error) => {
-      if (error.limitReached) {
-        setLimitMessage(error.message);
-        setShowLimitNotification(true);
-      }
-    }
+    handleSessionError
   );
 
   // Check if the topic is premium (not one of the first two topics)
@@ -138,76 +159,121 @@ export default function PracticeClientPage() {
     checkTopicAccess();
   }, [topicId, isPremium, subjectParam, limitParam]);
 
-  // Initialize session with selected subject after checking limits
+  // More robust session initialization with retries and better error handling
   useEffect(() => {
     const initSession = async () => {
-      if (selectedSubject && limitStatus && !sessionLoading && !session && !accessDenied) {
-        if (!limitStatus.canTake) {
+      // Skip if we've already initialized or if we're in the subject selection screen
+      if (sessionInitialized || !selectedSubject || accessDenied) {
+        setIsInitializing(false);
+        return;
+      }
+      
+      // Wait for limit status to be available (max 3 seconds)
+      let waitTime = 0;
+      const maxWaitTime = 3000; // 3 seconds
+      const checkInterval = 100; // 100ms
+      
+      while (!limitStatus && waitTime < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+        waitTime += checkInterval;
+      }
+      
+      // If we have limit status or we've waited too long, proceed
+      try {
+        if (limitStatus && !limitStatus.canTake) {
           // Show limit notification if user can't take more tests
-          setLimitMessage(limitStatus.reason || "You&apos;ve reached your daily practice limit");
+          setLimitMessage(limitStatus.reason || "You've reached your daily practice limit");
           setShowLimitNotification(true);
         } else {
-          // Create session if user can take more tests
-          await createSession(selectedSubject);
-          // Increment the refresh key to force a re-fetch
-          setLimitsRefreshKey(prev => prev + 1);
-          // Refetch limits after creating session to update the counter
-          refetchLimits();
+          // Create session if user can take more tests or if we're using default limits
+          const newSession = await createSession(selectedSubject);
+          
+          if (newSession) {
+            // Session created successfully
+            setSessionInitialized(true);
+            // Increment the refresh key to force a re-fetch
+            setLimitsRefreshKey(prev => prev + 1);
+            // Refetch limits after creating session to update the counter
+            refetchLimits();
+          }
         }
+      } catch (error) {
+        console.error('Failed to initialize session:', error);
+      } finally {
+        setIsInitializing(false);
       }
     };
     
     initSession();
-  }, [selectedSubject, limitStatus, sessionLoading, session, createSession, refetchLimits, accessDenied]);
+  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, retryCount]);
 
-  // Derived loading and error states
-  const loading = subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
-  const error = subjectsError || sessionError || limitsError;
+  // Combined loading state
+  const loading = isInitializing || subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
+  
+  // Combined error state with precedence
+  const error = sessionError || subjectsError || limitsError;
 
-  // Handle retry button click
-  const handleRetry = () => {
+  // Handle retry button click with improved recovery
+  const handleRetry = useCallback(() => {
     setShowLimitNotification(false);
     setAccessDenied(false);
+    setSessionInitialized(false);
+    setRetryCount(prev => prev + 1);
     refetchLimits();
+    sessionRetry();
     
     if (selectedSubject) {
+      // Force re-initialization of the subject
       const tempSubject = { ...selectedSubject };
       setSelectedSubject(null);
       setTimeout(() => setSelectedSubject(tempSubject), 100);
     }
-  };
+  }, [selectedSubject, setSelectedSubject, refetchLimits, sessionRetry]);
 
   // Handle subject selection
-  const handleSubjectSelect = (subject: Subject) => {
+  const handleSubjectSelect = useCallback((subject: Subject) => {
     // Clear any previous notifications
     setShowLimitNotification(false);
     setAccessDenied(false);
+    setSessionInitialized(false);
     setSelectedSubject(subject);
-  };
+  }, [setSelectedSubject]);
 
-  // Add this function to your component
-  const customHandleStartNewSession = () => {
+  // Handle start new session with improved timing
+  const handleStartNewSessionWithRefresh = useCallback(() => {
     handleStartNewSession();
     // After a small delay to allow the session to be created
     setTimeout(() => {
       setLimitsRefreshKey(prev => prev + 1);
       refetchLimits();
     }, 300);
-  };
+  }, [handleStartNewSession, refetchLimits]);
 
   // If session is completed, show the completion page
   if (sessionCompleted && session) {
     return (
       <SessionCompletePage
         sessionId={session.sessionId}
-        onStartNewSession={customHandleStartNewSession}
+        onStartNewSession={handleStartNewSessionWithRefresh}
       />
     );
   }
 
-  // Render loading state
+  // Render loading state with message based on what we're waiting for
   if (loading) {
-    return <LoadingSpinner message="Loading practice session..." />;
+    let loadingMessage = "Loading practice session...";
+    
+    if (isCheckingAccess) {
+      loadingMessage = "Checking access...";
+    } else if (limitsLoading) {
+      loadingMessage = "Checking subscription limits...";
+    } else if (subjectsLoading) {
+      loadingMessage = "Loading subjects...";
+    } else if (sessionLoading) {
+      loadingMessage = "Preparing questions...";
+    }
+    
+    return <LoadingSpinner message={loadingMessage} />;
   }
 
   // Render premium content access denied state
@@ -250,9 +316,19 @@ export default function PracticeClientPage() {
     );
   }
 
-  // Render error state
+  // Render error state with more specific error messaging
   if (error) {
-    return <ErrorDisplay message={error} onRetry={handleRetry} />;
+    return (
+      <ErrorDisplay 
+        message={error} 
+        onRetry={handleRetry} 
+        additionalInfo={
+          error.includes("API not responding") ? 
+          "We're experiencing connectivity issues. Please try again in a moment." : 
+          undefined
+        } 
+      />
+    );
   }
 
   // Render subject selection if no subject is selected
@@ -276,7 +352,7 @@ export default function PracticeClientPage() {
           
           <div className="p-6">
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              {limitStatus.reason || "You&apos;ve reached your daily practice test limit. Upgrade to Premium for unlimited practice tests."}
+              {limitStatus.reason || "You've reached your daily practice test limit. Upgrade to Premium for unlimited practice tests."}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 mt-4">
@@ -355,7 +431,7 @@ export default function PracticeClientPage() {
         {!isPremium && limitParam === 'free' && (
           <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
             <p className="text-blue-700">
-              <span className="font-semibold">Free access:</span> You&apos;re using a free practice session. 
+              <span className="font-semibold">Free access:</span> You're using a free practice session. 
               <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> to access all topics.
             </p>
           </div>
