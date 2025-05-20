@@ -1,7 +1,7 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import {  count } from 'drizzle-orm';
+import { count } from 'drizzle-orm';
 import { 
   practice_sessions, 
   questions, 
@@ -22,8 +22,8 @@ import {
 } from '@/lib/middleware/subscriptionMiddleware';
 // Add rate limiting imports
 import { RateLimiter } from '@/lib/rate-limiter';
-// Optional - only if you're using Next.js App Router
-import { revalidatePath, revalidateTag } from 'next/cache';
+// Only import what's actually used
+import { revalidatePath } from 'next/cache';
 
 // Define rate limit configurations
 const RATE_LIMITS = {
@@ -715,7 +715,7 @@ async function invalidateUserSessionCaches(userId: string) {
       }
     }
     
-    // Add the revalidation calls
+    // Use revalidatePath for Next.js cache invalidation
     if (typeof revalidatePath === 'function') {
       revalidatePath('/dashboard');
       revalidatePath('/practice');

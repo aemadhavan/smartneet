@@ -1,4 +1,4 @@
-// src/app/practice/hooks/usePracticeSession.ts - Modified version
+// src/app/practice/hooks/usePracticeSession.ts
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Subject, SessionResponse } from '../types';
 
@@ -21,9 +21,6 @@ const DEFAULT_QUESTION_COUNT = 10;
 // TTL for cached session data in milliseconds (5 minutes)
 const SESSION_CACHE_TTL = 5 * 60 * 1000;
 
-// Max retry attempts for session creation
-const MAX_RETRY_ATTEMPTS = 3;
-
 export function usePracticeSession(
   selectedSubject: Subject | null,
   onResetSubject?: (subject: Subject | null) => void, // Callback prop
@@ -31,13 +28,16 @@ export function usePracticeSession(
   subtopicId?: number | null, // Parameter for subtopic ID
   onSessionError?: (error: SubscriptionError) => void // Callback for subscription errors
 ) {
+  // State management
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0);
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [sessionCompleted, setSessionCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryAttempt, setRetryAttempt] = useState(0);
+  
+  // For tracking retry attempts internally without exposing to UI
+  const retryCountRef = useRef<number>(0);
   
   // Session caching reference
   const sessionCacheKey = useRef<string | null>(null);
@@ -170,7 +170,7 @@ export function usePracticeSession(
         let errorData;
         try {
           errorData = await response.json();
-        } catch (e) {
+        } catch {
           // If we can't parse JSON, use status text
           errorData = { error: response.statusText };
         }
@@ -396,7 +396,7 @@ export function usePracticeSession(
   // Handle retry when there's an error
   const handleRetry = useCallback(() => {
     setError(null);
-    setRetryAttempt(prev => prev + 1);
+    retryCountRef.current += 1;
     
     if (selectedSubject) {
       createSession(selectedSubject);

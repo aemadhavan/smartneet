@@ -36,6 +36,13 @@ interface Topic {
   updated_at?: string;
 }
 
+// Define SubscriptionError interface to match the one expected by usePracticeSession
+interface SubscriptionError {
+  message: string;
+  requiresUpgrade?: boolean;
+  limitReached?: boolean;
+}
+
 export default function PracticeClientPage() {
   const searchParams = useSearchParams();
   const subjectParam = searchParams.get('subject')?.toLowerCase();
@@ -81,13 +88,8 @@ export default function PracticeClientPage() {
     setSelectedSubject 
   } = useSubjects(subjectParam);
   
-  interface SessionError {
-  limitReached?: boolean;
-  message: string;
-  [key: string]: any; // For any other properties the error might have
-}
   // Create a wrapper function for handling session errors
-  const handleSessionError = useCallback((error: SessionError) => {
+  const handleSessionError = useCallback((error: SubscriptionError) => {
     if (error.limitReached) {
       setLimitMessage(error.message);
       setShowLimitNotification(true);
@@ -431,7 +433,7 @@ export default function PracticeClientPage() {
         {!isPremium && limitParam === 'free' && (
           <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
             <p className="text-blue-700">
-              <span className="font-semibold">Free access:</span> You're using a free practice session. 
+              <span className="font-semibold">Free access:</span> You&apos;re using a free practice session. 
               <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> to access all topics.
             </p>
           </div>
