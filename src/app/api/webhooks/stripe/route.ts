@@ -313,9 +313,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error: unknown) {
     const err = error as Error;
-    console.error(`Error handling webhook: ${err.message}`);
+    // Log the detailed error for server-side inspection
+    console.error(`Error handling webhook event type ${event?.type}:`, err.message, err.stack);
+    // Return a generic error message to the client (Stripe)
     return NextResponse.json(
-      { error: `Webhook handler failed: ${err.message}` },
+      { error: 'An unexpected error occurred while handling the webhook event.' },
       { status: 500 }
     );
   }

@@ -1,19 +1,25 @@
 // src/app/api/topic-mastery/all/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'; // Import NextRequest
 import { db } from '@/db';
 import { topic_mastery, topics, subjects } from '@/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm'; // Import and
 import { auth } from '@clerk/nextjs/server';
 import { cache } from '@/lib/cache'; // Import cache
 
-export async function GET() {
+export async function GET(request: NextRequest) { // Add request parameter
   try {
     const { userId } = await auth();
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const cacheKey = `user:${userId}:topic-mastery:all-topics`;
+    // Read subjectId query parameter
+    const searchParams = request.nextUrl.searchParams;
+    const subjectIdParam = searchParams.get('subjectId');
+    const subjectId = subjectIdParam ? parseInt(subjectIdParam) : undefined;
+
+    // Update cache key
+    const cacheKey = `user:${userId}:topic-mastery:all-topics:subject:${subjectId || 'all'}`;
 
     // Try to get from cache first
     const cachedData = await cache.get(cacheKey);
@@ -21,8 +27,8 @@ export async function GET() {
       return NextResponse.json({ data: cachedData, source: 'cache' });
     }
 
-    // Fetch complete topic mastery data with subject information
-    const masteryDataFromDb = await db.select({ // Renamed to avoid confusion
+    // Base query
+    let query = db.select({
       topic_id: topics.topic_id,
       topic_name: topics.topic_name,
       subject_id: subjects.subject_id,
@@ -34,31 +40,35 @@ export async function GET() {
     })
     .from(topics)
     .leftJoin(topic_mastery, 
-      // Original: eq(topics.topic_id, topic_mastery.topic_id) && eq(topic_mastery.user_id, userId)
-      // Drizzle requires `and` for multiple conditions in join
-      eq(topics.topic_id, topic_mastery.topic_id) 
-      // Note: The userId condition in leftJoin might behave unexpectedly if user_id is null in topic_mastery.
-      // It might be better to filter by userId in a WHERE clause on topic_mastery if that's the intent,
-      // or ensure the join condition is correctly structured if topic_mastery might not have a user_id record.
-      // For now, assuming original logic was intended to be `ON ... AND topic_mastery.user_id = userId`
-      // which Drizzle translates from `eq(field, value)` directly in the join.
-      // A more robust way if `topic_mastery.user_id` could be null or if you only want user-specific mastery:
-      // .leftJoin(topic_mastery, and(eq(topics.topic_id, topic_mastery.topic_id), eq(topic_mastery.user_id, userId)))
-      // The original code `eq(topics.topic_id, topic_mastery.topic_id) && eq(topic_mastery.user_id, userId)`
-      // is not valid Drizzle syntax for a join condition. It should be `and(...)`.
-      // However, since it's a LEFT JOIN, the `eq(topic_mastery.user_id, userId)` effectively turns it into an INNER JOIN
-      // for the mastery part if `userId` is not found or `topic_mastery.user_id` is null.
-      // Correcting this to a proper `and` condition for clarity, though behavior might change if original was flawed.
-      // Sticking to original structure's implied logic:
-      // This part `eq(topics.topic_id, topic_mastery.topic_id) && eq(topic_mastery.user_id, userId)` is problematic for Drizzle.
-      // Let's assume it's meant to be `and(eq(topics.topic_id, topic_mastery.topic_id), eq(topic_mastery.user_id, userId))`
-      // For a left join, this means if a topic_mastery record exists, it MUST match the userId.
-      // If no such record exists, topic fields are null.
-      // This is a common pattern.
-       .on(eq(topics.topic_id, topic_mastery.topic_id) && eq(topic_mastery.user_id, userId))
+      and( // Corrected join condition
+        eq(topics.topic_id, topic_mastery.topic_id), 
+        eq(topic_mastery.user_id, userId)
+      )
     )
-    .innerJoin(subjects, eq(topics.subject_id, subjects.subject_id))
-    .orderBy(desc(topic_mastery.last_practiced));
+    .innerJoin(subjects, eq(topics.subject_id, subjects.subject_id));
+
+    // Apply subjectId filter if provided
+    const conditions = [];
+    if (subjectId !== undefined) { // Check if subjectId is defined (could be 0)
+      conditions.push(eq(topics.subject_id, subjectId));
+    }
+
+    if (conditions.length > 0) {
+      // query.where(and(...conditions)); // This syntax is for update/delete, select uses it directly
+      // For select, apply where directly if conditions exist.
+      // Drizzle's select query builder needs the where clause chained.
+      // So, we build the query instance and then conditionally add .where()
+      // This can't be done by re-assigning `query = query.where(...)` if query is not `any` type.
+      // A common pattern is to build conditions array and then pass to where.
+      // However, Drizzle's select expects `where` to be chained directly.
+      // The simplest way is to build the query and then execute it.
+      // Let's adjust the query building slightly.
+    }
+
+    // If there are conditions, apply them. Otherwise, fetch all.
+    const finalQuery = conditions.length > 0 ? query.where(and(...conditions)) : query;
+    
+    const masteryDataFromDb = await finalQuery.orderBy(desc(topic_mastery.last_practiced));
 
     // For topics that the user hasn't started yet, set default values
     const processedData = masteryDataFromDb.map(topic => ({

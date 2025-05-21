@@ -85,9 +85,11 @@ export async function GET() {
     // Step 7: Return subjectsWithTopics
     return NextResponse.json(subjectsWithTopics);
   } catch (error) {
-    console.error('Error fetching subjects with topics:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error fetching subjects with topics:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
     return NextResponse.json(
-      { error: 'Failed to fetch subjects with topics' },
+      { error: 'An unexpected error occurred while fetching subjects with topics.' },
       { status: 500 }
     );
   }

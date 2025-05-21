@@ -148,8 +148,13 @@ export async function GET(
       source: 'database' 
     });
   } catch (error) {
-    console.error('Error fetching session details:', error);
-    return NextResponse.json({ error: 'Failed to fetch session details' }, { status: 500 });
+    // Log the detailed error for server-side inspection
+    console.error('Error fetching session details:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while fetching session details.' }, 
+      { status: 500 }
+    );
   }
 }
 
@@ -199,8 +204,13 @@ export async function PATCH(
 
     return NextResponse.json(updatedSession);
   } catch (error) {
-    console.error('Error updating session:', error);
-    return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
+    // Log the detailed error for server-side inspection
+    console.error('Error updating session:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while updating the session.' }, 
+      { status: 500 }
+    );
   }
 }
 
@@ -243,7 +253,12 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting session:', error);
-    return NextResponse.json({ error: 'Failed to delete session' }, { status: 500 });
+    // Log the detailed error for server-side inspection
+    console.error('Error deleting session:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while deleting the session.' }, 
+      { status: 500 }
+    );
   }
 }

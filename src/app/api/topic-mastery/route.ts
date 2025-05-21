@@ -1,7 +1,7 @@
 // src/app/api/topic-mastery/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { topic_mastery, topics } from '@/db/schema';
+import { topic_mastery, topics, subjects } from '@/db/schema'; // Added subjects
 import { eq, desc, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { cache } from '@/lib/cache'; // Import cache
@@ -39,10 +39,12 @@ export async function GET(request: NextRequest) {
         accuracy_percentage: topic_mastery.accuracy_percentage,
         last_practiced: topic_mastery.last_practiced,
         streak_count: topic_mastery.streak_count,
-        subject_id: topics.subject_id
+        subject_id: topics.subject_id,
+        subject_name: subjects.subject_name // Added subject_name
       })
       .from(topic_mastery)
-      .innerJoin(topics, eq(topic_mastery.topic_id, topics.topic_id));
+      .innerJoin(topics, eq(topic_mastery.topic_id, topics.topic_id))
+      .innerJoin(subjects, eq(topics.subject_id, subjects.subject_id)); // Added join with subjects
     
     // Create conditions array
     const conditions = [eq(topic_mastery.user_id, userId)];
@@ -62,7 +64,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data: masteryDataFromDb, source: 'database' });
   } catch (error) {
-    console.error('Error fetching topic mastery data:', error);
-    return NextResponse.json({ error: 'Failed to fetch topic mastery data' }, { status: 500 });
+    console.error('Error fetching topic mastery data:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while fetching topic mastery data.' }, 
+      { status: 500 }
+    );
   }
 }

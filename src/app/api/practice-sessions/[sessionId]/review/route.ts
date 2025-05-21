@@ -330,8 +330,13 @@ export async function GET(
       );
     }
     
+    // Log the detailed error for server-side inspection
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Error in session review API (details):', errorMessage, error); // Log full error object too
+
+    // Return a generic error message to the client
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to retrieve session review data' },
+      { error: 'An unexpected error occurred while retrieving session review data.' },
       { status: 500 }
     );
   }

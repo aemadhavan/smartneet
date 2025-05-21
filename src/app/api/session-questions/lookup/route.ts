@@ -83,9 +83,11 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    console.error('Error looking up session question:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error looking up session question:', error instanceof Error ? error.message : String(error), error);
+    // Return a generic error message to the client
     return NextResponse.json(
-      { error: 'Failed to look up session question' },
+      { error: 'An unexpected error occurred while looking up the session question.' },
       { status: 500 }
     );
   }

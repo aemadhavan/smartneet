@@ -95,10 +95,12 @@ export async function GET(req: NextRequest) {
       source: 'database'
     }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching subtopics:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error fetching subtopics:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch subtopics'
+      error: 'An unexpected error occurred while fetching subtopics.'
     }, { status: 500 });
   }
 }
@@ -160,10 +162,12 @@ export async function POST(req: NextRequest) {
       data: newSubtopic[0] // Return the created subtopic
     }, { status: 201 });
   } catch (error) {
-    console.error('Error creating subtopic:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error creating subtopic:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
     return NextResponse.json({
       success: false,
-      error: 'Failed to create subtopic'
+      error: 'An unexpected error occurred while creating the subtopic.'
     }, { status: 500 });
   }
 }

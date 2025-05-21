@@ -224,14 +224,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Invalid session parameters',
-          message: e instanceof Error ? e.message : String(e)
-          // Remove detailed error stack traces
+          // Standardize the non-Zod error message for 400 status
+          message: 'The provided session parameters were invalid.'
         }, 
         { status: 400 }
       );
     }
   } catch (e) {
-    console.error('Unexpected error in practice session creation:', e);
+    // Log the detailed error for server-side inspection
+    console.error('Unexpected error in practice session creation:', e instanceof Error ? e.message : String(e), e);
     
     // Check if it's a database constraint error
     if (e instanceof Error && e.message.includes('23505')) {

@@ -54,9 +54,11 @@ export async function GET() {
     
     return NextResponse.json({ plans, source });
   } catch (error: unknown) {
-    console.error('Error fetching subscription plans:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error fetching subscription plans:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
     return NextResponse.json(
-      { error: 'Failed to fetch subscription plans', details: String(error) },
+      { error: 'An unexpected error occurred while fetching subscription plans.' },
       { status: 500 }
     );
   }
