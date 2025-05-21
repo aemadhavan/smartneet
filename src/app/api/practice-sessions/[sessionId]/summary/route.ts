@@ -10,6 +10,7 @@ import {
 } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache'; // Import cache
 
 interface TopicPerformance {
   topicId: number;
@@ -35,11 +36,20 @@ export async function GET(
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
+
+    const cacheKey = `session:${userId}:${sessionId}:summary`;
+
+    // Try to get from cache first
+    const cachedSummary = await cache.get(cacheKey);
+    if (cachedSummary) {
+      return NextResponse.json({ ...(cachedSummary as Record<string,unknown>), source: 'cache' });
+    }
+    
     const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
-    await updateSessionStats(sessionId, userId);
+    await updateSessionStats(sessionId, userId); // This ensures session stats are up-to-date before fetching
 
     // Get the session details
-    const [session] = await db
+    const [sessionFromDb] = await db // Renamed to avoid conflict with 'session' in summary
     .select()
     .from(practice_sessions)
     .where(
@@ -49,7 +59,7 @@ export async function GET(
       )
     );
 
-    if (!session) {
+    if (!sessionFromDb) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
@@ -81,10 +91,8 @@ export async function GET(
       )
     );
 
-    // Process question data to calculate overall statistics
     const totalQuestions = sessionQuestionData.length;
     
-    // For tracking topic performance
     const topicMap = new Map<number, {
       topicName: string;
       questionsTotal: number;
@@ -92,7 +100,6 @@ export async function GET(
     }>();
 
     const calculatedMetrics = sessionQuestionData.reduce((metrics, question) => {
-      // Track topic performance
       if (!topicMap.has(question.topicId)) {
         topicMap.set(question.topicId, {
           topicName: question.topicName,
@@ -100,23 +107,15 @@ export async function GET(
           questionsCorrect: 0
         });
       }
-
       const topicStats = topicMap.get(question.topicId)!;
       topicStats.questionsTotal++;
-      
-      // Count correct questions and calculate metrics
       if (question.isCorrect) {
         metrics.questionsCorrect++;
         topicStats.questionsCorrect++;
       }
-
-      // Calculate score
       metrics.score += question.marksAwarded || 0;
       metrics.maxScore += question.marksPossible || 0;
-
-      // Track time
       metrics.totalTimeSeconds += question.timeTaken || 0;
-
       return metrics;
     }, {
       questionsCorrect: 0,
@@ -125,10 +124,8 @@ export async function GET(
       totalTimeSeconds: 0
     });
 
-    // Convert time from seconds to minutes
     const calculatedTimeTakenMinutes = Math.round(calculatedMetrics.totalTimeSeconds / 60);
 
-    // Format topic performance data
     const topicPerformance: TopicPerformance[] = Array.from(topicMap.entries())
       .map(([topicId, stats]) => ({
         topicId,
@@ -139,42 +136,46 @@ export async function GET(
           ? Math.round((stats.questionsCorrect / stats.questionsTotal) * 100)
           : 0
       }))
-      .sort((a, b) => b.questionsTotal - a.questionsTotal); // Sort by number of questions
+      .sort((a, b) => b.questionsTotal - a.questionsTotal); 
 
-    // Format the summary data
-    const summary = {
+    const summaryData = { // Renamed to avoid conflict
       sessionId,
-      totalQuestions: session.total_questions ?? 0,
-      questionsAttempted: session.questions_attempted ?? 0,
-      questionsCorrect: session.questions_correct ?? 0,
-      questionsIncorrect: (session.questions_attempted ?? 0) - (session.questions_correct ?? 0),
-      accuracy: (session.questions_attempted ?? 0) > 0 
-        ? Math.round(((session.questions_correct ?? 0) / (session.questions_attempted ?? 1)) * 100)
+      totalQuestions: sessionFromDb.total_questions ?? 0,
+      questionsAttempted: sessionFromDb.questions_attempted ?? 0,
+      questionsCorrect: sessionFromDb.questions_correct ?? 0,
+      questionsIncorrect: (sessionFromDb.questions_attempted ?? 0) - (sessionFromDb.questions_correct ?? 0),
+      accuracy: (sessionFromDb.questions_attempted ?? 0) > 0 
+        ? Math.round(((sessionFromDb.questions_correct ?? 0) / (sessionFromDb.questions_attempted ?? 1)) * 100)
         : 0,
       calculatedAccuracy: totalQuestions > 0 
         ? Math.round((calculatedMetrics.questionsCorrect / totalQuestions) * 100)
         : 0,
-      timeTakenMinutes: session.duration_minutes ?? calculatedTimeTakenMinutes, 
-      score: session.score ?? calculatedMetrics.score, 
-      maxScore: session.max_score || calculatedMetrics.maxScore,
+      timeTakenMinutes: sessionFromDb.duration_minutes ?? calculatedTimeTakenMinutes, 
+      score: sessionFromDb.score ?? calculatedMetrics.score, 
+      maxScore: sessionFromDb.max_score || calculatedMetrics.maxScore,
       topicPerformance
     };
 
-    // Also update the session record with the final stats
-    await db.update(practice_sessions)
-    .set({
-      end_time: new Date(),
-      is_completed: true,
-      updated_at: new Date()
-    })
-    .where(
-      and(
-        eq(practice_sessions.session_id, sessionId),
-        eq(practice_sessions.user_id, userId)
-      )
-    );
+    // Ensure session is marked as completed if not already (idempotent)
+    if (!sessionFromDb.is_completed) {
+        await db.update(practice_sessions)
+        .set({
+          end_time: sessionFromDb.end_time || new Date(), // Use existing end_time if already set
+          is_completed: true,
+          updated_at: new Date()
+        })
+        .where(
+          and(
+            eq(practice_sessions.session_id, sessionId),
+            eq(practice_sessions.user_id, userId)
+          )
+        );
+    }
+    
+    // Cache the result
+    await cache.set(cacheKey, summaryData, 7200); // 7200 seconds = 2 hours
 
-    return NextResponse.json(summary);
+    return NextResponse.json({ ...summaryData, source: 'database' });
     
   } catch (error) {
     console.error('Error generating session summary:', error);

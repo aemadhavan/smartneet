@@ -104,20 +104,61 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/subtopics - Create a new subtopic
+import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
+
+const createSubtopicSchema = z.object({
+  topic_id: z.number({ required_error: "Topic ID is required" }).int().positive(),
+  subtopic_name: z.string({ required_error: "Subtopic name is required" }).min(1, "Subtopic name cannot be empty").max(255),
+  subtopic_description: z.string().optional(),
+  is_active: z.boolean().optional().default(true), // Default to true if not provided
+});
+
 export async function POST(req: NextRequest) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json();
-    
-    // Your existing code to create a subtopic...
+    const validationResult = createSubtopicSchema.safeParse(body);
+
+    if (!validationResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: "Invalid input",
+        details: validationResult.error.flatten().fieldErrors,
+      }, { status: 400 });
+    }
+    const validatedData = validationResult.data;
+
+    // Database insertion using validatedData
+    const newSubtopic = await db.insert(subtopics).values({
+      topic_id: validatedData.topic_id,
+      subtopic_name: validatedData.subtopic_name,
+      subtopic_description: validatedData.subtopic_description,
+      is_active: validatedData.is_active,
+      // created_by: userId, // Assuming you have a created_by field
+      // updated_by: userId, // Assuming you have an updated_by field
+    }).returning(); // .returning() to get the inserted record, if needed
+
+    if (!newSubtopic || newSubtopic.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to create subtopic in database'
+      }, { status: 500 });
+    }
     
     // Use the utility function to invalidate caches
-    await invalidateSubtopicCaches(undefined, body.topic_id);
+    // Pass the newly created subtopic_id if invalidateSubtopicCaches can use it
+    await invalidateSubtopicCaches(newSubtopic[0]?.subtopic_id, validatedData.topic_id); 
     
-    // Return the response...
     return NextResponse.json({
       success: true,
-      message: 'Subtopic created successfully'
-    });
+      message: 'Subtopic created successfully',
+      data: newSubtopic[0] // Return the created subtopic
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating subtopic:', error);
     return NextResponse.json({

@@ -9,89 +9,14 @@ import {
 } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { 
+  evaluateAnswer, 
+  parseQuestionDetails, 
+  getCorrectAnswerForQuestionType,
+  QuestionDetails 
+} from '@/lib/utils/answerEvaluation';
 
-// TypeScript Interfaces for Question Details
-interface MultipleChoiceDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface MatchingDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-  matching_details: {
-    items: Array<{
-      left_item_text: string;
-      left_item_label: string;
-      right_item_text: string;
-      right_item_label: string;
-    }>;
-    left_column_header?: string;
-    right_column_header?: string;
-  };
-}
-
-interface AssertionReasonDetails {
-  statements: Array<{
-    is_correct: boolean;
-    statement_text: string;
-    statement_label: string;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface SequenceOrderingDetails {
-  sequence_items: Array<{
-    item_text: string;
-    item_number: number;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface DiagramBasedDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface MultipleCorrectStatementsDetails {
-  statements: Array<{
-    is_correct: boolean;
-    statement_text: string;
-    statement_label: string;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-type QuestionDetails =
-  | MultipleChoiceDetails
-  | MatchingDetails
-  | AssertionReasonDetails
-  | SequenceOrderingDetails
-  | DiagramBasedDetails
-  | MultipleCorrectStatementsDetails;
-
-// Interface for individual result objects
+// Interface for individual result objects (if still needed locally, otherwise remove)
 interface AnswerResult {
   question_id: number;
   is_correct: boolean;
@@ -102,32 +27,13 @@ interface SubmitAnswersBody {
   answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
 }
 
+// This interface combines QuestionDetails (imported) with session-specific info.
 interface QuestionDetailsWithSessionInfo {
   session_question_id: number;
-  details: QuestionDetails;
+  details: QuestionDetails; // This now uses the imported QuestionDetails type
   marks: number | null;
   negative_marks: number | null;
   question_type: string;
-}
-// type OptionBasedResponse = 
-//   | string 
-//   | number 
-//   | { option: string | number } 
-//   | { selectedOption: string | number }
-//   | { selectedMatches: string | number };
-
-interface ParsedOptionDetails {
-  option_number: string;
-  option_text: string;
-  is_correct: boolean;
-}
-
-// Interface for the raw shape of an option before validation and normalization
-interface RawOptionBeforeNormalization {
-  option_number: unknown;
-  option_text?: unknown;
-  is_correct: unknown;
-  [key: string]: unknown;
 }
 
 export async function POST(
@@ -362,180 +268,9 @@ export async function POST(
   }
 }
 
-function evaluateAnswer(
-  questionType: string,
-  details: QuestionDetails,
-  userAnswer: unknown
-): boolean {
-  try {
-    // Normalize userAnswer to simplify processing
-    const normalizedAnswer = normalizeUserAnswer(userAnswer);
-    
-    // If we couldn't extract a meaningful answer, return false
-    if (normalizedAnswer === null) {
-      console.warn('Could not normalize user answer:', userAnswer);
-      return false;
-    }
-
-    // Log for debugging
-    console.log(`Evaluating ${questionType}:`, { 
-      normalizedAnswer, 
-      details: JSON.stringify(details).substring(0, 100) + '...' 
-    });
-
-    // Evaluate based on question type
-    return evaluateOptionBasedAnswer(questionType, details, normalizedAnswer);
-  } catch (error) {
-    console.error(`Error evaluating answer for question type ${questionType}:`, error);
-    // Add detailed logging to help diagnose the issue
-    console.error('Question details:', JSON.stringify(details, null, 2));
-    console.error('User answer:', JSON.stringify(userAnswer, null, 2));
-    return false;
-  }
-}
-
-function normalizeUserAnswer(userAnswer: unknown): string | null {
-  // Handle different input formats consistently
-  if (userAnswer === null || userAnswer === undefined) {
-    return null;
-  }
-  
-  // Convert numeric answers to strings
-  if (typeof userAnswer === 'number') {
-    return userAnswer.toString();
-  }
-  
-  // Extract the normalized answer from various possible formats
-  if (typeof userAnswer === 'string') {
-    return userAnswer;
-  } 
-  
-  // Handle object-based answers
-  if (typeof userAnswer === 'object' && userAnswer !== null) {
-    const answerObj = userAnswer as Record<string, unknown>;
-    
-    // Check for nested option formats
-    const optionKeys = ['option', 'selectedOption', 'selectedMatches'];
-    for (const key of optionKeys) {
-      const optionValue = answerObj[key];
-      if (typeof optionValue === 'string' || typeof optionValue === 'number') {
-        return optionValue.toString();
-      }
-    }
-  }
-
-  // Could not normalize
-  console.warn('Could not normalize user answer:', userAnswer);
-  return null;
-}
-
-function evaluateOptionBasedAnswer(
-  questionType: string, 
-  details: QuestionDetails, 
-  normalizedAnswer: string
-): boolean {
-  // Ensure the details have options
-  if (!('options' in details) || !Array.isArray(details.options)) {
-    console.warn(`No options found for question type: ${questionType}`);
-    return false;
-  }
-
-  // Find matching option
-  return details.options.some(
-    (opt: ParsedOptionDetails) => 
-      opt.is_correct && opt.option_number.toString() === normalizedAnswer
-  );
-}
-
-function parseQuestionDetails(details: unknown): QuestionDetails {
-  // First, check if the details are already in the correct format
-  if (isQuestionDetails(details)) {
-    // Normalize options to ensure consistent structure
-    return {
-      ...details,
-      options: details.options.map(opt => ({
-        option_number: opt.option_number.toString(),
-        option_text: opt.option_text || '',
-        is_correct: !!opt.is_correct
-      }))
-    };
-  }
-
-  // If details is a string, try to parse it as JSON
-  if (typeof details === 'string') {
-    try {
-      const parsedDetails = JSON.parse(details);
-      
-      // Validate the parsed details
-      if (isQuestionDetails(parsedDetails)) {
-        return {
-          ...parsedDetails,
-          options: parsedDetails.options.map(opt => ({
-            option_number: opt.option_number.toString(),
-            option_text: opt.option_text || '',
-            is_correct: !!opt.is_correct
-          }))
-        };
-      }
-      
-      throw new Error('Parsed details do not match expected structure');
-    } catch (e) {
-      console.error('Failed to parse question details string:', e);
-      throw new Error('Invalid JSON format in question details');
-    }
-  }
-
-  // If we reach here, the details are in an invalid format
-  throw new Error('Invalid question details format');
-}
-
-// Function to extract correct answer for logging/debugging purposes
-function getCorrectAnswerForQuestionType(
-  questionType: string, 
-  details: QuestionDetails
-): string {
-  try {
-    // All supported question types have options
-    if ('options' in details && Array.isArray(details.options)) {
-      const correctOption = details.options.find((opt: ParsedOptionDetails) => opt.is_correct);
-      return correctOption 
-        ? `Option ${correctOption.option_number}: ${correctOption.option_text}` 
-        : 'Unknown';
-    }
-    
-    return 'No correct option found';
-  } catch (error) {
-    console.error('Error extracting correct answer:', error);
-    return 'Error extracting correct answer';
-  }
-}
-// Type guard for parsing details with improved type safety
-function isQuestionDetails(details: unknown): details is QuestionDetails {
-  if (typeof details !== 'object' || details === null) {
-    return false;
-  }
-
-  // Check for required properties based on known question types
-  const typedDetails = details as Partial<QuestionDetails>;
-
-  // Check for options array in the details
-  if (!Array.isArray(typedDetails.options)) {
-    return false;
-  }
-
-  // Validate options structure
-  return typedDetails.options.every(opt => {
-    if (typeof opt !== 'object' || opt === null) return false;
-    
-    const typedOpt = opt as RawOptionBeforeNormalization; // Use a specific type for looser check before normalization
-    return (
-      (typeof typedOpt.option_number === 'string' || typeof typedOpt.option_number === 'number') &&
-      (typedOpt.option_text === undefined || typedOpt.option_text === null || typeof typedOpt.option_text === 'string') &&
-      (typeof typedOpt.is_correct === 'boolean' || typeof typedOpt.is_correct === 'number') // Numbers 0 or 1 are often used for boolean
-    );
-  });
-}
-
-// function explainOptionBasedResponse(_response: OptionBasedResponse): string {
-//   return 'This function exists to provide type documentation for OptionBasedResponse';
-// }
+// All helper functions (evaluateAnswer, normalizeUserAnswer, evaluateOptionBasedAnswer, 
+// parseQuestionDetails, getCorrectAnswerForQuestionType, isQuestionDetails)
+// and their related type definitions (MultipleChoiceDetails, MatchingDetails, etc., QuestionDetails union,
+// ParsedOptionDetails, RawOptionBeforeNormalization) have been moved to 
+// src/lib/utils/answerEvaluation.ts
+// They are now imported at the top of this file.

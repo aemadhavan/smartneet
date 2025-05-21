@@ -8,7 +8,7 @@ import { cache } from '@/lib/cache';
 export async function GET() {
   try {
     // Define cache key
-    const cacheKey = `api:subscription-plans:all:${Date.now()}`;
+    const cacheKey = "api:subscription-plans:all:active";
     
     // Try to get from cache first
     let plans = await cache.get<typeof subscription_plans.$inferSelect[]>(cacheKey);

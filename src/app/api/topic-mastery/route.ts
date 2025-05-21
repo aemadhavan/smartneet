@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { topic_mastery, topics } from '@/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Get topic mastery data for a user
 export async function GET(request: NextRequest) {
@@ -16,6 +17,14 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const subjectIdParam = searchParams.get('subjectId');
     const subjectId = subjectIdParam ? parseInt(subjectIdParam) : undefined;
+
+    const cacheKey = `user:${userId}:topic-mastery:subject:${subjectId || 'all'}`;
+
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({ data: cachedData, source: 'cache' });
+    }
     
     // Create base query
     const baseQuery = db
@@ -44,11 +53,14 @@ export async function GET(request: NextRequest) {
     }
     
     // Execute query with all conditions and ordering
-    const masteryData = await baseQuery
+    const masteryDataFromDb = await baseQuery // Renamed to avoid confusion
       .where(and(...conditions))
       .orderBy(desc(topic_mastery.last_practiced));
     
-    return NextResponse.json(masteryData);
+    // Cache the result
+    await cache.set(cacheKey, masteryDataFromDb, 3600); // 3600 seconds = 1 hour
+
+    return NextResponse.json({ data: masteryDataFromDb, source: 'database' });
   } catch (error) {
     console.error('Error fetching topic mastery data:', error);
     return NextResponse.json({ error: 'Failed to fetch topic mastery data' }, { status: 500 });

@@ -101,96 +101,15 @@ export async function POST(request: NextRequest) {
       }, { status: 403 });
     }
 
-    // Try to get data from request body or URL parameters
+    // Expect JSON request body
     let requestData;
-    const requestBody = await request.text(); // Read the request body as text
-    
-    if (requestBody) {
-      try {
-        requestData = await request.json();
-        console.log('Using JSON body:', requestData);
-      } catch (e) {
-        // If JSON parsing fails, try to get from URL parameters
-        console.log('Error parsing JSON, trying URL parameters:', e);
-        // Proceed to extract parameters from URL
-      }
+    try {
+      requestData = await request.json();
+    } catch (error) {
+      console.error('Error parsing JSON request body in practice-sessions:', error);
+      return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
     }
     
-    if (!requestBody || !requestData) {
-      const searchParams = request.nextUrl.searchParams;
-      
-      // Parse and validate numeric parameters
-      const subject_id = searchParams.has('subject_id') ? 
-        Number(searchParams.get('subject_id')) : undefined;
-      
-      // Check if subject_id is a valid number
-      if (subject_id === undefined || Number.isNaN(subject_id)) {
-        return NextResponse.json({ 
-          error: 'Invalid subject_id parameter: must be a valid number' 
-        }, { status: 400 });
-      }
-      
-      // Parse and validate other numeric parameters
-      let topic_id, subtopic_id, duration_minutes, question_count;
-      
-      if (searchParams.has('topic_id')) {
-        topic_id = Number(searchParams.get('topic_id'));
-        if (Number.isNaN(topic_id)) {
-          return NextResponse.json({ 
-            error: 'Invalid topic_id parameter: must be a valid number' 
-          }, { status: 400 });
-        }
-      }
-      
-      if (searchParams.has('subtopic_id')) {
-        subtopic_id = Number(searchParams.get('subtopic_id'));
-        if (Number.isNaN(subtopic_id)) {
-          return NextResponse.json({ 
-            error: 'Invalid subtopic_id parameter: must be a valid number' 
-          }, { status: 400 });
-        }
-      }
-      
-      if (searchParams.has('duration_minutes')) {
-        duration_minutes = Number(searchParams.get('duration_minutes'));
-        if (Number.isNaN(duration_minutes)) {
-          return NextResponse.json({ 
-            error: 'Invalid duration_minutes parameter: must be a valid number' 
-          }, { status: 400 });
-        }
-      }
-      
-      if (searchParams.has('question_count')) {
-        question_count = Number(searchParams.get('question_count'));
-        if (Number.isNaN(question_count)) {
-          return NextResponse.json({ 
-            error: 'Invalid question_count parameter: must be a valid number' 
-          }, { status: 400 });
-        }
-      } else {
-        question_count = 10; // Default value
-      }
-      
-      const session_type = searchParams.get('session_type') || 'Practice';
-      // Validate session_type
-      if (!['Practice', 'Test', 'Review', 'Custom'].includes(session_type)) {
-        return NextResponse.json({ 
-          error: 'Invalid session_type parameter: must be one of Practice, Test, Review, Custom' 
-        }, { status: 400 });
-      }
-      
-      requestData = {
-        subject_id,
-        topic_id,
-        subtopic_id,
-        session_type,
-        duration_minutes,
-        question_count
-      };
-      
-      console.log('Using URL parameters:', requestData);
-    }
-
     // Validate the data using the schema
     try {
       const validatedData = createSessionSchema.parse(requestData);

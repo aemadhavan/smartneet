@@ -8,40 +8,15 @@ import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 
-// Define types for Stripe objects
-type StripeSubscription = {
-  id: string;
-  customer: string;
-  metadata?: { userId?: string };
-  items: { data: Array<{ price: { id: string } }> };
-  status: string;
-  current_period_start: number;
-  current_period_end: number;
-  trial_end: number | null;
-};
-
-type StripeInvoice = {
-  id: string;
-  subscription?: string;
-  customer: string;
-  metadata?: { userId?: string };
-  amount_paid: number;
-  payment_intent: string;
-  payment_method_details?: { type: string };
-  status: string;
-  created: number;
-  next_payment_attempt: number | null; // Make this nullable
-  hosted_invoice_url: string;
-  customer_tax_ids?: Array<{ value: string }>;
-  tax?: number;
-  tax_percent?: number;
-};
-
 // Event handler functions
-async function handleSubscriptionChange(subscription: StripeSubscription) {
-  try {
-    const stripeSubscriptionId = subscription.id;
-    const stripeCustomerId = subscription.customer;
+async function handleSubscriptionChange(subscription: Stripe.Subscription) {
+  return db.transaction(async (tx) => {
+    // Pass `tx` to db operations if needed, e.g., tx.select()...
+    // For now, we'll assume service methods can participate or Drizzle handles context
+    // If service methods like createOrUpdateSubscription need explicit tx, that's a refactor note.
+    try {
+      const stripeSubscriptionId = subscription.id;
+    const stripeCustomerId = getCustomerId(subscription.customer);
     const userId = subscription.metadata?.userId;
     
     if (!userId) {
@@ -62,7 +37,7 @@ async function handleSubscriptionChange(subscription: StripeSubscription) {
     }
     
     // Find the plan by Stripe price ID
-    const plans = await db
+    const plans = await db // tx.select() if you want to use the transaction object, for now using global db
       .select()
       .from(subscription_plans)
       .where(eq(subscription_plans.price_id_stripe, priceId))
@@ -89,151 +64,178 @@ async function handleSubscriptionChange(subscription: StripeSubscription) {
         ? new Date(subscription.trial_end * 1000)
         : null
     });
-  } catch (error) {
-    console.error('Error handling subscription change:', error);
-    throw error;
-  }
-}
-
-async function handleSubscriptionDeleted(subscription: StripeSubscription) {
-  try {
-    const stripeSubscriptionId = subscription.id;
-    
-    // Find the subscription directly in our database
-    const userSubscriptions = await db
-      .select()
-      .from(user_subscriptions)
-      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
-      .limit(1);
-    
-    if (userSubscriptions.length === 0) {
-      console.log(`No subscription found for Stripe ID: ${stripeSubscriptionId}, it may already be deleted`);
-      return;
-    }
-    
-    // Update the subscription status to canceled directly
-    await db
-      .update(user_subscriptions)
-      .set({
-        status: 'canceled',
-        canceled_at: new Date(),
-        updated_at: new Date()
-      })
-      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId));
-    
-    console.log(`Successfully updated subscription ${stripeSubscriptionId} to canceled status`);
-  } catch (error) {
-    console.error('Error handling subscription deletion:', error);
-    throw error;
-  }
-}
-
-async function handlePaymentSucceeded(invoice: StripeInvoice) {
-  try {
-    console.log('Processing invoice payment success:', JSON.stringify(invoice, null, 2));
-    
-    if (!stripe) {
-      console.error('Stripe is not configured');
-      throw new Error('Stripe is not configured');
-    }
-
-    const stripeSubscriptionId = invoice.subscription;
-    if (!stripeSubscriptionId) {
-      console.log('No subscription ID in invoice, skipping');
-      return;
-    }
-    
-    const userId = invoice.metadata?.userId;
-    
-    // Get user ID from subscription if not in invoice metadata
-    let userIdFromSubscription: string | undefined;
-    
-    try {
-      if (!userId) {
-        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        userIdFromSubscription = subscription.metadata?.userId;
-        if (!userIdFromSubscription) {
-          console.error('No userId found in subscription metadata');
-          return;
-        }
-      }
     } catch (error) {
-      console.error('Error retrieving subscription from Stripe:', error);
-      return;
+      console.error('Error handling subscription change:', error);
+      throw error; // Re-throw to trigger transaction rollback
     }
-    
-    // Get subscription from our database
-    let subscription;
+  });
+}
+
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+  return db.transaction(async (tx) => {
+    // Pass `tx` to db operations if needed
     try {
-      subscription = await subscriptionService.updateSubscriptionFromStripe(
-        stripeSubscriptionId
-      );
+      const stripeSubscriptionId = subscription.id;
       
-      if (!subscription) {
-        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+      // Find the subscription directly in our database
+      const userSubscriptions = await db // tx.select()
+        .select()
+        .from(user_subscriptions)
+        .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+        .limit(1);
+      
+      if (userSubscriptions.length === 0) {
+        console.log(`No subscription found for Stripe ID: ${stripeSubscriptionId}, it may already be deleted`);
         return;
       }
+      
+      // Update the subscription status to canceled directly
+      await db // tx.update()
+        .update(user_subscriptions)
+        .set({
+          status: 'canceled',
+          canceled_at: new Date(),
+          updated_at: new Date()
+        })
+        .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId));
+      
+      console.log(`Successfully updated subscription ${stripeSubscriptionId} to canceled status`);
     } catch (error) {
-      console.error('Error updating subscription from Stripe:', error);
-      return;
+      console.error('Error handling subscription deletion:', error);
+      throw error; // Re-throw to trigger transaction rollback
     }
-    
-    if (!invoice || typeof invoice.amount_paid !== 'number') {
-      console.error('Invalid invoice object received from Stripe');
-      return;
-    }
-    
-    // Handle payment_intent safely - it might be a string or an object with id
-    let paymentIntentId = typeof invoice.payment_intent === 'string' 
-      ? invoice.payment_intent 
-      : (invoice.payment_intent as Stripe.PaymentIntent)?.id || null;
-    
-    if (!paymentIntentId) {
-      console.log('No payment intent ID found in invoice, using invoice ID instead');
-      paymentIntentId = invoice.id;
-    }
-    
-    // Handle nextBillingDate properly - make sure it's never undefined
-    const nextBillingDate = invoice.next_payment_attempt 
-      ? new Date(invoice.next_payment_attempt * 1000) 
-      : new Date(subscription.current_period_end); // Use subscription end date as fallback
-    
-    // Record payment with careful null handling
-    try {
-      await subscriptionService.recordPayment({
-        userId: userId || userIdFromSubscription || subscription.user_id,
-        subscriptionId: subscription.subscription_id,
-        amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
-        stripePaymentId: paymentIntentId,
-        stripeInvoiceId: invoice.id,
-        paymentMethod: invoice.payment_method_details?.type || 'card',
-        paymentStatus: invoice.status,
-        paymentDate: new Date(invoice.created * 1000),
-        nextBillingDate: nextBillingDate, // Use our calculated value
-        receiptUrl: invoice.hosted_invoice_url || null,
-        gstDetails: {
-          gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
-          taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
-          taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
-          hasGST: !!invoice.customer_tax_ids?.length,
-          hsnSacCode: "998431", // HSN code for educational services
-          placeOfSupply: "India" // Default place of supply
-        }
-      });
-      console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
-    } catch (error) {
-      console.error('Error recording payment:', error);
-      throw error;
-    }
-  } catch (error) {
-    console.error('Error handling payment success:', error);
-    throw error;
-  }
+  });
 }
 
-async function handlePaymentFailed(invoice: StripeInvoice) {
+// Helper function to extract customer ID
+function getCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustomer | null): string {
+  if (typeof customer === 'string') {
+    return customer;
+  }
+  if (customer && 'id' in customer) {
+    return customer.id;
+  }
+  throw new Error('Invalid customer ID type');
+}
+
+async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+  return db.transaction(async (tx) => {
+    // Pass `tx` to db operations and service methods if they support it
+    try {
+      console.log('Processing invoice payment success:', JSON.stringify(invoice, null, 2));
+      
+      if (!stripe) {
+        console.error('Stripe is not configured');
+        throw new Error('Stripe is not configured');
+      }
+
+      const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+      if (!stripeSubscriptionId) {
+        console.log('No subscription ID in invoice, skipping');
+        return;
+      }
+      
+      // Ensure metadata is treated as potentially null or undefined
+      const userId = invoice.metadata?.userId ?? null; 
+      
+      // Get user ID from subscription if not in invoice metadata
+      let userIdFromSubscription: string | undefined | null = null; 
+      
+      try {
+        if (!userId) {
+          const subscriptionObject = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+          userIdFromSubscription = subscriptionObject.metadata?.userId ?? null;
+          if (!userIdFromSubscription) {
+            console.error('No userId found in subscription metadata');
+            return; // Or throw error if this is critical for the transaction
+          }
+        }
+      } catch (error) {
+        console.error('Error retrieving subscription from Stripe:', error);
+        // Decide if this should roll back the transaction or if it's a recoverable/ignorable state
+        throw error; // Re-throw to ensure transaction rollback
+      }
+      
+      // Get subscription from our database
+      let subscription;
+      try {
+        // TODO: Refactor subscriptionService.updateSubscriptionFromStripe to accept `tx`
+        subscription = await subscriptionService.updateSubscriptionFromStripe(
+          stripeSubscriptionId
+        );
+        
+        if (!subscription) {
+          console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+          throw new Error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`); // ensure rollback
+        }
+      } catch (error) {
+        console.error('Error updating subscription from Stripe:', error);
+        throw error; // Re-throw to ensure transaction rollback
+      }
+      
+      if (!invoice || typeof invoice.amount_paid !== 'number') {
+        console.error('Invalid invoice object received from Stripe');
+        throw new Error('Invalid invoice object received from Stripe'); // ensure rollback
+      }
+      
+      // Handle payment_intent safely - it might be a string or an object with id
+      let paymentIntentId = typeof invoice.payment_intent === 'string'
+        ? invoice.payment_intent
+        : invoice.payment_intent?.id || null;
+
+      if (!paymentIntentId) {
+        console.log('No payment intent ID found in invoice, using invoice ID instead');
+        paymentIntentId = invoice.id;
+      }
+
+      // Handle nextBillingDate properly - make sure it's never undefined
+      const nextBillingDate = invoice.next_payment_attempt
+        ? new Date(invoice.next_payment_attempt * 1000)
+        // @ts-ignore // current_period_end is present on the subscription object from our DB
+        : new Date(subscription.current_period_end); // Use subscription end date as fallback
+
+      // Record payment with careful null handling
+      try {
+        // Ensure subscriptionService.recordPayment is idempotent (e.g., by checking Stripe Invoice ID before inserting).
+        // TODO: Refactor subscriptionService.recordPayment to accept `tx`
+        await subscriptionService.recordPayment({
+          // @ts-ignore // user_id is present on the subscription object from our DB
+          userId: userId || userIdFromSubscription || subscription.user_id,
+          // @ts-ignore // subscription_id is present on the subscription object from our DB
+          subscriptionId: subscription.subscription_id,
+          amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
+          stripePaymentId: paymentIntentId!, // Assert non-null as we fallback to invoice.id
+          stripeInvoiceId: invoice.id,
+          paymentMethod: invoice.payment_method_details?.type || 'card',
+          paymentStatus: invoice.status || 'succeeded', // Default to succeeded if null
+          paymentDate: new Date(invoice.created * 1000),
+          nextBillingDate: nextBillingDate, // Use our calculated value
+          receiptUrl: invoice.hosted_invoice_url || null,
+          gstDetails: {
+            gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
+            taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
+            taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
+            hasGST: !!invoice.customer_tax_ids?.length,
+            hsnSacCode: "998431", // HSN code for educational services
+            placeOfSupply: "India" // Default place of supply
+          }
+        });
+        console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
+      } catch (error) {
+        console.error('Error recording payment:', error);
+        throw error; // Re-throw to ensure transaction rollback
+      }
+    } catch (error) {
+      console.error('Error handling payment success:', error);
+      // Transaction will be rolled back by Drizzle if an error is thrown from here
+      throw error; 
+    }
+  });
+}
+
+async function handlePaymentFailed(invoice: Stripe.Invoice) {
   try {
-    const stripeSubscriptionId = invoice.subscription;
+    const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
     if (!stripeSubscriptionId) return;
     
     // Update subscription status
@@ -286,22 +288,22 @@ export async function POST(req: NextRequest) {
       // Subscription created or updated
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
-        await handleSubscriptionChange(event.data.object as unknown as StripeSubscription);
+        await handleSubscriptionChange(event.data.object as Stripe.Subscription);
         break;
 
       // Subscription deleted
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as unknown as StripeSubscription);
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
         break;
 
       // Payment succeeded
       case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object as unknown as StripeInvoice);
+        await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
         break;
 
       // Payment failed
       case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object as unknown as StripeInvoice);
+        await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
 
       default:

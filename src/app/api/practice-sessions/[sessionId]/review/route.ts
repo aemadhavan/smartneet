@@ -6,9 +6,11 @@ import {
   topics,
   subtopics,
   practice_sessions,
-  session_questions
+  session_questions,
+  // subjects is needed for session context
+  subjects 
 } from '@/db';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm'; // Added inArray
 import { auth } from '@clerk/nextjs/server';
 import { getCorrectAnswer } from '@/app/practice-sessions/[sessionId]/review/components/helpers';
 import { 
@@ -16,6 +18,7 @@ import {
   QuestionType, 
   NormalizedAnswer 
 } from '@/app/practice-sessions/[sessionId]/review/components/interfaces';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Add connection pooling and retry logic
 const MAX_RETRIES = 3;
@@ -71,40 +74,57 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    // First verify that the session belongs to this user
-    const session = await withRetry(async () => {
+    const cacheKey = `session:${userId}:${sessionId}:review`;
+
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({ ...(cachedData as Record<string, unknown>), source: 'cache' });
+    }
+
+    // First verify that the session belongs to this user and fetch its details
+    // Also fetch related subject, topic, subtopic names for comprehensive review context
+    const sessionDetails = await withRetry(async () => {
       return db.query.practice_sessions.findFirst({
         where: and(
           eq(practice_sessions.session_id, sessionId),
           eq(practice_sessions.user_id, userId)
         ),
+        with: {
+          subject: { columns: { subject_name: true } },
+          topic: { columns: { topic_name: true } },
+          subtopic: { columns: { subtopic_name: true } }
+        }
       });
     });
 
-    if (!session) {
+    if (!sessionDetails) {
       return NextResponse.json(
         { error: 'Session not found or does not belong to the current user' },
         { status: 404 }
       );
     }
 
-    // Get all question attempts for this session
+    // Get all question attempts for this session, ordered by attempt_timestamp descending
+    // to easily pick the latest attempt if multiple exist for a single question (though typically not expected)
     const attempts = await withRetry(async () => {
       return db.query.question_attempts.findMany({
         where: and(
           eq(question_attempts.session_id, sessionId),
           eq(question_attempts.user_id, userId)
         ),
-        orderBy: question_attempts.attempt_timestamp,
+        orderBy: desc(question_attempts.attempt_timestamp), // Get latest attempts first
         with: {
           question: {
             columns: {
               question_id: true,
               question_text: true,
               question_type: true,
-              details: true,
+              details: true, // Contains options and structure for correct answer
               explanation: true,
-              marks: true,
+              marks: true, // Max marks for the question
+              negative_marks: true, // Negative marks for the question
+              difficulty_level: true, // Difficulty of the question
               topic_id: true,
               subtopic_id: true,
               is_image_based: true,
@@ -114,128 +134,184 @@ export async function GET(
         }
       });
     });
-
+    
+    // If no attempts, still return basic session info and empty attempts/summary
+    // This part does not need separate caching as the main response will be cached.
     if (!attempts.length) {
-      return NextResponse.json({
+      const emptyResponse = {
+        session: {
+          session_id: sessionDetails.session_id,
+          session_type: sessionDetails.session_type,
+          start_time: sessionDetails.start_time,
+          end_time: sessionDetails.end_time,
+          duration_minutes: sessionDetails.duration_minutes,
+          subject_name: sessionDetails.subject?.subject_name,
+          topic_name: sessionDetails.topic?.topic_name,
+          subtopic_name: sessionDetails.subtopic?.subtopic_name,
+          total_questions: sessionDetails.total_questions,
+          questions_attempted: sessionDetails.questions_attempted,
+          questions_correct: sessionDetails.questions_correct,
+          score: sessionDetails.score,
+          max_score: sessionDetails.max_score,
+          accuracy: sessionDetails.questions_attempted 
+            ? Math.round((sessionDetails.questions_correct / sessionDetails.questions_attempted) * 100) 
+            : 0,
+        },
         attempts: [],
-        summary: {
-          totalQuestions: 0,
-          questionsCorrect: 0,
-          accuracy: 0,
-          score: 0,
-          maxScore: 0
-        }
-      });
+        summary: { // This summary might differ from finalSummary if attempts are empty
+          totalQuestions: sessionDetails.total_questions || 0,
+          questionsCorrect: sessionDetails.questions_correct || 0,
+          accuracy: sessionDetails.questions_attempted 
+            ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
+            : 0,
+          score: sessionDetails.score || 0,
+          maxScore: sessionDetails.max_score || 0,
+        },
+        source: 'database' // or 'empty_session_no_attempts' to be specific
+      };
+      await cache.set(cacheKey, emptyResponse, 7200); // Cache empty response too
+      return NextResponse.json(emptyResponse);
     }
 
-    // Get session questions to ensure correct ordering
-    const sessionQs = await db.query.session_questions.findMany({
+    // Get session questions to map is_bookmarked, question_order, time_spent_seconds
+    const sessionQsData = await db.query.session_questions.findMany({
       where: and(
         eq(session_questions.session_id, sessionId),
-        eq(session_questions.user_id, userId)
+        eq(session_questions.user_id, userId) // Ensure user_id matches here too for security
       ),
-      orderBy: session_questions.question_order,
       columns: {
         question_id: true,
         question_order: true,
-        time_spent_seconds: true
+        time_spent_seconds: true,
+        is_bookmarked: true 
       }
     });
 
-    // Create an object map of question IDs to their order
-    const questionOrderMap: Record<number, { order: number, timeSpent: number }> = {};
-    sessionQs.forEach(sq => {
-      questionOrderMap[sq.question_id] = { 
+    // Create a map for easy lookup of session question details
+    const sessionQuestionDetailsMap: Record<number, { order: number, timeSpent: number, isBookmarked: boolean }> = {};
+    sessionQsData.forEach(sq => {
+      sessionQuestionDetailsMap[sq.question_id] = { 
         order: sq.question_order, 
-        timeSpent: sq.time_spent_seconds ?? 0 // Use nullish coalescing to handle null values
+        timeSpent: sq.time_spent_seconds ?? 0,
+        isBookmarked: sq.is_bookmarked ?? false
       };
     });
+    
+    const topicIdsFromAttempts = new Set<number>();
+    const subtopicIdsFromAttempts = new Set<number>();
 
-    // Prepare the list of attempts with all needed data
-    const detailedAttempts = await Promise.all(attempts.map(async (attempt) => {
-      // Get topic information
-      const topic = await db.query.topics.findFirst({
-        where: eq(topics.topic_id, attempt.question.topic_id),
-        columns: {
-          topic_id: true,
-          topic_name: true
+    attempts.forEach(attempt => {
+      if (attempt.question.topic_id) {
+        topicIdsFromAttempts.add(attempt.question.topic_id);
+      }
+      if (attempt.question.subtopic_id) {
+        subtopicIdsFromAttempts.add(attempt.question.subtopic_id);
+      }
+    });
+
+    let topicMap = new Map<number, { topic_id: number; topic_name: string }>();
+    if (topicIdsFromAttempts.size > 0) {
+      const topicsData = await withRetry(async () => {
+        return db.query.topics.findMany({
+          where: inArray(topics.topic_id, Array.from(topicIdsFromAttempts)),
+          columns: { topic_id: true, topic_name: true }
+        });
+      });
+      topicMap = new Map(topicsData.map(t => [t.topic_id, t]));
+    }
+
+    let subtopicMap = new Map<number, { subtopic_id: number; subtopic_name: string }>();
+    if (subtopicIdsFromAttempts.size > 0) {
+      const subtopicsData = await withRetry(async () => {
+        return db.query.subtopics.findMany({
+          where: inArray(subtopics.subtopic_id, Array.from(subtopicIdsFromAttempts)),
+          columns: { subtopic_id: true, subtopic_name: true }
+        });
+      });
+      subtopicMap = new Map(subtopicsData.map(st => [st.subtopic_id, st]));
+    }
+
+    const detailedReviewQuestions = sessionQsData.map(sq => {
+        const attempt = attempts.find(a => a.question_id === sq.question_id); 
+
+        const topicInfoFromMap = attempt?.question.topic_id ? topicMap.get(attempt.question.topic_id) : null;
+        
+        let subtopicInfoFromMap = null;
+        if (attempt?.question.subtopic_id) {
+          const subtopicData = subtopicMap.get(attempt.question.subtopic_id);
+          if (subtopicData) {
+            subtopicInfoFromMap = {
+              subtopicId: subtopicData.subtopic_id,
+              subtopicName: subtopicData.subtopic_name
+            };
+          }
         }
+        
+        const questionDetails = attempt?.question.details as NormalizedQuestionDetails | null;
+        const questionType = attempt?.question.question_type as QuestionType | undefined;
+
+        return {
+          question_id: sq.question_id,
+          question_order: sessionQuestionDetailsMap[sq.question_id]?.order ?? 0, 
+          time_spent_seconds: sessionQuestionDetailsMap[sq.question_id]?.timeSpent ?? 0, 
+          is_bookmarked: sessionQuestionDetailsMap[sq.question_id]?.isBookmarked ?? false, 
+          question_text: attempt?.question.question_text || "N/A (Question data missing)",
+          question_type: questionType || "N/A",
+          details: questionDetails,
+          explanation: attempt?.question.explanation,
+          user_answer: attempt?.user_answer as NormalizedAnswer | null,
+          is_correct: attempt?.is_correct ?? null,
+          correct_answer: questionDetails && questionType ? getCorrectAnswer(questionDetails, questionType) : null,
+          marks_awarded: attempt?.marks_awarded ?? 0,
+          marks_available: attempt?.question.marks ?? 0,
+          negative_marks: attempt?.question.negative_marks ?? 0,
+          difficulty_level: attempt?.question.difficulty_level,
+          topic: {
+            topic_id: topicInfoFromMap?.topic_id,
+            topic_name: topicInfoFromMap?.topic_name || "Unknown Topic"
+          },
+          subtopic: subtopicInfoFromMap,
+          is_image_based: attempt?.question.is_image_based,
+          image_url: attempt?.question.image_url
+        };
       });
 
-      // Get subtopic information if available
-      let subtopicInfo = null;
-      if (attempt.question.subtopic_id) {
-        const subtopic = await db.query.subtopics.findFirst({
-          where: eq(subtopics.subtopic_id, attempt.question.subtopic_id),
-          columns: {
-            subtopic_id: true,
-            subtopic_name: true
-          }
-        });
-
-        if (subtopic) {
-          subtopicInfo = {
-            subtopicId: subtopic.subtopic_id,
-            subtopicName: subtopic.subtopic_name
-          };
-        }
-      }
-
-      // Get the question order and time spent
-      const orderInfo = questionOrderMap[attempt.question_id] || { order: 0, timeSpent: 0 };
-
-      // Format the attempt data
-      return {
-        questionId: attempt.question.question_id,
-        questionNumber: orderInfo.order,
-        timeSpentSeconds: orderInfo.timeSpent,
-        questionText: attempt.question.question_text,
-        questionType: attempt.question.question_type as QuestionType,
-        details: attempt.question.details as NormalizedQuestionDetails | null,
-        explanation: attempt.question.explanation,
-        userAnswer: attempt.user_answer as NormalizedAnswer,
-        isCorrect: attempt.is_correct,
-        correctAnswer: getCorrectAnswer(
-          attempt.question.details as NormalizedQuestionDetails, 
-          attempt.question.question_type as QuestionType
-        ),
-        marksAwarded: attempt.marks_awarded || 0,
-        maxMarks: attempt.question.marks || 0,
-        topic: {
-          topicId: topic?.topic_id || 0,
-          topicName: topic?.topic_name || 'Unknown Topic'
-        },
-        subtopic: subtopicInfo,
-        isImageBased: attempt.question.is_image_based,
-        imageUrl: attempt.question.image_url
-      };
-    }));
-
-    // Sort attempts by question order
-    detailedAttempts.sort((a, b) => a.questionNumber - b.questionNumber);
-
-    // Generate session summary data
-    const summary = {
-      totalQuestions: detailedAttempts.length,
-      questionsCorrect: detailedAttempts.filter(a => a.isCorrect).length,
-      accuracy: Math.round((detailedAttempts.filter(a => a.isCorrect).length / detailedAttempts.length) * 100),
-      score: detailedAttempts.reduce((sum, attempt) => sum + (attempt.marksAwarded || 0), 0),
-      maxScore: detailedAttempts.reduce((sum, attempt) => sum + (attempt.maxMarks || 0), 0)
+    detailedReviewQuestions.sort((a, b) => a.question_order - b.question_order);
+    
+    const finalSummary = {
+      total_questions: sessionDetails.total_questions,
+      questions_attempted: sessionDetails.questions_attempted,
+      questions_correct: sessionDetails.questions_correct,
+      accuracy: sessionDetails.questions_attempted 
+        ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
+        : 0,
+      score: sessionDetails.score,
+      max_score: sessionDetails.max_score,
     };
 
-    // Create a safe copy of the data without any non-serializable values
-    const safeData = {
-      attempts: detailedAttempts.map(attempt => ({
-        ...attempt,
-        // Ensure all properties are serializable
-        details: attempt.details ? JSON.parse(JSON.stringify(attempt.details)) : null,
-        userAnswer: attempt.userAnswer ? JSON.parse(JSON.stringify(attempt.userAnswer)) : null,
-        correctAnswer: attempt.correctAnswer ? JSON.parse(JSON.stringify(attempt.correctAnswer)) : null
+    const dataToCache = {
+      session: {
+        session_id: sessionDetails.session_id,
+        session_type: sessionDetails.session_type,
+        start_time: sessionDetails.start_time,
+        end_time: sessionDetails.end_time,
+        duration_minutes: sessionDetails.duration_minutes,
+        subject_name: sessionDetails.subject?.subject_name,
+        topic_name: sessionDetails.topic?.topic_name,
+        subtopic_name: sessionDetails.subtopic?.subtopic_name,
+        ...finalSummary 
+      },
+      questions: detailedReviewQuestions.map(q => ({
+        ...q,
+        details: q.details ? JSON.parse(JSON.stringify(q.details)) : null,
+        user_answer: q.user_answer ? JSON.parse(JSON.stringify(q.user_answer)) : null,
+        correct_answer: q.correct_answer ? JSON.parse(JSON.stringify(q.correct_answer)) : null
       })),
-      summary
     };
     
-    return NextResponse.json(safeData);
+    await cache.set(cacheKey, dataToCache, 7200); // 7200 seconds = 2 hours
+
+    return NextResponse.json({ ...dataToCache, source: 'database' });
   } catch (error) {
     console.error('Error in session review API:', error);
     

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { subjects } from '@/db/schema';
 import { ilike } from 'drizzle-orm';
+import { cache } from '@/lib/cache'; // Import cache
 
 // GET /api/subjects/by-name?name=botany - Get a subject by name
 export async function GET(request: NextRequest) {
@@ -17,7 +18,22 @@ export async function GET(request: NextRequest) {
         error: 'Subject name is required'
       }, { status: 400 });
     }
+
+    const cacheKey = `subject:by-name:${name.toLowerCase()}`;
+
+    // Try to get from cache first
+    const cachedSubject = await cache.get(cacheKey);
+    if (cachedSubject) {
+      return NextResponse.json({
+        success: true,
+        data: cachedSubject,
+        source: 'cache'
+      });
+    }
     
+    let dataFromDb = null;
+    let source = 'database';
+
     // Look for subject by name (case-insensitive)
     const foundSubjects = await db
       .select()
@@ -25,30 +41,35 @@ export async function GET(request: NextRequest) {
       .where(ilike(subjects.subject_name, name))
       .limit(1);
     
-    // If not found by name, try by code
-    if (foundSubjects.length === 0) {
+    if (foundSubjects.length > 0) {
+      dataFromDb = foundSubjects[0];
+    } else {
+      // If not found by name, try by code
       const foundByCode = await db
         .select()
         .from(subjects)
         .where(ilike(subjects.subject_code, name))
         .limit(1);
       
-      if (foundByCode.length === 0) {
-        return NextResponse.json({
-          success: false, 
-          error: 'Subject not found'
-        }, { status: 404 });
+      if (foundByCode.length > 0) {
+        dataFromDb = foundByCode[0];
       }
-      
-      return NextResponse.json({
-        success: true,
-        data: foundByCode[0]
-      });
     }
+    
+    if (!dataFromDb) {
+      return NextResponse.json({
+        success: false, 
+        error: 'Subject not found'
+      }, { status: 404 });
+    }
+
+    // Cache the result
+    await cache.set(cacheKey, dataFromDb, 7200); // 7200 seconds = 2 hours
     
     return NextResponse.json({
       success: true,
-      data: foundSubjects[0]
+      data: dataFromDb,
+      source: source
     });
   } catch (error) {
     console.error('Error finding subject by name:', error);

@@ -4,12 +4,22 @@ import { db } from '@/db';
 import { auth } from '@clerk/nextjs/server';
 import { count, eq } from 'drizzle-orm';
 import { question_attempts, questions } from '@/db/schema';
+import { cache } from '@/lib/cache'; // Import cache
 
 export async function GET() {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const cacheKey = `user:${userId}:question-type-distribution`;
+
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      // Assuming cachedData stores the final array structure
+      return NextResponse.json({ data: cachedData, source: 'cache' });
     }
 
     // Get distribution of question types from user's attempts
@@ -24,30 +34,36 @@ export async function GET() {
       .groupBy(questions.question_type);
 
     // Format the response for the pie chart
-    const formattedData = questionTypeDistribution.map((item) => {
-      // Convert enum values to readable names
-      const name = item.question_type
-        .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-        .trim(); // Remove leading/trailing spaces
-      
-      return {
-        name,
-        value: Number(item.count)
-      };
-    });
+    let dataToReturn;
+    let source = 'database';
 
-    // If no data, return default distribution
-    if (formattedData.length === 0) {
-      return NextResponse.json([
+    if (questionTypeDistribution.length === 0) {
+      dataToReturn = [
         { name: 'Multiple Choice', value: 65 },
         { name: 'Multiple Correct Statements', value: 15 },
         { name: 'Assertion Reason', value: 10 },
         { name: 'Matching', value: 5 },
         { name: 'Sequence Ordering', value: 5 }
-      ]);
+      ];
+      source = 'default_cached'; // Indicate that default data is being served and cached
+    } else {
+      dataToReturn = questionTypeDistribution.map((item) => {
+        // Convert enum values to readable names
+        const name = item.question_type
+          .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+          .trim(); // Remove leading/trailing spaces
+        
+        return {
+          name,
+          value: Number(item.count)
+        };
+      });
     }
 
-    return NextResponse.json(formattedData);
+    // Cache the result (either formatted data or default data)
+    await cache.set(cacheKey, dataToReturn, 3600); // 3600 seconds = 1 hour
+
+    return NextResponse.json({ data: dataToReturn, source: source });
   } catch (error) {
     console.error('Error fetching question type distribution:', error);
     return NextResponse.json(
