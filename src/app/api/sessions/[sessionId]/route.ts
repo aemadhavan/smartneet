@@ -1,10 +1,10 @@
+// src/app/api/sessions/[sessionId]/route.ts.deprecated
+
 // DEPRECATED: This route's functionality has been merged into
 // GET /api/practice-sessions/[sessionId]/route.ts (for active sessions)
 // and GET /api/practice-sessions/[sessionId]/review/route.ts (for session review).
-// This file can be deleted in a future cleanup.
+// This file is kept for reference only and is not part of the active codebase.
 
-/*
-// src/app/api/sessions/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { 
@@ -220,4 +220,3 @@ export async function GET(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-*/

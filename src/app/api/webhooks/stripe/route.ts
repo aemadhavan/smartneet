@@ -8,62 +8,83 @@ import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
 
-// Event handler functions
-async function handleSubscriptionChange(subscription: Stripe.Subscription) {
-  return db.transaction(async (tx) => {
-    // Pass `tx` to db operations if needed, e.g., tx.select()...
-    // For now, we'll assume service methods can participate or Drizzle handles context
-    // If service methods like createOrUpdateSubscription need explicit tx, that's a refactor note.
-    try {
-      const stripeSubscriptionId = subscription.id;
-    const stripeCustomerId = getCustomerId(subscription.customer);
-    const userId = subscription.metadata?.userId;
-    
-    if (!userId) {
-      console.error('No userId found in subscription metadata');
-      return;
-    }
-    
-    // Get the price ID to find the corresponding plan
-    const priceId = subscription.items.data[0]?.price.id;
-    if (!priceId) {
-      console.error('No price ID found in subscription');
-      return;
-    }
+// Define types for our local database records
+interface DatabaseSubscription {
+  subscription_id: number;
+  user_id: string;
+  current_period_end: Date;
+}
 
-    if (!subscription || !subscription.items || !subscription.items.data) {
-      console.error('Invalid subscription object received from Stripe');
-      return;
-    }
-    
-    // Find the plan by Stripe price ID
-    const plans = await db // tx.select() if you want to use the transaction object, for now using global db
-      .select()
-      .from(subscription_plans)
-      .where(eq(subscription_plans.price_id_stripe, priceId))
-      .limit(1);
-    
-    if (plans.length === 0) {
-      console.error(`No plan found for Stripe price ID: ${priceId}`);
-      return;
-    }
-    
-    const plan = plans[0];
-    
-    // Create or update subscription
-    await subscriptionService.createOrUpdateSubscription({
-      userId,
-      planId: plan.plan_id,
-      stripeSubscriptionId,
-      stripeCustomerId,
-      // Ensure we have a valid status string
-      status: subscription.status || 'active', // Provide a default value when undefined
-      periodStart: new Date(subscription.current_period_start * 1000),
-      periodEnd: new Date(subscription.current_period_end * 1000),
-      trialEnd: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000)
-        : null
-    });
+// Type augmentation for Stripe's objects to fix missing properties
+interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
+  current_period_start: number;
+  current_period_end: number;
+}
+
+interface StripeInvoiceWithPaymentDetails extends Stripe.Invoice {
+  subscription?: string | { id: string };
+  payment_intent?: string | { id: string };
+  payment_method_details?: { type: string };
+  tax?: number;
+  tax_percent?: number;
+}
+
+// Event handler functions
+async function handleSubscriptionChange(rawSubscription: Stripe.Subscription) {
+  return db.transaction(async () => {
+    try {
+      // Cast to our augmented type
+      const subscription = rawSubscription as StripeSubscriptionWithPeriods;
+      
+      const stripeSubscriptionId = subscription.id;
+      const stripeCustomerId = getCustomerId(subscription.customer);
+      const userId = subscription.metadata?.userId;
+      
+      if (!userId) {
+        console.error('No userId found in subscription metadata');
+        return;
+      }
+      
+      // Get the price ID to find the corresponding plan
+      const priceId = subscription.items.data[0]?.price.id;
+      if (!priceId) {
+        console.error('No price ID found in subscription');
+        return;
+      }
+
+      if (!subscription || !subscription.items || !subscription.items.data) {
+        console.error('Invalid subscription object received from Stripe');
+        return;
+      }
+      
+      // Find the plan by Stripe price ID
+      const plans = await db
+        .select()
+        .from(subscription_plans)
+        .where(eq(subscription_plans.price_id_stripe, priceId))
+        .limit(1);
+      
+      if (plans.length === 0) {
+        console.error(`No plan found for Stripe price ID: ${priceId}`);
+        return;
+      }
+      
+      const plan = plans[0];
+      
+      // Create or update subscription
+      await subscriptionService.createOrUpdateSubscription({
+        userId,
+        planId: plan.plan_id,
+        stripeSubscriptionId,
+        stripeCustomerId,
+        // Ensure we have a valid status string
+        status: subscription.status || 'active', // Provide a default value when undefined
+        periodStart: new Date(subscription.current_period_start * 1000),
+        periodEnd: new Date(subscription.current_period_end * 1000),
+        trialEnd: subscription.trial_end
+          ? new Date(subscription.trial_end * 1000)
+          : null
+      });
     } catch (error) {
       console.error('Error handling subscription change:', error);
       throw error; // Re-throw to trigger transaction rollback
@@ -72,13 +93,12 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  return db.transaction(async (tx) => {
-    // Pass `tx` to db operations if needed
+  return db.transaction(async () => {
     try {
       const stripeSubscriptionId = subscription.id;
       
       // Find the subscription directly in our database
-      const userSubscriptions = await db // tx.select()
+      const userSubscriptions = await db
         .select()
         .from(user_subscriptions)
         .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
@@ -90,7 +110,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       }
       
       // Update the subscription status to canceled directly
-      await db // tx.update()
+      await db
         .update(user_subscriptions)
         .set({
           status: 'canceled',
@@ -118,10 +138,12 @@ function getCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustom
   throw new Error('Invalid customer ID type');
 }
 
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  return db.transaction(async (tx) => {
-    // Pass `tx` to db operations and service methods if they support it
+async function handlePaymentSucceeded(rawInvoice: Stripe.Invoice) {
+  return db.transaction(async () => {
     try {
+      // Cast to our augmented type
+      const invoice = rawInvoice as StripeInvoiceWithPaymentDetails;
+      
       console.log('Processing invoice payment success:', JSON.stringify(invoice, null, 2));
       
       if (!stripe) {
@@ -129,7 +151,10 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         throw new Error('Stripe is not configured');
       }
 
-      const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+      const stripeSubscriptionId = typeof invoice.subscription === 'string' 
+        ? invoice.subscription 
+        : (invoice.subscription?.id || '');
+        
       if (!stripeSubscriptionId) {
         console.log('No subscription ID in invoice, skipping');
         return;
@@ -139,7 +164,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       const userId = invoice.metadata?.userId ?? null; 
       
       // Get user ID from subscription if not in invoice metadata
-      let userIdFromSubscription: string | undefined | null = null; 
+      let userIdFromSubscription: string | null = null; 
       
       try {
         if (!userId) {
@@ -147,26 +172,24 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
           userIdFromSubscription = subscriptionObject.metadata?.userId ?? null;
           if (!userIdFromSubscription) {
             console.error('No userId found in subscription metadata');
-            return; // Or throw error if this is critical for the transaction
+            return;
           }
         }
       } catch (error) {
         console.error('Error retrieving subscription from Stripe:', error);
-        // Decide if this should roll back the transaction or if it's a recoverable/ignorable state
         throw error; // Re-throw to ensure transaction rollback
       }
       
       // Get subscription from our database
-      let subscription;
+      let subscription: DatabaseSubscription | null = null;
       try {
-        // TODO: Refactor subscriptionService.updateSubscriptionFromStripe to accept `tx`
         subscription = await subscriptionService.updateSubscriptionFromStripe(
           stripeSubscriptionId
-        );
+        ) as DatabaseSubscription | null;
         
         if (!subscription) {
           console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-          throw new Error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`); // ensure rollback
+          throw new Error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
         }
       } catch (error) {
         console.error('Error updating subscription from Stripe:', error);
@@ -175,41 +198,39 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       
       if (!invoice || typeof invoice.amount_paid !== 'number') {
         console.error('Invalid invoice object received from Stripe');
-        throw new Error('Invalid invoice object received from Stripe'); // ensure rollback
+        throw new Error('Invalid invoice object received from Stripe');
       }
       
+      // Ensure all required fields are non-undefined strings with explicit string typing
       // Handle payment_intent safely - it might be a string or an object with id
-      let paymentIntentId = typeof invoice.payment_intent === 'string'
+      // Force a default empty string if both are undefined (shouldn't happen with invoice.id fallback)
+      const paymentIntentId: string = (typeof invoice.payment_intent === 'string'
         ? invoice.payment_intent
-        : invoice.payment_intent?.id || null;
-
-      if (!paymentIntentId) {
-        console.log('No payment intent ID found in invoice, using invoice ID instead');
-        paymentIntentId = invoice.id;
-      }
+        : (invoice.payment_intent?.id || invoice.id || ''));
 
       // Handle nextBillingDate properly - make sure it's never undefined
       const nextBillingDate = invoice.next_payment_attempt
         ? new Date(invoice.next_payment_attempt * 1000)
-        // @ts-ignore // current_period_end is present on the subscription object from our DB
-        : new Date(subscription.current_period_end); // Use subscription end date as fallback
+        : new Date(subscription.current_period_end);
 
+      // Get a safe payment method with explicit string typing
+      const paymentMethod: string = (invoice.payment_method_details?.type || 'card');
+      
+      // Ensure invoice.id is used as string for stripeInvoiceId with explicit string typing
+      const stripeInvoiceId: string = (invoice.id || '');
+        
       // Record payment with careful null handling
       try {
-        // Ensure subscriptionService.recordPayment is idempotent (e.g., by checking Stripe Invoice ID before inserting).
-        // TODO: Refactor subscriptionService.recordPayment to accept `tx`
         await subscriptionService.recordPayment({
-          // @ts-ignore // user_id is present on the subscription object from our DB
           userId: userId || userIdFromSubscription || subscription.user_id,
-          // @ts-ignore // subscription_id is present on the subscription object from our DB
           subscriptionId: subscription.subscription_id,
           amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
-          stripePaymentId: paymentIntentId!, // Assert non-null as we fallback to invoice.id
-          stripeInvoiceId: invoice.id,
-          paymentMethod: invoice.payment_method_details?.type || 'card',
+          stripePaymentId: paymentIntentId,
+          stripeInvoiceId: stripeInvoiceId,
+          paymentMethod: paymentMethod,
           paymentStatus: invoice.status || 'succeeded', // Default to succeeded if null
           paymentDate: new Date(invoice.created * 1000),
-          nextBillingDate: nextBillingDate, // Use our calculated value
+          nextBillingDate: nextBillingDate,
           receiptUrl: invoice.hosted_invoice_url || null,
           gstDetails: {
             gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
@@ -227,15 +248,20 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       }
     } catch (error) {
       console.error('Error handling payment success:', error);
-      // Transaction will be rolled back by Drizzle if an error is thrown from here
       throw error; 
     }
   });
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(rawInvoice: Stripe.Invoice) {
   try {
-    const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+    // Cast to our augmented type
+    const invoice = rawInvoice as StripeInvoiceWithPaymentDetails;
+    
+    const stripeSubscriptionId = typeof invoice.subscription === 'string' 
+      ? invoice.subscription 
+      : (invoice.subscription?.id || '');
+      
     if (!stripeSubscriptionId) return;
     
     // Update subscription status
@@ -249,9 +275,11 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
 // Stripe webhook handler
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  // Fix: In newer versions of Next.js, headers() returns a Promise
+  
+  // In this version of Next.js, headers() returns a Promise
+  // We need to await it before calling methods like get()
   const headerList = await headers();
-  const signature =  headerList.get('stripe-signature') as string;
+  const signature = headerList.get('stripe-signature') || '';
 
   if (!signature) {
     console.error('No stripe signature in request headers');

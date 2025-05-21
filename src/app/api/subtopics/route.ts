@@ -112,7 +112,7 @@ import { z } from 'zod';
 const createSubtopicSchema = z.object({
   topic_id: z.number({ required_error: "Topic ID is required" }).int().positive(),
   subtopic_name: z.string({ required_error: "Subtopic name is required" }).min(1, "Subtopic name cannot be empty").max(255),
-  subtopic_description: z.string().optional(),
+  description: z.string().optional(), // Changed from subtopic_description to description to match schema
   is_active: z.boolean().optional().default(true), // Default to true if not provided
 });
 
@@ -135,14 +135,17 @@ export async function POST(req: NextRequest) {
     }
     const validatedData = validationResult.data;
 
-    // Database insertion using validatedData
+    // Database insertion using validatedData with corrected field names
     const newSubtopic = await db.insert(subtopics).values({
       topic_id: validatedData.topic_id,
       subtopic_name: validatedData.subtopic_name,
-      subtopic_description: validatedData.subtopic_description,
+      description: validatedData.description, // Changed to match the schema field name
       is_active: validatedData.is_active,
-      // created_by: userId, // Assuming you have a created_by field
-      // updated_by: userId, // Assuming you have an updated_by field
+      // Add timestamps if they're not automatically handled
+      created_at: new Date(),
+      updated_at: new Date()
+      // created_by: userId, // Uncomment if this field exists
+      // updated_by: userId, // Uncomment if this field exists
     }).returning(); // .returning() to get the inserted record, if needed
 
     if (!newSubtopic || newSubtopic.length === 0) {

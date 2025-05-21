@@ -7,8 +7,7 @@ import {
   subtopics,
   practice_sessions,
   session_questions,
-  // subjects is needed for session context
-  subjects 
+  // Note: We import subjects via the practice_sessions relation instead
 } from '@/db';
 import { eq, and, desc, inArray } from 'drizzle-orm'; // Added inArray
 import { auth } from '@clerk/nextjs/server';
@@ -150,10 +149,10 @@ export async function GET(
           subtopic_name: sessionDetails.subtopic?.subtopic_name,
           total_questions: sessionDetails.total_questions,
           questions_attempted: sessionDetails.questions_attempted,
-          questions_correct: sessionDetails.questions_correct,
+          questions_correct: sessionDetails.questions_correct || 0, // Add null check here
           score: sessionDetails.score,
           max_score: sessionDetails.max_score,
-          accuracy: sessionDetails.questions_attempted 
+          accuracy: sessionDetails.questions_attempted && sessionDetails.questions_correct
             ? Math.round((sessionDetails.questions_correct / sessionDetails.questions_attempted) * 100) 
             : 0,
         },
@@ -161,8 +160,8 @@ export async function GET(
         summary: { // This summary might differ from finalSummary if attempts are empty
           totalQuestions: sessionDetails.total_questions || 0,
           questionsCorrect: sessionDetails.questions_correct || 0,
-          accuracy: sessionDetails.questions_attempted 
-            ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
+          accuracy: sessionDetails.questions_attempted && sessionDetails.questions_correct
+            ? Math.round((sessionDetails.questions_correct / sessionDetails.questions_attempted) * 100) 
             : 0,
           score: sessionDetails.score || 0,
           maxScore: sessionDetails.max_score || 0,
@@ -279,14 +278,14 @@ export async function GET(
     detailedReviewQuestions.sort((a, b) => a.question_order - b.question_order);
     
     const finalSummary = {
-      total_questions: sessionDetails.total_questions,
-      questions_attempted: sessionDetails.questions_attempted,
-      questions_correct: sessionDetails.questions_correct,
-      accuracy: sessionDetails.questions_attempted 
-        ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
+      total_questions: sessionDetails.total_questions || 0,
+      questions_attempted: sessionDetails.questions_attempted || 0,
+      questions_correct: sessionDetails.questions_correct || 0,
+      accuracy: sessionDetails.questions_attempted && sessionDetails.questions_correct
+        ? Math.round((sessionDetails.questions_correct / sessionDetails.questions_attempted) * 100) 
         : 0,
-      score: sessionDetails.score,
-      max_score: sessionDetails.max_score,
+      score: sessionDetails.score || 0,
+      max_score: sessionDetails.max_score || 0,
     };
 
     const dataToCache = {
