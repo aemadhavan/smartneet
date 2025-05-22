@@ -13,30 +13,29 @@ import {
   evaluateAnswer, 
   parseQuestionDetails, 
   getCorrectAnswerForQuestionType,
-  QuestionDetails 
+  AnswerResult
 } from '@/lib/utils/answerEvaluation';
-import { cache } from '@/lib/cache'; // Import cache
+import { logger } from '@/lib/logger';
+import { cacheService } from '@/lib/services/CacheService';
+import { RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
+import { z } from 'zod';
+import { 
+  SubmitAnswersBody, 
+  QuestionDetailsWithSessionInfo,
+  SubmitAnswersResponse
+} from '@/types/answer-submission';
 
-// Interface for individual result objects (if still needed locally, otherwise remove)
-interface AnswerResult {
-  question_id: number;
-  is_correct: boolean;
-  marks_awarded: number;
-}
+// Validation schema for answer submission
+const submitAnswersSchema = z.object({
+  answers: z.record(z.string(), z.union([
+    z.string(),
+    z.record(z.string(), z.string())
+  ]))
+});
 
-interface SubmitAnswersBody {
-  answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
-}
-
-// This interface combines QuestionDetails (imported) with session-specific info.
-interface QuestionDetailsWithSessionInfo {
-  session_question_id: number;
-  details: QuestionDetails; // This now uses the imported QuestionDetails type
-  marks: number | null;
-  negative_marks: number | null;
-  question_type: string;
-}
-
+/**
+ * Submit answers for a practice session
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -54,6 +53,17 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `submit-session-answers:${sessionId}`, 
+      RATE_LIMITS.SUBMIT_SESSION_ANSWERS
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Verify session exists and belongs to user
     const [session] = await db
       .select({
@@ -69,18 +79,54 @@ export async function POST(
       );
 
     if (!session) {
+      logger.warn('Session not found for answer submission', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
     if (session.is_completed) {
+      logger.warn('Attempted to submit answers to already completed session', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        data: { sessionId }
+      });
       return NextResponse.json(
         { error: 'Session already completed' },
         { status: 400 }
       );
     }
 
-    // Parse the request body
-    const body: SubmitAnswersBody = await request.json();
+    // Parse and validate the request body
+    let body: SubmitAnswersBody;
+    try {
+      body = await request.json();
+      submitAnswersSchema.parse(body);
+    } catch (e) {
+      logger.error('Invalid answer submission format', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        error: e instanceof Error ? e.message : String(e)
+      });
+      
+      if (e instanceof z.ZodError) {
+        return NextResponse.json(
+          { 
+            error: 'Invalid answer submission format',
+            details: e.errors
+          }, 
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+    
     const { answers = {} } = body;
 
     if (Object.keys(answers).length === 0) {
@@ -99,6 +145,7 @@ export async function POST(
         marks: questions.marks,
         negative_marks: questions.negative_marks,
         question_type: questions.question_type,
+        topic_id: questions.topic_id
       })
       .from(session_questions)
       .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
@@ -113,12 +160,21 @@ export async function POST(
     const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = 
       sessionQuestions.reduce((map, q) => {
         const parsedDetails = parseQuestionDetails(q.details);
+        if (!parsedDetails) {
+          logger.warn('Failed to parse question details', {
+            userId,
+            context: 'practice-sessions/[sessionId]/submit.POST',
+            data: { questionId: q.question_id }
+          });
+          return map;
+        }
         map[q.question_id.toString()] = {
           session_question_id: q.session_question_id,
           details: parsedDetails,
           marks: q.marks,
           negative_marks: q.negative_marks,
           question_type: q.question_type,
+          topic_id: q.topic_id
         };
         return map;
       }, {} as Record<string, QuestionDetailsWithSessionInfo>);
@@ -140,7 +196,13 @@ export async function POST(
     );
     
     const results: AnswerResult[] = [];
-    const evaluationLog: Record<string, unknown> = {};
+    const evaluationLog: Record<string, {
+      questionType: string;
+      userAnswer: unknown;
+      correctAnswer: unknown;
+      isCorrect: boolean;
+    }> = {};
+    const topicIdsWithNewAttempts = new Set<number>();
     
     // Process each answer and create records for new attempts only
     await db.transaction(async (tx) => {
@@ -157,13 +219,13 @@ export async function POST(
           continue; // Skip this question if it doesn't belong to the session
         }
 
-        // For debugging purposes
+        // For debugging and logging
         const correctAnswer = getCorrectAnswerForQuestionType(
           questionDetails.question_type, 
           questionDetails.details
         );
         
-        // Evaluate if the answer is correct using our improved function
+        // Evaluate if the answer is correct
         let isCorrect = false;
         try {
           isCorrect = evaluateAnswer(
@@ -181,7 +243,16 @@ export async function POST(
           };
           
         } catch (error) {
-          console.error('Error evaluating answer:', error);
+          logger.error('Error evaluating answer', {
+            userId,
+            context: 'practice-sessions/[sessionId]/submit.POST',
+            data: { 
+              sessionId, 
+              questionId, 
+              questionType: questionDetails.question_type 
+            },
+            error: error instanceof Error ? error.message : String(error)
+          });
           continue; // Skip this question if there's an error
         }
 
@@ -189,6 +260,11 @@ export async function POST(
         const marksAwarded = isCorrect
           ? questionDetails.marks ?? 0
           : -(questionDetails.negative_marks ?? 0);
+
+        // Track topic IDs for mastery updates if topic_id exists
+        if (questionDetails.topic_id) {
+          topicIdsWithNewAttempts.add(questionDetails.topic_id);
+        }
 
         // Create the question attempt record
         await tx
@@ -215,12 +291,30 @@ export async function POST(
       }
     });
 
-    // Add detailed evaluation log to the server logs
-    console.log('Answer evaluation results:', JSON.stringify(evaluationLog, null, 2));
+    // Log detailed evaluation results at debug level
+    logger.debug('Answer evaluation results', {
+      userId,
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      data: { sessionId, evaluationLog }
+    });
 
     // After the transaction, update session statistics
-    const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
+    const { updateSessionStats, updateTopicMastery } = await import('@/lib/utilities/sessionUtils');
+    
+    // Update session stats
     await updateSessionStats(sessionId, userId);
+    
+    // Update topic mastery for each attempted topic
+    for (const topicId of topicIdsWithNewAttempts) {
+      const attemptResult = results.find(r => {
+        const qId = r.question_id.toString();
+        return questionDetailsMap[qId]?.topic_id === topicId;
+      });
+      if (attemptResult) {
+        // Use only the first attempt for this topic
+        await updateTopicMastery(userId, topicId, attemptResult.is_correct);
+      }
+    }
 
     // Get the updated session stats
     const [updatedSession] = await db
@@ -234,7 +328,7 @@ export async function POST(
       .from(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
 
-    // Mark the session as completed if not already
+    // Mark the session as completed if all questions have been answered
     if (!updatedSession.is_completed) {
       await db
         .update(practice_sessions)
@@ -246,42 +340,49 @@ export async function POST(
         .where(eq(practice_sessions.session_id, sessionId));
     }
 
-    // Invalidate active session cache
-    try {
-      const activeSessionCacheKey = `session:${userId}:${sessionId}:active`;
-      await cache.delete(activeSessionCacheKey);
-      console.log(`Cache invalidated for active session: ${activeSessionCacheKey}`);
-    } catch (cacheError) {
-      console.error('Error during active session cache invalidation after submit:', cacheError);
-      // Non-critical, so don't fail the request, but log it.
-    }
+    // Invalidate session caches
+    await cacheService.invalidateUserSessionCaches(userId, sessionId);
 
     // Return the response with the latest statistics
-    return NextResponse.json({
+    const responseData: SubmitAnswersResponse = {
       success: true,
       session_id: sessionId,
       total_answers: Object.keys(answers).length,
       total_correct: updatedSession.questions_correct ?? 0,
       accuracy: (updatedSession.questions_attempted ?? 0) > 0 
-        ? Math.round(((updatedSession.questions_correct ?? 0) / (updatedSession.questions_attempted ?? 1)) * 100) // Handle null check and division by zero
+        ? Math.round(((updatedSession.questions_correct ?? 0) / (updatedSession.questions_attempted ?? 1)) * 100)
         : 0,
       score: updatedSession.score ?? 0,
       max_score: updatedSession.max_score ?? 0,
-      results,
-      evaluation_summary: evaluationLog // Include this for debugging during development
+      results
+    };
+    
+    // Include evaluation summary in development environments only
+    if (process.env.NODE_ENV === 'development') {
+      responseData.evaluation_summary = evaluationLog;
+    }
+
+    logger.info('Successfully submitted answers', {
+      userId,
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      data: { 
+        sessionId,
+        questionsSubmitted: Object.keys(answers).length,
+        resultsCount: results.length
+      }
     });
+
+    return NextResponse.json(responseData);
   } catch (error) {
-    console.error('Error submitting answers:', error);
+    logger.error('Error processing answer submission', {
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Return a generic error message to the client
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
-
-// All helper functions (evaluateAnswer, normalizeUserAnswer, evaluateOptionBasedAnswer, 
-// parseQuestionDetails, getCorrectAnswerForQuestionType, isQuestionDetails)
-// and their related type definitions (MultipleChoiceDetails, MatchingDetails, etc., QuestionDetails union,
-// ParsedOptionDetails, RawOptionBeforeNormalization) have been moved to 
-// src/lib/utils/answerEvaluation.ts
-// They are now imported at the top of this file.

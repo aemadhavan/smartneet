@@ -10,7 +10,8 @@ export const RATE_LIMITS = {
   DELETE_SESSION: { points: 10, duration: 60 * 60 }, // 10 requests per hour
   GET_SESSION_DETAIL: { points: 150, duration: 60 }, // 150 requests per minute
   UPDATE_SESSION_DETAIL: { points: 60, duration: 60 }, // 60 requests per minute
-  GET_SESSION_REVIEW: { points: 120, duration: 60 } // 120 requests per minute
+  GET_SESSION_REVIEW: { points: 120, duration: 60 }, // 120 requests per minute
+  SUBMIT_SESSION_ANSWERS: { points: 60, duration: 60 } // 60 requests per minute
 };
 
 // Cache TTL configurations - centralized
