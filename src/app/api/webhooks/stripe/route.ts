@@ -2,63 +2,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { db } from '@/db';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm'; // Import and
 import { subscription_plans, user_subscriptions } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
 import { headers } from 'next/headers';
 import Stripe from 'stripe';
-
-// Define types for our local database records
-interface DatabaseSubscription {
-  subscription_id: number;
-  user_id: string;
-  current_period_end: Date;
-}
-
-// Type augmentation for Stripe's objects to fix missing properties
-interface StripeSubscriptionWithPeriods extends Stripe.Subscription {
-  current_period_start: number;
-  current_period_end: number;
-}
-
-interface StripeInvoiceWithPaymentDetails extends Stripe.Invoice {
-  subscription?: string | { id: string };
-  payment_intent?: string | { id: string };
-  payment_method_details?: { type: string };
-  tax?: number;
-  tax_percent?: number;
-}
+import { CacheInvalidator } from '@/lib/cacheInvalidation'; // Import CacheInvalidator
+import { cache } from '@/lib/cache'; // Import cache
 
 // Event handler functions
-async function handleSubscriptionChange(rawSubscription: Stripe.Subscription) {
-  return db.transaction(async () => {
+async function handleSubscriptionChange(subscriptionData: Stripe.Subscription) {
+  const userId = subscriptionData.metadata?.userId;
+  if (!userId) {
+    console.error('No userId found in subscription metadata for handleSubscriptionChange');
+    return; // Cannot proceed without userId for cache invalidation
+  }
+
+  await db.transaction(async (tx) => {
     try {
-      // Cast to our augmented type
-      const subscription = rawSubscription as StripeSubscriptionWithPeriods;
-      
-      const stripeSubscriptionId = subscription.id;
-      const stripeCustomerId = getCustomerId(subscription.customer);
-      const userId = subscription.metadata?.userId;
-      
-      if (!userId) {
-        console.error('No userId found in subscription metadata');
-        return;
-      }
+      const stripeSubscriptionId = subscriptionData.id;
+      const stripeCustomerId = getCustomerId(subscriptionData.customer);
       
       // Get the price ID to find the corresponding plan
-      const priceId = subscription.items.data[0]?.price.id;
+      const priceId = subscriptionData.items.data[0]?.price.id;
       if (!priceId) {
         console.error('No price ID found in subscription');
-        return;
+        throw new Error('No price ID found in subscription');
       }
 
-      if (!subscription || !subscription.items || !subscription.items.data) {
-        console.error('Invalid subscription object received from Stripe');
-        return;
+      if (!subscriptionData.items?.data) {
+        console.error('Invalid subscription object received from Stripe (no items data)');
+        throw new Error('Invalid subscription object received from Stripe (no items data)');
       }
       
-      // Find the plan by Stripe price ID
-      const plans = await db
+      // Find the plan by Stripe price ID using the transaction object
+      const plans = await tx
         .select()
         .from(subscription_plans)
         .where(eq(subscription_plans.price_id_stripe, priceId))
@@ -66,55 +44,81 @@ async function handleSubscriptionChange(rawSubscription: Stripe.Subscription) {
       
       if (plans.length === 0) {
         console.error(`No plan found for Stripe price ID: ${priceId}`);
-        return;
+        throw new Error(`No plan found for Stripe price ID: ${priceId}`);
       }
       
       const plan = plans[0];
       
-      // Create or update subscription
+      // Create or update subscription using the transaction object
       await subscriptionService.createOrUpdateSubscription({
         userId,
         planId: plan.plan_id,
         stripeSubscriptionId,
         stripeCustomerId,
-        // Ensure we have a valid status string
-        status: subscription.status || 'active', // Provide a default value when undefined
-        periodStart: new Date(subscription.current_period_start * 1000),
-        periodEnd: new Date(subscription.current_period_end * 1000),
-        trialEnd: subscription.trial_end
-          ? new Date(subscription.trial_end * 1000)
+        status: subscriptionData.status || 'active',
+        periodStart: new Date(subscriptionData.current_period_start * 1000),
+        periodEnd: new Date(subscriptionData.current_period_end * 1000),
+        trialEnd: subscriptionData.trial_end
+          ? new Date(subscriptionData.trial_end * 1000)
           : null
-      });
+      }, tx); // Pass tx
     } catch (error) {
       console.error('Error handling subscription change:', error);
       throw error; // Re-throw to trigger transaction rollback
     }
   });
+
+  // Cache invalidation after successful transaction
+  await CacheInvalidator.invalidateUserSubscription(userId);
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  return db.transaction(async () => {
+async function handleSubscriptionDeleted(subscriptionData: Stripe.Subscription) {
+  // Attempt to get userId from metadata first
+  let userId = subscriptionData.metadata?.userId;
+
+  // If userId is not in metadata, we need to fetch it before deleting.
+  // This part is tricky because the data is about to be "deleted" or marked as such.
+  // For cache invalidation, we MUST have the userId.
+  // If the subscription object from Stripe doesn't have userId in metadata,
+  // we might need to look it up from our DB using stripeSubscriptionId BEFORE the transaction.
+  
+  if (!userId) {
+    const subBeforeDelete = await db.select({ userId: user_subscriptions.user_id })
+      .from(user_subscriptions)
+      .where(eq(user_subscriptions.stripe_subscription_id, subscriptionData.id))
+      .limit(1);
+    if (subBeforeDelete.length > 0 && subBeforeDelete[0].userId) {
+      userId = subBeforeDelete[0].userId;
+    } else {
+      // If still no userId, we might not be able to invalidate cache correctly.
+      // This could happen if the webhook arrives after our record is already gone or never had userId.
+      console.warn(`Cannot determine userId for cache invalidation on subscription deletion: ${subscriptionData.id}`);
+      // Proceed with deletion but cache invalidation might be missed.
+    }
+  }
+  
+  await db.transaction(async (tx) => {
     try {
-      const stripeSubscriptionId = subscription.id;
+      const stripeSubscriptionId = subscriptionData.id;
       
-      // Find the subscription directly in our database
-      const userSubscriptions = await db
+      // Find the subscription directly in our database using the transaction
+      const existingSubscriptions = await tx
         .select()
         .from(user_subscriptions)
         .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
         .limit(1);
       
-      if (userSubscriptions.length === 0) {
-        console.log(`No subscription found for Stripe ID: ${stripeSubscriptionId}, it may already be deleted`);
-        return;
+      if (existingSubscriptions.length === 0) {
+        console.log(`No subscription found for Stripe ID: ${stripeSubscriptionId}, it may already be deleted or never existed.`);
+        return; // Nothing to do if not found
       }
       
-      // Update the subscription status to canceled directly
-      await db
+      // Update the subscription status to canceled directly using the transaction
+      await tx
         .update(user_subscriptions)
         .set({
           status: 'canceled',
-          canceled_at: new Date(),
+          canceled_at: new Date(), // Use current time for cancellation
           updated_at: new Date()
         })
         .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId));
@@ -125,6 +129,10 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       throw error; // Re-throw to trigger transaction rollback
     }
   });
+
+  if (userId) {
+    await CacheInvalidator.invalidateUserSubscription(userId);
+  }
 }
 
 // Helper function to extract customer ID
@@ -138,12 +146,10 @@ function getCustomerId(customer: string | Stripe.Customer | Stripe.DeletedCustom
   throw new Error('Invalid customer ID type');
 }
 
-async function handlePaymentSucceeded(rawInvoice: Stripe.Invoice) {
-  return db.transaction(async () => {
+async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+  return db.transaction(async (tx) => {
+    // Pass `tx` to db operations and service methods
     try {
-      // Cast to our augmented type
-      const invoice = rawInvoice as StripeInvoiceWithPaymentDetails;
-      
       console.log('Processing invoice payment success:', JSON.stringify(invoice, null, 2));
       
       if (!stripe) {
@@ -151,49 +157,30 @@ async function handlePaymentSucceeded(rawInvoice: Stripe.Invoice) {
         throw new Error('Stripe is not configured');
       }
 
-      const stripeSubscriptionId = typeof invoice.subscription === 'string' 
-        ? invoice.subscription 
-        : (invoice.subscription?.id || '');
-        
+      const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
       if (!stripeSubscriptionId) {
         console.log('No subscription ID in invoice, skipping');
-        return;
+        return; // Or throw new Error('Missing subscription ID in invoice') if critical
       }
       
-      // Ensure metadata is treated as potentially null or undefined
-      const userId = invoice.metadata?.userId ?? null; 
+      let finalUserId = invoice.metadata?.userId ?? null; 
       
-      // Get user ID from subscription if not in invoice metadata
-      let userIdFromSubscription: string | null = null; 
-      
-      try {
-        if (!userId) {
-          const subscriptionObject = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-          userIdFromSubscription = subscriptionObject.metadata?.userId ?? null;
-          if (!userIdFromSubscription) {
-            console.error('No userId found in subscription metadata');
-            return;
-          }
+      if (!finalUserId) {
+        const subscriptionObject = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        finalUserId = subscriptionObject.metadata?.userId ?? null;
+        if (!finalUserId) {
+          console.error('No userId found in invoice or subscription metadata');
+          throw new Error('User ID not found for payment success handling');
         }
-      } catch (error) {
-        console.error('Error retrieving subscription from Stripe:', error);
-        throw error; // Re-throw to ensure transaction rollback
       }
       
-      // Get subscription from our database
-      let subscription: DatabaseSubscription | null = null;
-      try {
-        subscription = await subscriptionService.updateSubscriptionFromStripe(
-          stripeSubscriptionId
-        ) as DatabaseSubscription | null;
+      // Get subscription from our database using the transaction
+      // Pass the userId if available to scope the search
+      const subscription = await subscriptionService.updateSubscriptionFromStripe(stripeSubscriptionId, finalUserId, tx);
         
-        if (!subscription) {
-          console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-          throw new Error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-        }
-      } catch (error) {
-        console.error('Error updating subscription from Stripe:', error);
-        throw error; // Re-throw to ensure transaction rollback
+      if (!subscription) {
+        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+        throw new Error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
       }
       
       if (!invoice || typeof invoice.amount_paid !== 'number') {
@@ -201,71 +188,82 @@ async function handlePaymentSucceeded(rawInvoice: Stripe.Invoice) {
         throw new Error('Invalid invoice object received from Stripe');
       }
       
-      // Ensure all required fields are non-undefined strings with explicit string typing
-      // Handle payment_intent safely - it might be a string or an object with id
-      // Force a default empty string if both are undefined (shouldn't happen with invoice.id fallback)
-      const paymentIntentId: string = (typeof invoice.payment_intent === 'string'
+      let paymentIntentId = typeof invoice.payment_intent === 'string'
         ? invoice.payment_intent
-        : (invoice.payment_intent?.id || invoice.id || ''));
+        : invoice.payment_intent?.id || null;
 
-      // Handle nextBillingDate properly - make sure it's never undefined
+      if (!paymentIntentId) {
+        console.log('No payment intent ID found in invoice, using invoice ID instead');
+        paymentIntentId = invoice.id;
+      }
+
       const nextBillingDate = invoice.next_payment_attempt
         ? new Date(invoice.next_payment_attempt * 1000)
-        : new Date(subscription.current_period_end);
+        // @ts-ignore 
+        : new Date(subscription.current_period_end); 
 
-      // Get a safe payment method with explicit string typing
-      const paymentMethod: string = (invoice.payment_method_details?.type || 'card');
-      
-      // Ensure invoice.id is used as string for stripeInvoiceId with explicit string typing
-      const stripeInvoiceId: string = (invoice.id || '');
-        
-      // Record payment with careful null handling
-      try {
-        await subscriptionService.recordPayment({
-          userId: userId || userIdFromSubscription || subscription.user_id,
-          subscriptionId: subscription.subscription_id,
-          amountInr: Math.round(invoice.amount_paid / 100), // Convert paisa to rupees
-          stripePaymentId: paymentIntentId,
-          stripeInvoiceId: stripeInvoiceId,
-          paymentMethod: paymentMethod,
-          paymentStatus: invoice.status || 'succeeded', // Default to succeeded if null
-          paymentDate: new Date(invoice.created * 1000),
-          nextBillingDate: nextBillingDate,
-          receiptUrl: invoice.hosted_invoice_url || null,
-          gstDetails: {
-            gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
-            taxAmount: (invoice.tax || 0) / 100, // Convert from paise to rupees
-            taxPercentage: invoice.tax_percent || 18, // Default to 18% GST
-            hasGST: !!invoice.customer_tax_ids?.length,
-            hsnSacCode: "998431", // HSN code for educational services
-            placeOfSupply: "India" // Default place of supply
-          }
-        });
-        console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
-      } catch (error) {
-        console.error('Error recording payment:', error);
-        throw error; // Re-throw to ensure transaction rollback
-      }
+      // Record payment using the transaction
+      await subscriptionService.recordPayment({
+        // @ts-ignore 
+        userId: finalUserId || subscription.user_id, // Ensure userId is available
+        // @ts-ignore 
+        subscriptionId: subscription.subscription_id,
+        amountInr: Math.round(invoice.amount_paid / 100),
+        stripePaymentId: paymentIntentId!, 
+        stripeInvoiceId: invoice.id,
+        paymentMethod: invoice.payment_method_details?.type || 'card',
+        paymentStatus: invoice.status || 'succeeded', 
+        paymentDate: new Date(invoice.created * 1000),
+        nextBillingDate: nextBillingDate, 
+        receiptUrl: invoice.hosted_invoice_url || null,
+        gstDetails: {
+          gstNumber: invoice.customer_tax_ids?.[0]?.value || null,
+          taxAmount: (invoice.tax || 0) / 100, 
+          taxPercentage: invoice.tax_percent || 18, 
+          hasGST: !!invoice.customer_tax_ids?.length,
+          hsnSacCode: "998431", 
+          placeOfSupply: "India" 
+        }
+      }, tx); // Pass tx
+      console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
     } catch (error) {
       console.error('Error handling payment success:', error);
       throw error; 
     }
   });
+
+  // Cache invalidation after successful transaction
+  const userIdForCache = invoice.metadata?.userId ?? (await stripe.subscriptions.retrieve(invoice.subscription as string).then(s => s.metadata?.userId));
+  if (userIdForCache) {
+    await CacheInvalidator.invalidateUserSubscription(userIdForCache);
+    await cache.delete(`user:${userIdForCache}:payments`);
+  } else {
+    console.warn("Could not determine userId for cache invalidation after payment success.");
+  }
 }
 
-async function handlePaymentFailed(rawInvoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  // Try to get userId for cache invalidation. This might be optional if failure doesn't change our sub status.
+  let userIdForCache: string | null | undefined = invoice.metadata?.userId;
+  if (!userIdForCache && invoice.subscription) {
+     try {
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+        userIdForCache = subscription.metadata?.userId;
+     } catch (e) {
+        console.error("Error retrieving subscription to get userId for payment_failed cache invalidation", e);
+     }
+  }
+
   try {
-    // Cast to our augmented type
-    const invoice = rawInvoice as StripeInvoiceWithPaymentDetails;
-    
-    const stripeSubscriptionId = typeof invoice.subscription === 'string' 
-      ? invoice.subscription 
-      : (invoice.subscription?.id || '');
-      
+    const stripeSubscriptionId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
     if (!stripeSubscriptionId) return;
     
-    // Update subscription status
-    await subscriptionService.updateSubscriptionFromStripe(stripeSubscriptionId);
+    // This call might not need to be part of a transaction if it's just updating status
+    // and doesn't have other dependent DB operations in this specific handler.
+    // However, if updateSubscriptionFromStripe itself becomes transactional internally, this is fine.
+    // For now, assuming it can be called outside a transaction or handles its own.
+    // If it were to be part of a transaction here, we'd need to start one: db.transaction(async (tx) => { ... })
+    await subscriptionService.updateSubscriptionFromStripe(stripeSubscriptionId, userIdForCache || undefined); // Pass userId if available
   } catch (error) {
     console.error('Error handling payment failure:', error);
     throw error;
@@ -275,11 +273,9 @@ async function handlePaymentFailed(rawInvoice: Stripe.Invoice) {
 // Stripe webhook handler
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  
-  // In this version of Next.js, headers() returns a Promise
-  // We need to await it before calling methods like get()
+  // Fix: In newer versions of Next.js, headers() returns a Promise
   const headerList = await headers();
-  const signature = headerList.get('stripe-signature') || '';
+  const signature =  headerList.get('stripe-signature') as string;
 
   if (!signature) {
     console.error('No stripe signature in request headers');

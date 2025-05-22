@@ -7,7 +7,8 @@ import {
   payment_history
 } from '@/db/schema';
 import { withCache, cache } from '@/lib/cache';
-import { CacheInvalidator } from '@/lib/cacheInvalidation';
+// CacheInvalidator will be used by the calling context (webhook handlers)
+// import { CacheInvalidator } from '@/lib/cacheInvalidation'; 
 import { addDays } from 'date-fns';
 import { GSTDetails } from '@/types/payment';
 import { getSubscriptionFromStripe } from '@/lib/stripe';
@@ -16,6 +17,9 @@ import Stripe from 'stripe';
 // Define type for subscription to match your schema
 type UserSubscription = typeof user_subscriptions.$inferSelect;
 type SubscriptionPlan = typeof subscription_plans.$inferSelect;
+
+// Infer DrizzleTransaction type
+type DrizzleTransaction = Parameters<typeof db.transaction>[0] extends (tx: infer T) => any ? T : never;
 
 export class SubscriptionService {
   /**
@@ -176,11 +180,11 @@ export class SubscriptionService {
         metadata: null
       };
       
-      const [subscription] = await db.insert(user_subscriptions)
+      const [subscription] = await db.insert(user_subscriptions) // Assuming default sub creation is not part of a larger tx here
         .values(newSubscription)
         .returning();
       
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
       
       return subscription;
     } catch (error) {
@@ -269,11 +273,11 @@ export class SubscriptionService {
       
       // If no tests taken or last test was on a different day, reset counter
       if (!lastTestDate || !this.isSameDay(lastTestDate, today)) {
-        await db.update(user_subscriptions)
+        await db.update(user_subscriptions) // Assuming this standalone update is fine without tx
           .set({ tests_used_today: 0 })
           .where(eq(user_subscriptions.user_id, userId));
         
-        await CacheInvalidator.invalidateUserSubscription(userId);
+        // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
       }
     } catch (error) {
       console.error(`Error resetting counter for user ${userId}:`, error);
@@ -317,7 +321,7 @@ export class SubscriptionService {
         })
         .where(eq(user_subscriptions.user_id, userId));
       
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
     } catch (error) {
       console.error(`Error incrementing test count for user ${userId}:`, error);
       // Log error but don't throw - this should not block the user experience
@@ -424,10 +428,11 @@ async createOrUpdateSubscription({
   cancelAtPeriodEnd?: boolean;
   canceledAt?: Date | null;
   trialEnd?: Date | null;
-}): Promise<UserSubscription> {
+}, tx?: DrizzleTransaction): Promise<UserSubscription> { // Added tx parameter
+  const dbOrTx = tx || db; // Use transaction if provided, otherwise global db
   try {
     // Check if the user already has a subscription
-    const existingSubscription = await db
+    const existingSubscription = await dbOrTx
       .select()
       .from(user_subscriptions)
       .where(eq(user_subscriptions.user_id, userId))
@@ -439,11 +444,11 @@ async createOrUpdateSubscription({
     const validStatuses = ['active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired'];
     const validStatus = validStatuses.includes(status)
       ? status as 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired'
-      : 'active';
+      : 'active'; // Default to 'active' or handle as error
     
     if (existingSubscription.length > 0) {
       // Update existing subscription
-      const [updatedSubscription] = await db
+      const [updatedSubscription] = await dbOrTx
         .update(user_subscriptions)
         .set({
           plan_id: planId,
@@ -460,13 +465,13 @@ async createOrUpdateSubscription({
         .where(eq(user_subscriptions.user_id, userId))
         .returning();
       
-      // Invalidate cache for this user's subscription
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // Cache invalidation moved to calling context (webhook handler)
+      // await CacheInvalidator.invalidateUserSubscription(userId); 
       
       return updatedSubscription;
     } else {
       // Create new subscription
-      const newSubscription = {
+      const newSubscriptionData = { // Renamed to avoid conflict
         user_id: userId,
         plan_id: planId,
         stripe_subscription_id: stripeSubscriptionId,
@@ -481,17 +486,18 @@ async createOrUpdateSubscription({
         tests_used_total: 0,
         last_test_date: null,
         metadata: null
+        // created_at and updated_at will be set by default or by Drizzle
       };
       
-      const [subscription] = await db
+      const [insertedSubscription] = await dbOrTx // Renamed variable
         .insert(user_subscriptions)
-        .values(newSubscription)
+        .values(newSubscriptionData)
         .returning();
       
-      // Invalidate cache
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // Cache invalidation moved
+      // await CacheInvalidator.invalidateUserSubscription(userId);
       
-      return subscription;
+      return insertedSubscription;
     }
   } catch (error) {
     console.error(`Error creating/updating subscription for user ${userId}:`, error);
@@ -525,32 +531,26 @@ async getUserPaymentHistory(userId: string): Promise<typeof payment_history.$inf
 /**
  * Update subscription status from Stripe webhook
  */
-async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
+async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string, tx?: DrizzleTransaction) { // Added tx
+  const dbOrTx = tx || db;
   try {
     const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
     
     // Find the user subscription
-    let userQuery = db
+    // Build the query conditions
+    const queryConditions = [eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)];
+    if (userId) {
+      queryConditions.push(eq(user_subscriptions.user_id, userId));
+    }
+
+    const subscriptions = await dbOrTx
       .select()
       .from(user_subscriptions)
-      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
+      .where(and(...queryConditions))
       .limit(1);
     
-    if (userId) {
-      userQuery = db
-        .select()
-        .from(user_subscriptions)
-        .where(and(
-          eq(user_subscriptions.user_id, userId),
-          eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-        ))
-        .limit(1);
-    }
-    
-    const subscriptions = await userQuery;
-    
     if (subscriptions.length === 0) {
-      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
+      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId} and User ID: ${userId || 'any'}`);
       return null;
     }
     
@@ -560,46 +560,27 @@ async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string
     let status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired' = 'active';
     
     switch (stripeSubscription.status) {
-      case 'active':
-        status = 'active';
-        break;
-      case 'canceled':
-        status = 'canceled';
-        break;
-      case 'past_due':
-        status = 'past_due';
-        break;
-      case 'unpaid':
-        status = 'unpaid';
-        break;
-      case 'trialing':
-        status = 'trialing';
-        break;
-      case 'incomplete':
-        status = 'incomplete';
-        break;
-      case 'incomplete_expired':
-        status = 'incomplete_expired';
-        break;
+      case 'active': status = 'active'; break;
+      case 'canceled': status = 'canceled'; break;
+      case 'past_due': status = 'past_due'; break;
+      case 'unpaid': status = 'unpaid'; break;
+      case 'trialing': status = 'trialing'; break;
+      case 'incomplete': status = 'incomplete'; break;
+      case 'incomplete_expired': status = 'incomplete_expired'; break;
       default:
-        console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
+        console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}, defaulting to active.`);
+        status = 'active'; // Default to active or handle as error
     }
     
     // Access values from the Stripe subscription object
-    const stripeData = stripeSubscription as unknown as {
-      current_period_start: number;
-      current_period_end: number;
-      cancel_at_period_end: boolean;
-      canceled_at: number | null;
-    };
-    
-    const currentPeriodStart = stripeData.current_period_start;
-    const currentPeriodEnd = stripeData.current_period_end;
-    const cancelAtPeriodEnd = stripeData.cancel_at_period_end || false;
-    const canceledAt = stripeData.canceled_at;
+    // It's better to directly use properties if Stripe.Subscription type is accurate
+    const currentPeriodStart = stripeSubscription.current_period_start;
+    const currentPeriodEnd = stripeSubscription.current_period_end;
+    const cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end ?? false; // Ensure boolean
+    const canceledAt = stripeSubscription.canceled_at;
     
     // Update subscription in our database
-    await db.update(user_subscriptions)
+    await dbOrTx.update(user_subscriptions)
       .set({
         status,
         current_period_start: new Date(currentPeriodStart * 1000),
@@ -610,7 +591,8 @@ async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string
       })
       .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
     
-    await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
+    // Cache invalidation moved
+    // await CacheInvalidator.invalidateUserSubscription(subscription.user_id); 
     
     return subscription;
   } catch (error) {
@@ -646,8 +628,9 @@ async recordPayment({
   nextBillingDate: Date;
   receiptUrl: string | null;
   gstDetails: GSTDetails;
-}) {
-  await db.insert(payment_history)
+}, tx?: DrizzleTransaction) { // Added tx
+  const dbOrTx = tx || db;
+  await dbOrTx.insert(payment_history)
     .values({
       user_id: userId,
       subscription_id: subscriptionId,
@@ -662,12 +645,10 @@ async recordPayment({
       gst_details: gstDetails
     });
     
-  // Invalidate related caches
-  await CacheInvalidator.invalidateUserSubscription(userId);
-  
-  // Also invalidate payment history cache
-  const paymentsCacheKey = `user:${userId}:payments`;
-  await cache.delete(paymentsCacheKey);
+  // Cache invalidation moved
+  // await CacheInvalidator.invalidateUserSubscription(userId);
+  // const paymentsCacheKey = `user:${userId}:payments`;
+  // await cache.delete(paymentsCacheKey);
 }
 }
 

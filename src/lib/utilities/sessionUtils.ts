@@ -1,10 +1,8 @@
 // src/lib/utilities/sessionUtils.ts
 import { db } from '@/db';
-import { practice_sessions, session_questions, question_attempts, questions, topic_mastery } from '@/db/schema';
+import { practice_sessions, session_questions, question_attempts, questions, topic_mastery, topics } from '@/db/schema'; // Added topics
 import { and, eq, countDistinct, sum } from 'drizzle-orm';
-
-/**
- * Atomically updates the practice session statistics based on question attempts
+import { cache } from '@/lib/cache'; // Import cache
  * 
  * @param sessionId The ID of the session to update
  * @param userId The user ID associated with the session
@@ -215,7 +213,7 @@ export async function updateTopicMastery(
   questions_correct: number,
   accuracy_percentage: number
 }> {
-  return await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
     // Get current mastery level
     const [mastery] = await tx
       .select()
@@ -227,16 +225,15 @@ export async function updateTopicMastery(
         )
       );
     
+    let updatedMasteryInfo;
+
     if (mastery) {
       // Update existing mastery record
       const questionsAttempted = mastery.questions_attempted + 1;
       const questionsCorrect = isCorrect ? mastery.questions_correct + 1 : mastery.questions_correct;
       const accuracyPercentage = Math.round((questionsCorrect / questionsAttempted) * 100);
       
-      // Determine new mastery level
       let masteryLevel = mastery.mastery_level;
-      
-      // Simple mastery algorithm (customize as needed)
       if (questionsAttempted >= 20) {
         if (accuracyPercentage >= 90) masteryLevel = 'mastered';
         else if (accuracyPercentage >= 75) masteryLevel = 'advanced';
@@ -253,7 +250,6 @@ export async function updateTopicMastery(
         masteryLevel = 'beginner';
       }
       
-      // Update the record
       await tx
         .update(topic_mastery)
         .set({
@@ -271,8 +267,7 @@ export async function updateTopicMastery(
           )
         );
       
-      // Return the updated mastery info
-      return {
+      updatedMasteryInfo = {
         mastery_level: masteryLevel,
         questions_attempted: questionsAttempted,
         questions_correct: questionsCorrect,
@@ -283,7 +278,6 @@ export async function updateTopicMastery(
       const initialAccuracy = isCorrect ? 100 : 0;
       const initialMasteryLevel = 'beginner';
       
-      // Insert the record
       await tx
         .insert(topic_mastery)
         .values({
@@ -298,13 +292,45 @@ export async function updateTopicMastery(
           updated_at: new Date()
         });
       
-      // Return the new mastery info
-      return {
+      updatedMasteryInfo = {
         mastery_level: initialMasteryLevel,
         questions_attempted: 1,
         questions_correct: isCorrect ? 1 : 0,
         accuracy_percentage: initialAccuracy
       };
     }
+    return updatedMasteryInfo;
   });
+
+  // After the transaction is successful, invalidate caches
+  // First, get the subject_id for the given topicId
+  let subjectIdForCacheClear: number | string = 'all';
+  if (topicId) { 
+      try {
+          const topicData = await db.select({ subject_id: topics.subject_id })
+                                        .from(topics)
+                                        .where(eq(topics.topic_id, topicId))
+                                        .limit(1);
+          if (topicData.length > 0 && topicData[0].subject_id) {
+              subjectIdForCacheClear = topicData[0].subject_id;
+          }
+      } catch (dbError) {
+          console.error(`Error fetching subject_id for topic ${topicId} during cache invalidation:`, dbError);
+      }
+  }
+
+  const masteryCachePattern = `user:${userId}:topic-mastery:*`;
+  // More specific invalidations (optional, covered by pattern):
+  // const specificMasteryCacheKey = `user:${userId}:topic-mastery:subject:${subjectIdForCacheClear}`;
+  // const allTopicsMasteryCacheKey = `user:${userId}:topic-mastery:all-topics:subject:${subjectIdForCacheClear}`;
+  // const allTopicsMasteryGlobalKey = `user:${userId}:topic-mastery:all-topics:subject:all`;
+
+  try {
+      await cache.deletePattern(masteryCachePattern); // Broad invalidation
+      console.log(`Topic mastery caches invalidated for user ${userId} using pattern ${masteryCachePattern}. Topic ${topicId}, Subject ${subjectIdForCacheClear}`);
+  } catch (cacheError) {
+      console.error('Error during topic mastery cache invalidation:', cacheError);
+  }
+
+  return result;
 }

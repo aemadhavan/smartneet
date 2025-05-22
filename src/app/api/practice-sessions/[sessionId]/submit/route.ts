@@ -15,6 +15,7 @@ import {
   getCorrectAnswerForQuestionType,
   QuestionDetails 
 } from '@/lib/utils/answerEvaluation';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Interface for individual result objects (if still needed locally, otherwise remove)
 interface AnswerResult {
@@ -243,6 +244,16 @@ export async function POST(
           updated_at: new Date()
         })
         .where(eq(practice_sessions.session_id, sessionId));
+    }
+
+    // Invalidate active session cache
+    try {
+      const activeSessionCacheKey = `session:${userId}:${sessionId}:active`;
+      await cache.delete(activeSessionCacheKey);
+      console.log(`Cache invalidated for active session: ${activeSessionCacheKey}`);
+    } catch (cacheError) {
+      console.error('Error during active session cache invalidation after submit:', cacheError);
+      // Non-critical, so don't fail the request, but log it.
     }
 
     // Return the response with the latest statistics

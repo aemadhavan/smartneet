@@ -116,6 +116,18 @@ export async function POST(request: NextRequest) {
       // Update topic mastery
       await updateTopicMastery(userId, questionDetails.topic_id, isCorrect);
 
+      // Invalidate relevant caches
+      try {
+        await cache.delete(`user:${userId}:stats`);
+        await cache.deletePattern(`user:${userId}:question-attempts:*`);
+        await cache.delete(`user:${userId}:question-type-distribution`);
+        await cache.delete(`session:${userId}:${validatedData.session_id}:active`);
+        console.log(`Cache invalidated for user ${userId} due to new question attempt in session ${validatedData.session_id}`);
+      } catch (cacheError) {
+        console.error('Error during cache invalidation in question-attempts:', cacheError);
+        // Non-critical, so don't fail the request, but log it.
+      }
+
       return NextResponse.json({
         attempt_id: result.attempt.attempt_id,
         is_correct: isCorrect,

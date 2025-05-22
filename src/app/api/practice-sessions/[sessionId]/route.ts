@@ -42,44 +42,36 @@ export async function GET(
       });
     }
 
-    // First, get the practice session data
-    const [sessionDataFromDb] = await db
-      .select({
-        // Practice session fields
-        session_id: practice_sessions.session_id,
-        session_type: practice_sessions.session_type,
-        start_time: practice_sessions.start_time,
-        end_time: practice_sessions.end_time,
-        duration_minutes: practice_sessions.duration_minutes,
-        total_questions: practice_sessions.total_questions,
-        questions_attempted: practice_sessions.questions_attempted,
-        questions_correct: practice_sessions.questions_correct,
-        score: practice_sessions.score,
-        max_score: practice_sessions.max_score,
-        is_completed: practice_sessions.is_completed,
-        
-        // Related data fields
-        subject_id: practice_sessions.subject_id,
-        subject_name: subjects.subject_name,
-        topic_id: practice_sessions.topic_id,
-        topic_name: topics.topic_name,
-        subtopic_id: practice_sessions.subtopic_id,
-        subtopic_name: subtopics.subtopic_name
-      })
-      .from(practice_sessions)
-      .leftJoin(subjects, eq(practice_sessions.subject_id, subjects.subject_id))
-      .leftJoin(topics, eq(practice_sessions.topic_id, topics.topic_id))
-      .leftJoin(subtopics, eq(practice_sessions.subtopic_id, subtopics.subtopic_id))
-      .where(and(
+    // Get session details with subject, topic, and subtopic names for context
+    const sessionDataFromDb = await db.query.practice_sessions.findFirst({
+      where: and(
         eq(practice_sessions.session_id, sessionId),
         eq(practice_sessions.user_id, userId)
-      ));
+      ),
+      columns: { // Select specific columns from practice_sessions
+        session_id: true,
+        session_type: true,
+        start_time: true,
+        end_time: true, // May be null for active sessions
+        duration_minutes: true,
+        total_questions: true,
+        questions_attempted: true, // For UI progress, not for review
+        questions_correct: true,   // For UI progress, not for review
+        score: true,               // For UI progress, not for review
+        max_score: true,
+        status: true,
+      },
+      with: {
+        subject: { columns: { subject_name: true, subject_id: true } },
+        topic: { columns: { topic_name: true, topic_id: true } },
+        subtopic: { columns: { subtopic_name: true, subtopic_id: true } }
+      }
+    });
 
     if (!sessionDataFromDb) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     
-    // Format the session data for the response
     const formattedSession = {
       session_id: sessionDataFromDb.session_id,
       session_type: sessionDataFromDb.session_type,
@@ -91,22 +83,20 @@ export async function GET(
       questions_correct: sessionDataFromDb.questions_correct,
       score: sessionDataFromDb.score,
       max_score: sessionDataFromDb.max_score,
-      status: sessionDataFromDb.is_completed ? 'completed' : 'active', // Derived status based on is_completed
-      subject_id: sessionDataFromDb.subject_id,
-      subject_name: sessionDataFromDb.subject_name,
-      topic_id: sessionDataFromDb.topic_id,
-      topic_name: sessionDataFromDb.topic_name,
-      subtopic_id: sessionDataFromDb.subtopic_id,
-      subtopic_name: sessionDataFromDb.subtopic_name,
+      status: sessionDataFromDb.status,
+      subject_id: sessionDataFromDb.subject?.subject_id,
+      subject_name: sessionDataFromDb.subject?.subject_name,
+      topic_id: sessionDataFromDb.topic?.topic_id,
+      topic_name: sessionDataFromDb.topic?.topic_name,
+      subtopic_id: sessionDataFromDb.subtopic?.subtopic_id,
+      subtopic_name: sessionDataFromDb.subtopic?.subtopic_name,
     };
 
-    // Get session questions with related data
     const sessionQuestionsDataFromDb = await db
       .select({
         session_question_id: session_questions.session_question_id,
         question_order: session_questions.question_order,
         is_bookmarked: session_questions.is_bookmarked, 
-        time_spent_seconds: session_questions.time_spent_seconds, // Added this field
         
         question_id: questions.question_id,
         question_text: questions.question_text,
@@ -129,12 +119,11 @@ export async function GET(
       .where(eq(session_questions.session_id, sessionId))
       .orderBy(session_questions.question_order);
 
-    // Format the questions data for the response
     const formattedQuestions = sessionQuestionsDataFromDb.map((sq) => ({
       session_question_id: sq.session_question_id,
       question_order: sq.question_order,
       is_bookmarked: sq.is_bookmarked,
-      time_spent_seconds: sq.time_spent_seconds,
+      // time_spent_seconds: sq.time_spent_seconds, // This was missing in original select, re-add if needed
       question: {
         question_id: sq.question_id,
         question_text: sq.question_text,
@@ -213,9 +202,15 @@ export async function PATCH(
       .where(eq(practice_sessions.session_id, sessionId))
       .returning();
 
-    // Invalidate the cache for this session
-    const cacheKey = `session:${userId}:${sessionId}:active`;
-    await cache.delete(cacheKey);
+    // Invalidate active session cache
+    try {
+      const activeSessionCacheKey = `session:${userId}:${sessionId}:active`;
+      await cache.delete(activeSessionCacheKey);
+      console.log(`Cache invalidated for active session after PATCH: ${activeSessionCacheKey}`);
+    } catch (cacheError) {
+      console.error('Error during active session cache invalidation after PATCH:', cacheError);
+      // Non-critical, so don't fail the request, but log it.
+    }
 
     return NextResponse.json(updatedSession);
   } catch (error) {
@@ -265,12 +260,29 @@ export async function DELETE(
     await db
       .delete(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
+
+    // Invalidate session caches
+    try {
+      const activeCacheKey = `session:${userId}:${sessionId}:active`;
+      const reviewCacheKey = `session:${userId}:${sessionId}:review`;
+      const summaryCacheKey = `session:${userId}:${sessionId}:summary`;
       
-    // Invalidate the caches for this session
-    const activeCacheKey = `session:${userId}:${sessionId}:active`;
-    const reviewCacheKey = `session:${userId}:${sessionId}:review`;
-    await cache.delete(activeCacheKey);
-    await cache.delete(reviewCacheKey);
+      await cache.delete(activeCacheKey);
+      console.log(`Cache invalidated for active session after DELETE: ${activeCacheKey}`);
+      await cache.delete(reviewCacheKey);
+      console.log(`Cache invalidated for review session after DELETE: ${reviewCacheKey}`);
+      await cache.delete(summaryCacheKey);
+      console.log(`Cache invalidated for summary session after DELETE: ${summaryCacheKey}`);
+
+      // Consider if broader invalidations are needed (e.g., list of all sessions for user)
+      // For now, specific deletions as per instructions.
+      // If invalidateUserSessionCaches from parent was usable, it would be:
+      // await invalidateUserSessionCaches(userId);
+
+    } catch (cacheError) {
+      console.error('Error during session cache invalidation after DELETE:', cacheError);
+      // Non-critical, so don't fail the request, but log it.
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
