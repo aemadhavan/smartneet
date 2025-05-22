@@ -5,15 +5,38 @@ import {
   practice_sessions, 
   session_questions,
   questions,
-  //subjects, 
   topics,
   subtopics
 } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { cache } from '@/lib/cache';
+import { logger } from '@/lib/logger';
+import { cacheService } from '@/lib/services/CacheService';
+import { z } from 'zod';
+import { CACHE_TTLS, RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
+import { 
+  SessionDetailResponse,
+  SessionDetail,
+  SessionQuestionDetail, 
+  UpdateSessionDetailRequest 
+} from '@/types/session-detail';
 
-// Get details for a specific practice session (for active practice)
+// Define validation schema for session updates
+const sessionUpdateSchema = z.object({
+  questions_attempted: z.number().optional(),
+  questions_correct: z.number().optional(),
+  score: z.number().optional(),
+  max_score: z.number().optional(),
+  is_completed: z.boolean().optional(),
+  end_time: z.date().optional(),
+  notes: z.string().optional(),
+  settings: z.record(z.unknown()).optional()
+});
+
+/**
+ * Get details for a specific practice session (for active practice)
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -29,14 +52,35 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `get-session-detail:${sessionId}`, 
+      RATE_LIMITS.GET_SESSION_DETAIL
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const cacheKey = `session:${userId}:${sessionId}:active`;
 
+    logger.debug('Fetching session details', {
+      userId,
+      context: 'practice-sessions/[sessionId].GET',
+      data: { sessionId, cacheKey }
+    });
+
     // Try to get from cache first
-    const cachedData = await cache.get(cacheKey) as { session: unknown, questions: unknown[] } | null;
+    const cachedData = await cache.get<SessionDetailResponse>(cacheKey);
     if (cachedData) {
+      logger.debug('Cache hit for session details', {
+        userId,
+        context: 'practice-sessions/[sessionId].GET',
+        data: { sessionId }
+      });
       return NextResponse.json({ 
-        session: cachedData.session, 
-        questions: cachedData.questions, 
+        ...cachedData,
         source: 'cache' 
       });
     }
@@ -47,7 +91,7 @@ export async function GET(
         eq(practice_sessions.session_id, sessionId),
         eq(practice_sessions.user_id, userId)
       ),
-      columns: { // Select specific columns from practice_sessions (removed non-existent 'status')
+      columns: {
         session_id: true,
         session_type: true,
         start_time: true,
@@ -58,7 +102,7 @@ export async function GET(
         questions_correct: true,
         score: true,
         max_score: true,
-        is_completed: true, // This exists in your schema instead of 'status'
+        is_completed: true,
         notes: true,
         settings: true,
         subject_id: true,
@@ -88,29 +132,34 @@ export async function GET(
     });
 
     if (!sessionDataFromDb) {
+      logger.warn('Session not found', {
+        userId,
+        context: 'practice-sessions/[sessionId].GET',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     
-    const formattedSession = {
+    const formattedSession: SessionDetail = {
       session_id: sessionDataFromDb.session_id,
       session_type: sessionDataFromDb.session_type,
       start_time: sessionDataFromDb.start_time,
-      end_time: sessionDataFromDb.end_time,
-      duration_minutes: sessionDataFromDb.duration_minutes,
-      total_questions: sessionDataFromDb.total_questions,
-      questions_attempted: sessionDataFromDb.questions_attempted,
-      questions_correct: sessionDataFromDb.questions_correct,
-      score: sessionDataFromDb.score,
-      max_score: sessionDataFromDb.max_score,
-      is_completed: sessionDataFromDb.is_completed, // Use is_completed instead of status
-      notes: sessionDataFromDb.notes,
-      settings: sessionDataFromDb.settings,
-      subject_id: sessionDataFromDb.subject?.subject_id || sessionDataFromDb.subject_id,
-      subject_name: sessionDataFromDb.subject?.subject_name,
-      topic_id: sessionDataFromDb.topic?.topic_id || sessionDataFromDb.topic_id,
-      topic_name: sessionDataFromDb.topic?.topic_name,
-      subtopic_id: sessionDataFromDb.subtopic?.subtopic_id || sessionDataFromDb.subtopic_id,
-      subtopic_name: sessionDataFromDb.subtopic?.subtopic_name,
+      end_time: sessionDataFromDb.end_time ?? undefined,
+      duration_minutes: sessionDataFromDb.duration_minutes ?? undefined,
+      total_questions: sessionDataFromDb.total_questions ?? 0,
+      questions_attempted: sessionDataFromDb.questions_attempted ?? 0,
+      questions_correct: sessionDataFromDb.questions_correct ?? 0,
+      score: sessionDataFromDb.score ?? undefined,
+      max_score: sessionDataFromDb.max_score ?? undefined,
+      is_completed: sessionDataFromDb.is_completed ?? false,
+      notes: sessionDataFromDb.notes ?? undefined,
+      settings: sessionDataFromDb.settings as Record<string, unknown> | undefined,
+      subject_id: sessionDataFromDb.subject?.subject_id ?? sessionDataFromDb.subject_id ?? undefined,
+      subject_name: sessionDataFromDb.subject?.subject_name ?? undefined,
+      topic_id: sessionDataFromDb.topic?.topic_id ?? undefined,
+      topic_name: sessionDataFromDb.topic?.topic_name ?? undefined,
+      subtopic_id: sessionDataFromDb.subtopic?.subtopic_id ?? undefined,
+      subtopic_name: sessionDataFromDb.subtopic?.subtopic_name ?? undefined,
     };
 
     const sessionQuestionsDataFromDb = await db
@@ -141,37 +190,56 @@ export async function GET(
       .where(eq(session_questions.session_id, sessionId))
       .orderBy(session_questions.question_order);
 
-    const formattedQuestions = sessionQuestionsDataFromDb.map((sq) => ({
+    const sessionQuestions: SessionQuestionDetail[] = sessionQuestionsDataFromDb.map(sq => ({
       session_question_id: sq.session_question_id,
       question_order: sq.question_order,
-      is_bookmarked: sq.is_bookmarked,
-      time_spent_seconds: sq.time_spent_seconds,
+      is_bookmarked: sq.is_bookmarked ?? false,
+      time_spent_seconds: sq.time_spent_seconds ?? 0,
       question: {
         question_id: sq.question_id,
         question_text: sq.question_text,
         question_type: sq.question_type,
-        details: sq.details, 
-        explanation: sq.explanation, 
+        details: sq.details,
+        explanation: sq.explanation,
         difficulty_level: sq.difficulty_level,
         marks: sq.marks,
         negative_marks: sq.negative_marks,
         topic_id: sq.question_topic_id,
         topic_name: sq.question_topic_name,
         subtopic_id: sq.question_subtopic_id,
-        subtopic_name: sq.question_subtopic_name,
+        subtopic_name: sq.question_subtopic_name ?? null
       }
     }));
     
-    const dataToCache = { session: formattedSession, questions: formattedQuestions };
-    await cache.set(cacheKey, dataToCache, 600); // 600 seconds = 10 minutes
+    const dataToCache: SessionDetailResponse = { 
+      session: formattedSession, 
+      questions: sessionQuestions 
+    };
+    
+    // Cache the result
+    await cache.set(cacheKey, dataToCache, CACHE_TTLS.SESSION_DETAIL_CACHE);
+    // Track this cache key for the user
+    await cacheService.trackCacheKey(userId, cacheKey);
+
+    logger.info('Fetched session details', {
+      userId,
+      context: 'practice-sessions/[sessionId].GET',
+      data: { 
+        sessionId, 
+        questionCount: sessionQuestions.length 
+      }
+    });
 
     return NextResponse.json({ 
       ...dataToCache, 
       source: 'database' 
     });
   } catch (error) {
-    // Log the detailed error for server-side inspection
-    console.error('Error fetching session details:', error instanceof Error ? error.message : String(error));
+    logger.error('Error fetching session details', {
+      context: 'practice-sessions/[sessionId].GET',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
     // Return a generic error message to the client
     return NextResponse.json(
       { error: 'An unexpected error occurred while fetching session details.' }, 
@@ -180,7 +248,9 @@ export async function GET(
   }
 }
 
-// Update session details (e.g., mark as completed)
+/**
+ * Update session details (e.g., mark as completed)
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -196,7 +266,57 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
-    const requestData = await request.json();
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `update-session-detail:${sessionId}`, 
+      RATE_LIMITS.UPDATE_SESSION_DETAIL
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    // Parse request body
+    let requestData: UpdateSessionDetailRequest;
+    try {
+      requestData = await request.json();
+    } catch (e) {
+      logger.error('Error parsing JSON', {
+        userId,
+        context: 'practice-sessions/[sessionId].PATCH',
+        error: e instanceof Error ? e.message : String(e)
+      });
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
+    // Validate request data
+    try {
+      sessionUpdateSchema.parse(requestData);
+    } catch (validationError) {
+      if (validationError instanceof z.ZodError) {
+        logger.warn('Validation error in session update', {
+          userId,
+          context: 'practice-sessions/[sessionId].PATCH',
+          data: { 
+            sessionId,
+            errors: validationError.errors
+          }
+        });
+        
+        return NextResponse.json(
+          { 
+            error: 'Invalid session update parameters',
+            details: validationError.errors.map(err => ({
+              field: err.path.join('.'),
+              message: err.message
+            }))
+          }, 
+          { status: 400 }
+        );
+      }
+      throw validationError;
+    }
 
     // Verify session exists and belongs to user
     const [existingSession] = await db
@@ -210,33 +330,43 @@ export async function PATCH(
       );
 
     if (!existingSession) {
+      logger.warn('Session not found or unauthorized for update', {
+        userId,
+        context: 'practice-sessions/[sessionId].PATCH',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+
+    // Set updated_at timestamp
+    requestData.updated_at = new Date();
 
     // Update session
     const [updatedSession] = await db
       .update(practice_sessions)
-      .set({
-        ...requestData,
-        updated_at: new Date()
-      })
+      .set(requestData)
       .where(eq(practice_sessions.session_id, sessionId))
       .returning();
 
-    // Invalidate active session cache
-    try {
-      const activeSessionCacheKey = `session:${userId}:${sessionId}:active`;
-      await cache.delete(activeSessionCacheKey);
-      console.log(`Cache invalidated for active session after PATCH: ${activeSessionCacheKey}`);
-    } catch (cacheError) {
-      console.error('Error during active session cache invalidation after PATCH:', cacheError);
-      // Non-critical, so don't fail the request, but log it.
-    }
+    // Invalidate session cache with the service
+    await cacheService.invalidateUserSessionCaches(userId, sessionId);
+
+    logger.info('Updated session', {
+      userId,
+      context: 'practice-sessions/[sessionId].PATCH',
+      data: { 
+        sessionId,
+        is_completed: requestData.is_completed
+      }
+    });
 
     return NextResponse.json(updatedSession);
   } catch (error) {
-    // Log the detailed error for server-side inspection
-    console.error('Error updating session:', error instanceof Error ? error.message : String(error));
+    logger.error('Error updating session', {
+      context: 'practice-sessions/[sessionId].PATCH',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
     // Return a generic error message to the client
     return NextResponse.json(
       { error: 'An unexpected error occurred while updating the session.' }, 
@@ -245,7 +375,9 @@ export async function PATCH(
   }
 }
 
-// Delete a session
+/**
+ * Delete a session
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -261,6 +393,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
+    // Apply rate limiting for deletions
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `delete-session:${sessionId}`, 
+      RATE_LIMITS.DELETE_SESSION
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Verify session exists and belongs to user
     const [existingSession] = await db
       .select()
@@ -273,6 +416,11 @@ export async function DELETE(
       );
 
     if (!existingSession) {
+      logger.warn('Session not found or unauthorized for deletion', {
+        userId,
+        context: 'practice-sessions/[sessionId].DELETE',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
@@ -281,28 +429,22 @@ export async function DELETE(
       .delete(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
 
-    // Invalidate session caches
-    try {
-      const activeCacheKey = `session:${userId}:${sessionId}:active`;
-      const reviewCacheKey = `session:${userId}:${sessionId}:review`;
-      const summaryCacheKey = `session:${userId}:${sessionId}:summary`;
-      
-      await cache.delete(activeCacheKey);
-      console.log(`Cache invalidated for active session after DELETE: ${activeCacheKey}`);
-      await cache.delete(reviewCacheKey);
-      console.log(`Cache invalidated for review session after DELETE: ${reviewCacheKey}`);
-      await cache.delete(summaryCacheKey);
-      console.log(`Cache invalidated for summary session after DELETE: ${summaryCacheKey}`);
+    // Invalidate session cache with the service
+    await cacheService.invalidateUserSessionCaches(userId, sessionId);
 
-    } catch (cacheError) {
-      console.error('Error during session cache invalidation after DELETE:', cacheError);
-      // Non-critical, so don't fail the request, but log it.
-    }
+    logger.info('Deleted session', {
+      userId,
+      context: 'practice-sessions/[sessionId].DELETE',
+      data: { sessionId }
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    // Log the detailed error for server-side inspection
-    console.error('Error deleting session:', error instanceof Error ? error.message : String(error));
+    logger.error('Error deleting session', {
+      context: 'practice-sessions/[sessionId].DELETE',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
     // Return a generic error message to the client
     return NextResponse.json(
       { error: 'An unexpected error occurred while deleting the session.' }, 

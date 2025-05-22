@@ -6,11 +6,9 @@ import {
   topics,
   subtopics,
   practice_sessions,
-  session_questions,
-  // subjects is needed for session context
-  //subjects 
+  session_questions
 } from '@/db';
-import { eq, and, desc, inArray } from 'drizzle-orm'; // Added inArray
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { getCorrectAnswer } from '@/app/practice-sessions/[sessionId]/review/components/helpers';
 import { 
@@ -18,12 +16,25 @@ import {
   QuestionType, 
   NormalizedAnswer 
 } from '@/app/practice-sessions/[sessionId]/review/components/interfaces';
-import { cache } from '@/lib/cache'; // Import cache
+import { cache } from '@/lib/cache';
+import { logger } from '@/lib/logger';
+import { cacheService } from '@/lib/services/CacheService';
+import { CACHE_TTLS, RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
+import { 
+  SessionReviewResponse,
+  SessionReviewInfo,
+  DetailedReviewQuestion,
+  SessionReviewSummary,
+  EmptySessionResponse
+} from '@/types/session-review';
 
-// Add connection pooling and retry logic
+// Constants for retry logic
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
+/**
+ * Retry wrapper for database operations that might hit connection limits
+ */
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastError: Error;
   let attempt = 0;
@@ -43,7 +54,15 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
           error.message.includes('concurrent connections limit exceeded')))
       ) {
         attempt++;
-        console.log(`Connection limit exceeded, retrying in ${RETRY_DELAY * attempt}ms (attempt ${attempt}/${MAX_RETRIES})`);
+        logger.warn(`Database connection limit exceeded, retrying operation`, {
+          context: 'practice-sessions/[sessionId]/review.withRetry',
+          data: {
+            attempt,
+            maxRetries: MAX_RETRIES,
+            delay: RETRY_DELAY * attempt
+          },
+          error: error instanceof Error ? error.message : String(error)
+        });
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * attempt));
       } else {
         // For other errors, don't retry
@@ -55,6 +74,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   throw lastError!;
 }
 
+/**
+ * Get detailed review information for a specific practice session
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -74,16 +96,40 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `get-session-review:${sessionId}`, 
+      RATE_LIMITS.GET_SESSION_REVIEW
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const cacheKey = `session:${userId}:${sessionId}:review`;
 
+    logger.debug('Fetching session review details', {
+      userId,
+      context: 'practice-sessions/[sessionId]/review.GET',
+      data: { sessionId, cacheKey }
+    });
+
     // Try to get from cache first
-    const cachedData = await cache.get(cacheKey);
+    const cachedData = await cache.get<SessionReviewResponse | EmptySessionResponse>(cacheKey);
     if (cachedData) {
-      return NextResponse.json({ ...(cachedData as Record<string, unknown>), source: 'cache' });
+      logger.debug('Cache hit for session review', {
+        userId,
+        context: 'practice-sessions/[sessionId]/review.GET',
+        data: { sessionId }
+      });
+      return NextResponse.json({ 
+        ...cachedData, 
+        source: 'cache' 
+      });
     }
 
     // First verify that the session belongs to this user and fetch its details
-    // Also fetch related subject, topic, subtopic names for comprehensive review context
     const sessionDetails = await withRetry(async () => {
       return db.query.practice_sessions.findFirst({
         where: and(
@@ -99,6 +145,11 @@ export async function GET(
     });
 
     if (!sessionDetails) {
+      logger.warn('Session not found or unauthorized', {
+        userId,
+        context: 'practice-sessions/[sessionId]/review.GET',
+        data: { sessionId }
+      });
       return NextResponse.json(
         { error: 'Session not found or does not belong to the current user' },
         { status: 404 }
@@ -106,25 +157,25 @@ export async function GET(
     }
 
     // Get all question attempts for this session, ordered by attempt_timestamp descending
-    // to easily pick the latest attempt if multiple exist for a single question (though typically not expected)
+    // to easily pick the latest attempt if multiple exist for a single question
     const attempts = await withRetry(async () => {
       return db.query.question_attempts.findMany({
         where: and(
           eq(question_attempts.session_id, sessionId),
           eq(question_attempts.user_id, userId)
         ),
-        orderBy: desc(question_attempts.attempt_timestamp), // Get latest attempts first
+        orderBy: desc(question_attempts.attempt_timestamp),
         with: {
           question: {
             columns: {
               question_id: true,
               question_text: true,
               question_type: true,
-              details: true, // Contains options and structure for correct answer
+              details: true,
               explanation: true,
-              marks: true, // Max marks for the question
-              negative_marks: true, // Negative marks for the question
-              difficulty_level: true, // Difficulty of the question
+              marks: true,
+              negative_marks: true,
+              difficulty_level: true,
               topic_id: true,
               subtopic_id: true,
               is_image_based: true,
@@ -136,7 +187,6 @@ export async function GET(
     });
     
     // If no attempts, still return basic session info and empty attempts/summary
-    // This part does not need separate caching as the main response will be cached.
     if (!attempts.length) {
       const questionsAttempted = sessionDetails.questions_attempted ?? 0;
       const questionsCorrect = sessionDetails.questions_correct ?? 0;
@@ -144,34 +194,45 @@ export async function GET(
         ? Math.round((questionsCorrect / questionsAttempted) * 100) 
         : 0;
 
-      const emptyResponse = {
+      const emptyResponse: EmptySessionResponse = {
         session: {
           session_id: sessionDetails.session_id,
           session_type: sessionDetails.session_type,
           start_time: sessionDetails.start_time,
-          end_time: sessionDetails.end_time,
-          duration_minutes: sessionDetails.duration_minutes,
-          subject_name: sessionDetails.subject?.subject_name,
-          topic_name: sessionDetails.topic?.topic_name,
-          subtopic_name: sessionDetails.subtopic?.subtopic_name,
-          total_questions: sessionDetails.total_questions,
+          end_time: sessionDetails.end_time ?? undefined,
+          duration_minutes: sessionDetails.duration_minutes ?? undefined,
+          subject_name: sessionDetails.subject?.subject_name || '',
+          topic_name: sessionDetails.topic?.topic_name ?? undefined,
+          subtopic_name: sessionDetails.subtopic?.subtopic_name ?? undefined,
+          total_questions: sessionDetails.total_questions ?? 0,
           questions_attempted: questionsAttempted,
           questions_correct: questionsCorrect,
-          score: sessionDetails.score,
-          max_score: sessionDetails.max_score,
+          score: sessionDetails.score ?? undefined,
+          max_score: sessionDetails.max_score ?? undefined,
           accuracy: accuracy,
         },
         attempts: [],
-        summary: { // This summary might differ from finalSummary if attempts are empty
-          totalQuestions: sessionDetails.total_questions || 0,
-          questionsCorrect: questionsCorrect,
+        summary: {
+          total_questions: sessionDetails.total_questions ?? 0,
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
           accuracy: accuracy,
-          score: sessionDetails.score || 0,
-          maxScore: sessionDetails.max_score || 0,
+          score: sessionDetails.score ?? undefined,
+          max_score: sessionDetails.max_score ?? undefined,
         },
-        source: 'database' // or 'empty_session_no_attempts' to be specific
+        source: 'empty_session_no_attempts'
       };
-      await cache.set(cacheKey, emptyResponse, 7200); // Cache empty response too
+      
+      // Cache empty response
+      await cache.set(cacheKey, emptyResponse, CACHE_TTLS.SESSION_REVIEW_CACHE);
+      await cacheService.trackCacheKey(userId, cacheKey);
+      
+      logger.info('Returning empty session review data', {
+        userId,
+        context: 'practice-sessions/[sessionId]/review.GET',
+        data: { sessionId }
+      });
+      
       return NextResponse.json(emptyResponse);
     }
 
@@ -179,7 +240,7 @@ export async function GET(
     const sessionQsData = await db.query.session_questions.findMany({
       where: and(
         eq(session_questions.session_id, sessionId),
-        eq(session_questions.user_id, userId) // Ensure user_id matches here too for security
+        eq(session_questions.user_id, userId) // Ensure user_id matches for security
       ),
       columns: {
         question_id: true,
@@ -190,7 +251,12 @@ export async function GET(
     });
 
     // Create a map for easy lookup of session question details
-    const sessionQuestionDetailsMap: Record<number, { order: number, timeSpent: number, isBookmarked: boolean }> = {};
+    const sessionQuestionDetailsMap: Record<number, { 
+      order: number, 
+      timeSpent: number, 
+      isBookmarked: boolean 
+    }> = {};
+    
     sessionQsData.forEach(sq => {
       sessionQuestionDetailsMap[sq.question_id] = { 
         order: sq.question_order, 
@@ -199,6 +265,7 @@ export async function GET(
       };
     });
     
+    // Collect topic and subtopic IDs for efficient batch loading
     const topicIdsFromAttempts = new Set<number>();
     const subtopicIdsFromAttempts = new Set<number>();
 
@@ -211,6 +278,7 @@ export async function GET(
       }
     });
 
+    // Batch load topics
     let topicMap = new Map<number, { topic_id: number; topic_name: string }>();
     if (topicIdsFromAttempts.size > 0) {
       const topicsData = await withRetry(async () => {
@@ -222,6 +290,7 @@ export async function GET(
       topicMap = new Map(topicsData.map(t => [t.topic_id, t]));
     }
 
+    // Batch load subtopics
     let subtopicMap = new Map<number, { subtopic_id: number; subtopic_name: string }>();
     if (subtopicIdsFromAttempts.size > 0) {
       const subtopicsData = await withRetry(async () => {
@@ -233,94 +302,120 @@ export async function GET(
       subtopicMap = new Map(subtopicsData.map(st => [st.subtopic_id, st]));
     }
 
-    const detailedReviewQuestions = sessionQsData.map(sq => {
-        const attempt = attempts.find(a => a.question_id === sq.question_id); 
+    // Combine all data to create detailed review questions
+    const detailedReviewQuestions: DetailedReviewQuestion[] = sessionQsData.map(sq => {
+      const attempt = attempts.find(a => a.question_id === sq.question_id); 
 
-        const topicInfoFromMap = attempt?.question.topic_id ? topicMap.get(attempt.question.topic_id) : null;
-        
-        let subtopicInfoFromMap = null;
-        if (attempt?.question.subtopic_id) {
-          const subtopicData = subtopicMap.get(attempt.question.subtopic_id);
-          if (subtopicData) {
-            subtopicInfoFromMap = {
-              subtopicId: subtopicData.subtopic_id,
-              subtopicName: subtopicData.subtopic_name
-            };
-          }
+      const topicInfoFromMap = attempt?.question.topic_id ? topicMap.get(attempt.question.topic_id) : null;
+      
+      let subtopicInfoFromMap = null;
+      if (attempt?.question.subtopic_id) {
+        const subtopicData = subtopicMap.get(attempt.question.subtopic_id);
+        if (subtopicData) {
+          subtopicInfoFromMap = {
+            subtopicId: subtopicData.subtopic_id,
+            subtopicName: subtopicData.subtopic_name
+          };
         }
-        
-        const questionDetails = attempt?.question.details as NormalizedQuestionDetails | null;
-        const questionType = attempt?.question.question_type as QuestionType | undefined;
+      }
+      
+      const questionDetails = attempt?.question.details as NormalizedQuestionDetails | null;
+      const questionType = attempt?.question.question_type as QuestionType | undefined;
 
-        return {
-          question_id: sq.question_id,
-          question_order: sessionQuestionDetailsMap[sq.question_id]?.order ?? 0, 
-          time_spent_seconds: sessionQuestionDetailsMap[sq.question_id]?.timeSpent ?? 0, 
-          is_bookmarked: sessionQuestionDetailsMap[sq.question_id]?.isBookmarked ?? false, 
-          question_text: attempt?.question.question_text || "N/A (Question data missing)",
-          question_type: questionType || "N/A",
-          details: questionDetails,
-          explanation: attempt?.question.explanation,
-          user_answer: attempt?.user_answer as NormalizedAnswer | null,
-          is_correct: attempt?.is_correct ?? null,
-          correct_answer: questionDetails && questionType ? getCorrectAnswer(questionDetails, questionType) : null,
-          marks_awarded: attempt?.marks_awarded ?? 0,
-          marks_available: attempt?.question.marks ?? 0,
-          negative_marks: attempt?.question.negative_marks ?? 0,
-          difficulty_level: attempt?.question.difficulty_level,
-          topic: {
-            topic_id: topicInfoFromMap?.topic_id,
-            topic_name: topicInfoFromMap?.topic_name || "Unknown Topic"
-          },
-          subtopic: subtopicInfoFromMap,
-          is_image_based: attempt?.question.is_image_based,
-          image_url: attempt?.question.image_url
-        };
-      });
+      return {
+        question_id: sq.question_id,
+        question_order: sessionQuestionDetailsMap[sq.question_id]?.order ?? 0, 
+        time_spent_seconds: sessionQuestionDetailsMap[sq.question_id]?.timeSpent ?? 0, 
+        is_bookmarked: sessionQuestionDetailsMap[sq.question_id]?.isBookmarked ?? false, 
+        question_text: attempt?.question.question_text || "N/A (Question data missing)",
+        question_type: questionType || "N/A",
+        details: questionDetails ?? undefined,
+        explanation: attempt?.question.explanation ?? undefined,
+        user_answer: attempt?.user_answer as NormalizedAnswer | null ?? undefined,
+        is_correct: attempt?.is_correct ?? null,
+        correct_answer: questionDetails && questionType ? getCorrectAnswer(questionDetails, questionType) : undefined,
+        marks_awarded: attempt?.marks_awarded ?? 0,
+        marks_available: attempt?.question.marks ?? 0,
+        negative_marks: attempt?.question.negative_marks ?? 0,
+        difficulty_level: attempt?.question.difficulty_level ?? undefined,
+        topic: {
+          topic_id: topicInfoFromMap?.topic_id,
+          topic_name: topicInfoFromMap?.topic_name || "Unknown Topic"
+        },
+        subtopic: subtopicInfoFromMap ?? undefined,
+        is_image_based: attempt?.question.is_image_based ?? false,
+        image_url: attempt?.question.image_url ?? undefined
+      };
+    });
 
+    // Sort by question order
     detailedReviewQuestions.sort((a, b) => a.question_order - b.question_order);
     
-    // Fix the null safety issues here
+    // Create the session summary
     const questionsAttempted = sessionDetails.questions_attempted ?? 0;
     const questionsCorrect = sessionDetails.questions_correct ?? 0;
     const accuracy = questionsAttempted > 0 
       ? Math.round((questionsCorrect / questionsAttempted) * 100) 
       : 0;
 
-    const finalSummary = {
-      total_questions: sessionDetails.total_questions,
+    const finalSummary: SessionReviewSummary = {
+      total_questions: sessionDetails.total_questions ?? 0,
       questions_attempted: questionsAttempted,
       questions_correct: questionsCorrect,
       accuracy: accuracy,
-      score: sessionDetails.score,
-      max_score: sessionDetails.max_score,
+      score: sessionDetails.score ?? undefined,
+      max_score: sessionDetails.max_score ?? undefined,
     };
 
-    const dataToCache = {
-      session: {
-        session_id: sessionDetails.session_id,
-        session_type: sessionDetails.session_type,
-        start_time: sessionDetails.start_time,
-        end_time: sessionDetails.end_time,
-        duration_minutes: sessionDetails.duration_minutes,
-        subject_name: sessionDetails.subject?.subject_name,
-        topic_name: sessionDetails.topic?.topic_name,
-        subtopic_name: sessionDetails.subtopic?.subtopic_name,
-        ...finalSummary 
-      },
+    const sessionInfo: SessionReviewInfo = {
+      session_id: sessionDetails.session_id,
+      session_type: sessionDetails.session_type,
+      start_time: sessionDetails.start_time,
+      end_time: sessionDetails.end_time ?? undefined,
+      duration_minutes: sessionDetails.duration_minutes ?? undefined,
+      subject_name: sessionDetails.subject?.subject_name || '',
+      topic_name: sessionDetails.topic?.topic_name ?? undefined,
+      subtopic_name: sessionDetails.subtopic?.subtopic_name ?? undefined,
+      total_questions: finalSummary.total_questions,
+      questions_attempted: finalSummary.questions_attempted,
+      questions_correct: finalSummary.questions_correct,
+      accuracy: finalSummary.accuracy,
+      score: finalSummary.score,
+      max_score: finalSummary.max_score
+    };
+
+    // Ensure deep copies of complex objects to prevent JSON parsing issues
+    const responseData: SessionReviewResponse = {
+      session: sessionInfo,
       questions: detailedReviewQuestions.map(q => ({
         ...q,
-        details: q.details ? JSON.parse(JSON.stringify(q.details)) : null,
-        user_answer: q.user_answer ? JSON.parse(JSON.stringify(q.user_answer)) : null,
-        correct_answer: q.correct_answer ? JSON.parse(JSON.stringify(q.correct_answer)) : null
+        details: q.details ? JSON.parse(JSON.stringify(q.details)) : undefined,
+        user_answer: q.user_answer ? JSON.parse(JSON.stringify(q.user_answer)) : undefined,
+        correct_answer: q.correct_answer ? JSON.parse(JSON.stringify(q.correct_answer)) : undefined,
+        is_image_based: q.is_image_based ?? false
       })),
+      source: 'database'
     };
     
-    await cache.set(cacheKey, dataToCache, 7200); // 7200 seconds = 2 hours
+    // Cache the response
+    await cache.set(cacheKey, responseData, CACHE_TTLS.SESSION_REVIEW_CACHE);
+    await cacheService.trackCacheKey(userId, cacheKey);
 
-    return NextResponse.json({ ...dataToCache, source: 'database' });
+    logger.info('Retrieved session review data', {
+      userId,
+      context: 'practice-sessions/[sessionId]/review.GET',
+      data: { 
+        sessionId, 
+        questionCount: detailedReviewQuestions.length 
+      }
+    });
+
+    return NextResponse.json(responseData);
   } catch (error) {
-    console.error('Error in session review API:', error);
+    logger.error('Error retrieving session review data', {
+      context: 'practice-sessions/[sessionId]/review.GET',
+      error: error instanceof Error ? error.message : String(error)
+    });
     
     // Add specific handling for concurrency errors
     if (
@@ -337,14 +432,16 @@ export async function GET(
       );
     }
     
-    // Log the detailed error for server-side inspection
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    console.error('Error in session review API (details):', errorMessage, error); // Log full error object too
-
+    // Handle database errors
+    if (error instanceof Error) {
+      logger.error('Database error in session review', {
+        context: 'practice-sessions/[sessionId]/review.GET',
+        error: error.message
+      });
+      return NextResponse.json({ error: 'Database error occurred' }, { status: 500 });
+    }
+    
     // Return a generic error message to the client
-    return NextResponse.json(
-      { error: 'An unexpected error occurred while retrieving session review data.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
 }

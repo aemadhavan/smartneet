@@ -6,13 +6,20 @@ import { RateLimiter } from '@/lib/rate-limiter';
 export const RATE_LIMITS = {
   CREATE_SESSION: { points: 20, duration: 60 * 60 }, // 20 requests per hour
   GET_SESSIONS: { points: 120, duration: 60 }, // 120 requests per minute
-  UPDATE_SESSION: { points: 60, duration: 60 } // 60 requests per minute
+  UPDATE_SESSION: { points: 60, duration: 60 }, // 60 requests per minute
+  DELETE_SESSION: { points: 10, duration: 60 * 60 }, // 10 requests per hour
+  GET_SESSION_DETAIL: { points: 150, duration: 60 }, // 150 requests per minute
+  UPDATE_SESSION_DETAIL: { points: 60, duration: 60 }, // 60 requests per minute
+  GET_SESSION_REVIEW: { points: 120, duration: 60 } // 120 requests per minute
 };
 
 // Cache TTL configurations - centralized
 export const CACHE_TTLS = {
   IDEMPOTENCY_KEY: 3600, // 1 hour
   SESSION_CACHE: 300, // 5 minutes
+  SESSION_DETAIL_CACHE: 600, // 10 minutes
+  SESSION_REVIEW_CACHE: 1800, // 30 minutes
+  SESSION_SUMMARY_CACHE: 3600, // 1 hour
   QUESTION_POOL: 3600, // 1 hour
   USER_KEYS: 86400 // 24 hours
 };
