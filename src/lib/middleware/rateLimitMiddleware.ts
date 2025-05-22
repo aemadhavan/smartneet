@@ -12,7 +12,8 @@ export const RATE_LIMITS = {
   UPDATE_SESSION_DETAIL: { points: 60, duration: 60 }, // 60 requests per minute
   GET_SESSION_REVIEW: { points: 120, duration: 60 }, // 120 requests per minute
   GET_SESSION_SUMMARY: { points: 120, duration: 60 }, // 120 requests per minute
-  SUBMIT_SESSION_ANSWERS: { points: 60, duration: 60 } // 60 requests per minute
+  SUBMIT_SESSION_ANSWERS: { points: 60, duration: 60 }, // 60 requests per minute
+  SESSION_QUESTION_LOOKUP: { points: 200, duration: 60 } // 200 requests per minute
 };
 
 // Cache TTL configurations - centralized
@@ -22,6 +23,7 @@ export const CACHE_TTLS = {
   SESSION_DETAIL_CACHE: 600, // 10 minutes
   SESSION_REVIEW_CACHE: 1800, // 30 minutes
   SESSION_SUMMARY_CACHE: 3600, // 1 hour
+  SESSION_QUESTION_LOOKUP: 3600, // 1 hour
   QUESTION_POOL: 3600, // 1 hour
   USER_KEYS: 86400 // 24 hours
 };
