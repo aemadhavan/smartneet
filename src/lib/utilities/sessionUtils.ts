@@ -1,8 +1,11 @@
 // src/lib/utilities/sessionUtils.ts
 import { db } from '@/db';
-import { practice_sessions, session_questions, question_attempts, questions, topic_mastery, topics } from '@/db/schema'; // Added topics
+import { practice_sessions, session_questions, question_attempts, questions, topic_mastery, topics } from '@/db/schema';
 import { and, eq, countDistinct, sum } from 'drizzle-orm';
-import { cache } from '@/lib/cache'; // Import cache
+import { cache } from '@/lib/cache';
+
+/**
+ * Updates session statistics based on question attempts
  * 
  * @param sessionId The ID of the session to update
  * @param userId The user ID associated with the session
@@ -146,6 +149,7 @@ export async function updateSessionStats(
  * @param isCorrect Whether the answer is correct
  * @param marksAwarded Marks awarded for the answer
  * @param timeTakenSeconds Time taken to answer (optional)
+ * @param userNotes User notes for the attempt (optional)
  * @returns The created attempt record
  */
 export async function recordQuestionAttempt(

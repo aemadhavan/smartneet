@@ -8,7 +8,7 @@ import {
   practice_sessions,
   session_questions,
   // subjects is needed for session context
-  subjects 
+  //subjects 
 } from '@/db';
 import { eq, and, desc, inArray } from 'drizzle-orm'; // Added inArray
 import { auth } from '@clerk/nextjs/server';
@@ -138,6 +138,12 @@ export async function GET(
     // If no attempts, still return basic session info and empty attempts/summary
     // This part does not need separate caching as the main response will be cached.
     if (!attempts.length) {
+      const questionsAttempted = sessionDetails.questions_attempted ?? 0;
+      const questionsCorrect = sessionDetails.questions_correct ?? 0;
+      const accuracy = questionsAttempted > 0 
+        ? Math.round((questionsCorrect / questionsAttempted) * 100) 
+        : 0;
+
       const emptyResponse = {
         session: {
           session_id: sessionDetails.session_id,
@@ -149,21 +155,17 @@ export async function GET(
           topic_name: sessionDetails.topic?.topic_name,
           subtopic_name: sessionDetails.subtopic?.subtopic_name,
           total_questions: sessionDetails.total_questions,
-          questions_attempted: sessionDetails.questions_attempted,
-          questions_correct: sessionDetails.questions_correct,
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
           score: sessionDetails.score,
           max_score: sessionDetails.max_score,
-          accuracy: sessionDetails.questions_attempted 
-            ? Math.round((sessionDetails.questions_correct / sessionDetails.questions_attempted) * 100) 
-            : 0,
+          accuracy: accuracy,
         },
         attempts: [],
         summary: { // This summary might differ from finalSummary if attempts are empty
           totalQuestions: sessionDetails.total_questions || 0,
-          questionsCorrect: sessionDetails.questions_correct || 0,
-          accuracy: sessionDetails.questions_attempted 
-            ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
-            : 0,
+          questionsCorrect: questionsCorrect,
+          accuracy: accuracy,
           score: sessionDetails.score || 0,
           maxScore: sessionDetails.max_score || 0,
         },
@@ -278,13 +280,18 @@ export async function GET(
 
     detailedReviewQuestions.sort((a, b) => a.question_order - b.question_order);
     
+    // Fix the null safety issues here
+    const questionsAttempted = sessionDetails.questions_attempted ?? 0;
+    const questionsCorrect = sessionDetails.questions_correct ?? 0;
+    const accuracy = questionsAttempted > 0 
+      ? Math.round((questionsCorrect / questionsAttempted) * 100) 
+      : 0;
+
     const finalSummary = {
       total_questions: sessionDetails.total_questions,
-      questions_attempted: sessionDetails.questions_attempted,
-      questions_correct: sessionDetails.questions_correct,
-      accuracy: sessionDetails.questions_attempted 
-        ? Math.round(((sessionDetails.questions_correct || 0) / sessionDetails.questions_attempted) * 100) 
-        : 0,
+      questions_attempted: questionsAttempted,
+      questions_correct: questionsCorrect,
+      accuracy: accuracy,
       score: sessionDetails.score,
       max_score: sessionDetails.max_score,
     };

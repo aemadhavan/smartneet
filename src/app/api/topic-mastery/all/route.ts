@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) { // Add request parameter
     }
 
     // Base query
-    let query = db.select({
+    const query = db.select({
       topic_id: topics.topic_id,
       topic_name: topics.topic_name,
       subject_id: subjects.subject_id,

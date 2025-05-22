@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
     
     let dataFromDb = null;
-    let source = 'database';
+    const source = 'database';
 
     // Look for subject by name (case-insensitive)
     const foundSubjects = await db

@@ -5,14 +5,13 @@ import {
   practice_sessions, 
   session_questions,
   questions,
-  // Import subjects table for session context
-  subjects, 
+  //subjects, 
   topics,
   subtopics
 } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
-import { cache } from '@/lib/cache'; // Import cache
+import { cache } from '@/lib/cache';
 
 // Get details for a specific practice session (for active practice)
 export async function GET(
@@ -48,23 +47,43 @@ export async function GET(
         eq(practice_sessions.session_id, sessionId),
         eq(practice_sessions.user_id, userId)
       ),
-      columns: { // Select specific columns from practice_sessions
+      columns: { // Select specific columns from practice_sessions (removed non-existent 'status')
         session_id: true,
         session_type: true,
         start_time: true,
-        end_time: true, // May be null for active sessions
+        end_time: true,
         duration_minutes: true,
         total_questions: true,
-        questions_attempted: true, // For UI progress, not for review
-        questions_correct: true,   // For UI progress, not for review
-        score: true,               // For UI progress, not for review
+        questions_attempted: true,
+        questions_correct: true,
+        score: true,
         max_score: true,
-        status: true,
+        is_completed: true, // This exists in your schema instead of 'status'
+        notes: true,
+        settings: true,
+        subject_id: true,
+        topic_id: true,
+        subtopic_id: true
       },
       with: {
-        subject: { columns: { subject_name: true, subject_id: true } },
-        topic: { columns: { topic_name: true, topic_id: true } },
-        subtopic: { columns: { subtopic_name: true, subtopic_id: true } }
+        subject: { 
+          columns: { 
+            subject_name: true, 
+            subject_id: true 
+          } 
+        },
+        topic: { 
+          columns: { 
+            topic_name: true, 
+            topic_id: true 
+          } 
+        },
+        subtopic: { 
+          columns: { 
+            subtopic_name: true, 
+            subtopic_id: true 
+          } 
+        }
       }
     });
 
@@ -83,12 +102,14 @@ export async function GET(
       questions_correct: sessionDataFromDb.questions_correct,
       score: sessionDataFromDb.score,
       max_score: sessionDataFromDb.max_score,
-      status: sessionDataFromDb.status,
-      subject_id: sessionDataFromDb.subject?.subject_id,
+      is_completed: sessionDataFromDb.is_completed, // Use is_completed instead of status
+      notes: sessionDataFromDb.notes,
+      settings: sessionDataFromDb.settings,
+      subject_id: sessionDataFromDb.subject?.subject_id || sessionDataFromDb.subject_id,
       subject_name: sessionDataFromDb.subject?.subject_name,
-      topic_id: sessionDataFromDb.topic?.topic_id,
+      topic_id: sessionDataFromDb.topic?.topic_id || sessionDataFromDb.topic_id,
       topic_name: sessionDataFromDb.topic?.topic_name,
-      subtopic_id: sessionDataFromDb.subtopic?.subtopic_id,
+      subtopic_id: sessionDataFromDb.subtopic?.subtopic_id || sessionDataFromDb.subtopic_id,
       subtopic_name: sessionDataFromDb.subtopic?.subtopic_name,
     };
 
@@ -96,7 +117,8 @@ export async function GET(
       .select({
         session_question_id: session_questions.session_question_id,
         question_order: session_questions.question_order,
-        is_bookmarked: session_questions.is_bookmarked, 
+        is_bookmarked: session_questions.is_bookmarked,
+        time_spent_seconds: session_questions.time_spent_seconds,
         
         question_id: questions.question_id,
         question_text: questions.question_text,
@@ -123,7 +145,7 @@ export async function GET(
       session_question_id: sq.session_question_id,
       question_order: sq.question_order,
       is_bookmarked: sq.is_bookmarked,
-      // time_spent_seconds: sq.time_spent_seconds, // This was missing in original select, re-add if needed
+      time_spent_seconds: sq.time_spent_seconds,
       question: {
         question_id: sq.question_id,
         question_text: sq.question_text,
@@ -164,7 +186,6 @@ export async function PATCH(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    // Await the auth call to get userId
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -230,7 +251,6 @@ export async function DELETE(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
-    // Await the auth call to get userId
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -273,11 +293,6 @@ export async function DELETE(
       console.log(`Cache invalidated for review session after DELETE: ${reviewCacheKey}`);
       await cache.delete(summaryCacheKey);
       console.log(`Cache invalidated for summary session after DELETE: ${summaryCacheKey}`);
-
-      // Consider if broader invalidations are needed (e.g., list of all sessions for user)
-      // For now, specific deletions as per instructions.
-      // If invalidateUserSessionCaches from parent was usable, it would be:
-      // await invalidateUserSessionCaches(userId);
 
     } catch (cacheError) {
       console.error('Error during session cache invalidation after DELETE:', cacheError);
