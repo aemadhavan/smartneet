@@ -7,7 +7,8 @@ import {
   payment_history
 } from '@/db/schema';
 import { withCache, cache } from '@/lib/cache';
-import { CacheInvalidator } from '@/lib/cacheInvalidation';
+// CacheInvalidator will be used by the calling context (webhook handlers)
+// import { CacheInvalidator } from '@/lib/cacheInvalidation'; 
 import { addDays } from 'date-fns';
 import { GSTDetails } from '@/types/payment';
 import { getSubscriptionFromStripe } from '@/lib/stripe';
@@ -16,6 +17,9 @@ import Stripe from 'stripe';
 // Define type for subscription to match your schema
 type UserSubscription = typeof user_subscriptions.$inferSelect;
 type SubscriptionPlan = typeof subscription_plans.$inferSelect;
+
+// Infer DrizzleTransaction type - Fixed the any type
+type DrizzleTransaction = Parameters<typeof db.transaction>[0] extends (tx: infer T) => unknown ? T : never;
 
 export class SubscriptionService {
   /**
@@ -176,11 +180,11 @@ export class SubscriptionService {
         metadata: null
       };
       
-      const [subscription] = await db.insert(user_subscriptions)
+      const [subscription] = await db.insert(user_subscriptions) // Assuming default sub creation is not part of a larger tx here
         .values(newSubscription)
         .returning();
       
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
       
       return subscription;
     } catch (error) {
@@ -269,11 +273,11 @@ export class SubscriptionService {
       
       // If no tests taken or last test was on a different day, reset counter
       if (!lastTestDate || !this.isSameDay(lastTestDate, today)) {
-        await db.update(user_subscriptions)
+        await db.update(user_subscriptions) // Assuming this standalone update is fine without tx
           .set({ tests_used_today: 0 })
           .where(eq(user_subscriptions.user_id, userId));
         
-        await CacheInvalidator.invalidateUserSubscription(userId);
+        // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
       }
     } catch (error) {
       console.error(`Error resetting counter for user ${userId}:`, error);
@@ -317,7 +321,7 @@ export class SubscriptionService {
         })
         .where(eq(user_subscriptions.user_id, userId));
       
-      await CacheInvalidator.invalidateUserSubscription(userId);
+      // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
     } catch (error) {
       console.error(`Error incrementing test count for user ${userId}:`, error);
       // Log error but don't throw - this should not block the user experience
@@ -398,54 +402,76 @@ export class SubscriptionService {
     }
   }
 
-  // Other methods from your original SubscriptionService class...
-/**
- * Create or update a user subscription
- */
-async createOrUpdateSubscription({
-  userId,
-  planId,
-  stripeSubscriptionId,
-  stripeCustomerId,
-  status,
-  periodStart,
-  periodEnd,
-  cancelAtPeriodEnd = false,
-  canceledAt = null,
-  trialEnd = null
-}: {
-  userId: string;
-  planId: number;
-  stripeSubscriptionId: string | null;
-  stripeCustomerId: string | null;
-  status: string;
-  periodStart: Date;
-  periodEnd: Date;
-  cancelAtPeriodEnd?: boolean;
-  canceledAt?: Date | null;
-  trialEnd?: Date | null;
-}): Promise<UserSubscription> {
-  try {
-    // Check if the user already has a subscription
-    const existingSubscription = await db
-      .select()
-      .from(user_subscriptions)
-      .where(eq(user_subscriptions.user_id, userId))
-      .limit(1);
-    
-    const now = new Date();
-    
-    // Ensure status is one of the valid enum values
-    const validStatuses = ['active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired'];
-    const validStatus = validStatuses.includes(status)
-      ? status as 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired'
-      : 'active';
-    
-    if (existingSubscription.length > 0) {
-      // Update existing subscription
-      const [updatedSubscription] = await db
-        .update(user_subscriptions)
-        .set({
+  /**
+   * Create or update a user subscription
+   */
+  async createOrUpdateSubscription({
+    userId,
+    planId,
+    stripeSubscriptionId,
+    stripeCustomerId,
+    status,
+    periodStart,
+    periodEnd,
+    cancelAtPeriodEnd = false,
+    canceledAt = null,
+    trialEnd = null
+  }: {
+    userId: string;
+    planId: number;
+    stripeSubscriptionId: string | null;
+    stripeCustomerId: string | null;
+    status: string;
+    periodStart: Date;
+    periodEnd: Date;
+    cancelAtPeriodEnd?: boolean;
+    canceledAt?: Date | null;
+    trialEnd?: Date | null;
+  }, tx?: DrizzleTransaction): Promise<UserSubscription> { // Added tx parameter
+    const dbOrTx = tx || db; // Use transaction if provided, otherwise global db
+    try {
+      // Check if the user already has a subscription
+      const existingSubscription = await dbOrTx
+        .select()
+        .from(user_subscriptions)
+        .where(eq(user_subscriptions.user_id, userId))
+        .limit(1);
+      
+      const now = new Date();
+      
+      // Ensure status is one of the valid enum values
+      const validStatuses = ['active', 'canceled', 'past_due', 'unpaid', 'trialing', 'incomplete', 'incomplete_expired'];
+      const validStatus = validStatuses.includes(status)
+        ? status as 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired'
+        : 'active'; // Default to 'active' or handle as error
+      
+      if (existingSubscription.length > 0) {
+        // Update existing subscription
+        const [updatedSubscription] = await dbOrTx
+          .update(user_subscriptions)
+          .set({
+            plan_id: planId,
+            stripe_subscription_id: stripeSubscriptionId,
+            stripe_customer_id: stripeCustomerId,
+            status: validStatus,
+            current_period_start: periodStart,
+            current_period_end: periodEnd,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            canceled_at: canceledAt,
+            trial_end: trialEnd,
+            updated_at: now
+          })
+          .where(eq(user_subscriptions.user_id, userId))
+          .returning();
+        
+        // Cache invalidation moved to calling context (webhook handler)
+        // await CacheInvalidator.invalidateUserSubscription(userId); 
+        
+        return updatedSubscription;
+      } else {
+        // Create new subscription
+        const newSubscriptionData = { // Renamed to avoid conflict
+          user_id: userId,
           plan_id: planId,
           stripe_subscription_id: stripeSubscriptionId,
           stripe_customer_id: stripeCustomerId,
@@ -455,220 +481,177 @@ async createOrUpdateSubscription({
           cancel_at_period_end: cancelAtPeriodEnd,
           canceled_at: canceledAt,
           trial_end: trialEnd,
-          updated_at: now
-        })
-        .where(eq(user_subscriptions.user_id, userId))
-        .returning();
-      
-      // Invalidate cache for this user's subscription
-      await CacheInvalidator.invalidateUserSubscription(userId);
-      
-      return updatedSubscription;
-    } else {
-      // Create new subscription
-      const newSubscription = {
-        user_id: userId,
-        plan_id: planId,
-        stripe_subscription_id: stripeSubscriptionId,
-        stripe_customer_id: stripeCustomerId,
-        status: validStatus,
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-        cancel_at_period_end: cancelAtPeriodEnd,
-        canceled_at: canceledAt,
-        trial_end: trialEnd,
-        tests_used_today: 0,
-        tests_used_total: 0,
-        last_test_date: null,
-        metadata: null
-      };
-      
-      const [subscription] = await db
-        .insert(user_subscriptions)
-        .values(newSubscription)
-        .returning();
-      
-      // Invalidate cache
-      await CacheInvalidator.invalidateUserSubscription(userId);
-      
-      return subscription;
+          tests_used_today: 0,
+          tests_used_total: 0,
+          last_test_date: null,
+          metadata: null
+          // created_at and updated_at will be set by default or by Drizzle
+        };
+        
+        const [insertedSubscription] = await dbOrTx // Renamed variable
+          .insert(user_subscriptions)
+          .values(newSubscriptionData)
+          .returning();
+        
+        // Cache invalidation moved
+        // await CacheInvalidator.invalidateUserSubscription(userId);
+        
+        return insertedSubscription;
+      }
+    } catch (error) {
+      console.error(`Error creating/updating subscription for user ${userId}:`, error);
+      throw new Error(`Failed to create or update subscription: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  } catch (error) {
-    console.error(`Error creating/updating subscription for user ${userId}:`, error);
-    throw new Error(`Failed to create or update subscription: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-}
-/**
- * Get user's payment history
- */
-/**
- * Get user's payment history
- */
-/**
- * Get user's payment history
- */
-async getUserPaymentHistory(userId: string): Promise<typeof payment_history.$inferSelect[]> {
-  const cacheKey = `user:${userId}:payments`;
-  
-  return withCache<typeof payment_history.$inferSelect[], [string]>(
-    async (uid: string) => {
-      return db
-        .select()
-        .from(payment_history)
-        .where(eq(payment_history.user_id, uid))
-        .orderBy(sql`${payment_history.payment_date} DESC`);
-    },
-    cacheKey,
-    300 // 5 minutes TTL
-  )(userId);
-}
-/**
- * Update subscription status from Stripe webhook
- */
-async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string) {
-  try {
-    const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
+
+  /**
+   * Get user's payment history
+   */
+  async getUserPaymentHistory(userId: string): Promise<typeof payment_history.$inferSelect[]> {
+    const cacheKey = `user:${userId}:payments`;
     
-    // Find the user subscription
-    let userQuery = db
-      .select()
-      .from(user_subscriptions)
-      .where(eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId))
-      .limit(1);
-    
-    if (userId) {
-      userQuery = db
+    return withCache<typeof payment_history.$inferSelect[], [string]>(
+      async (uid: string) => {
+        return db
+          .select()
+          .from(payment_history)
+          .where(eq(payment_history.user_id, uid))
+          .orderBy(sql`${payment_history.payment_date} DESC`);
+      },
+      cacheKey,
+      300 // 5 minutes TTL
+    )(userId);
+  }
+
+  /**
+   * Update subscription status from Stripe webhook
+   */
+  async updateSubscriptionFromStripe(stripeSubscriptionId: string, userId?: string, tx?: DrizzleTransaction) { // Added tx
+    const dbOrTx = tx || db;
+    try {
+      const stripeSubscription = await getSubscriptionFromStripe(stripeSubscriptionId) as Stripe.Subscription;
+      
+      // Find the user subscription
+      // Build the query conditions
+      const queryConditions = [eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)];
+      if (userId) {
+        queryConditions.push(eq(user_subscriptions.user_id, userId));
+      }
+
+      const subscriptions = await dbOrTx
         .select()
         .from(user_subscriptions)
-        .where(and(
-          eq(user_subscriptions.user_id, userId),
-          eq(user_subscriptions.stripe_subscription_id, stripeSubscriptionId)
-        ))
+        .where(and(...queryConditions))
         .limit(1);
+      
+      if (subscriptions.length === 0) {
+        console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId} and User ID: ${userId || 'any'}`);
+        return null;
+      }
+      
+      const subscription = subscriptions[0];
+      
+      // Map Stripe status to our enum
+      let status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired' = 'active';
+      
+      switch (stripeSubscription.status) {
+        case 'active': status = 'active'; break;
+        case 'canceled': status = 'canceled'; break;
+        case 'past_due': status = 'past_due'; break;
+        case 'unpaid': status = 'unpaid'; break;
+        case 'trialing': status = 'trialing'; break;
+        case 'incomplete': status = 'incomplete'; break;
+        case 'incomplete_expired': status = 'incomplete_expired'; break;
+        default:
+          console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}, defaulting to active.`);
+          status = 'active'; // Default to active or handle as error
+      }
+      
+      // Safely access Stripe subscription properties with proper type checking
+      // Convert to unknown first, then to Record for safe property access
+      const subscriptionData = stripeSubscription as unknown as Record<string, unknown>;
+      
+      const currentPeriodStart = (subscriptionData.current_period_start as number) || 
+                                Math.floor(Date.now() / 1000);
+      
+      const currentPeriodEnd = (subscriptionData.current_period_end as number) || 
+                              Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60); // Default to 30 days from now
+      
+      const cancelAtPeriodEnd = (subscriptionData.cancel_at_period_end as boolean) ?? false;
+      
+      const canceledAt = (subscriptionData.canceled_at as number | null) ?? null;
+      
+      // Update subscription in our database
+      await dbOrTx.update(user_subscriptions)
+        .set({
+          status,
+          current_period_start: new Date(currentPeriodStart * 1000),
+          current_period_end: new Date(currentPeriodEnd * 1000),
+          cancel_at_period_end: cancelAtPeriodEnd,
+          canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
+          updated_at: new Date()
+        })
+        .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
+      
+      // Cache invalidation moved
+      // await CacheInvalidator.invalidateUserSubscription(subscription.user_id); 
+      
+      return subscription;
+    } catch (error) {
+      console.error('Error updating subscription from Stripe:', error);
+      throw error;
     }
-    
-    const subscriptions = await userQuery;
-    
-    if (subscriptions.length === 0) {
-      console.error(`No subscription found for Stripe subscription ID: ${stripeSubscriptionId}`);
-      return null;
-    }
-    
-    const subscription = subscriptions[0];
-    
-    // Map Stripe status to our enum
-    let status: 'active' | 'canceled' | 'past_due' | 'unpaid' | 'trialing' | 'incomplete' | 'incomplete_expired' = 'active';
-    
-    switch (stripeSubscription.status) {
-      case 'active':
-        status = 'active';
-        break;
-      case 'canceled':
-        status = 'canceled';
-        break;
-      case 'past_due':
-        status = 'past_due';
-        break;
-      case 'unpaid':
-        status = 'unpaid';
-        break;
-      case 'trialing':
-        status = 'trialing';
-        break;
-      case 'incomplete':
-        status = 'incomplete';
-        break;
-      case 'incomplete_expired':
-        status = 'incomplete_expired';
-        break;
-      default:
-        console.warn(`Unknown Stripe subscription status: ${stripeSubscription.status}`);
-    }
-    
-    // Access values from the Stripe subscription object
-    const stripeData = stripeSubscription as unknown as {
-      current_period_start: number;
-      current_period_end: number;
-      cancel_at_period_end: boolean;
-      canceled_at: number | null;
-    };
-    
-    const currentPeriodStart = stripeData.current_period_start;
-    const currentPeriodEnd = stripeData.current_period_end;
-    const cancelAtPeriodEnd = stripeData.cancel_at_period_end || false;
-    const canceledAt = stripeData.canceled_at;
-    
-    // Update subscription in our database
-    await db.update(user_subscriptions)
-      .set({
-        status,
-        current_period_start: new Date(currentPeriodStart * 1000),
-        current_period_end: new Date(currentPeriodEnd * 1000),
-        cancel_at_period_end: cancelAtPeriodEnd,
-        canceled_at: canceledAt ? new Date(canceledAt * 1000) : null,
-        updated_at: new Date()
-      })
-      .where(eq(user_subscriptions.subscription_id, subscription.subscription_id));
-    
-    await CacheInvalidator.invalidateUserSubscription(subscription.user_id);
-    
-    return subscription;
-  } catch (error) {
-    console.error('Error updating subscription from Stripe:', error);
-    throw error;
   }
-}
 
-/**
- * Record a payment in the payment history
- */
-async recordPayment({
-  userId,
-  subscriptionId,
-  amountInr,
-  stripePaymentId,
-  stripeInvoiceId,
-  paymentMethod,
-  paymentStatus,
-  paymentDate,
-  nextBillingDate,
-  receiptUrl,
-  gstDetails
-}: {
-  userId: string;
-  subscriptionId: number;
-  amountInr: number;
-  stripePaymentId: string;
-  stripeInvoiceId: string;
-  paymentMethod: string;
-  paymentStatus: string;
-  paymentDate: Date;
-  nextBillingDate: Date;
-  receiptUrl: string | null;
-  gstDetails: GSTDetails;
-}) {
-  await db.insert(payment_history)
-    .values({
-      user_id: userId,
-      subscription_id: subscriptionId,
-      amount_inr: amountInr,
-      stripe_payment_id: stripePaymentId,
-      stripe_invoice_id: stripeInvoiceId,
-      payment_method: paymentMethod,
-      payment_status: paymentStatus,
-      payment_date: paymentDate,
-      next_billing_date: nextBillingDate,
-      receipt_url: receiptUrl,
-      gst_details: gstDetails
-    });
-    
-  // Invalidate related caches
-  await CacheInvalidator.invalidateUserSubscription(userId);
-  
-  // Also invalidate payment history cache
-  const paymentsCacheKey = `user:${userId}:payments`;
-  await cache.delete(paymentsCacheKey);
-}
+  /**
+   * Record a payment in the payment history
+   */
+  async recordPayment({
+    userId,
+    subscriptionId,
+    amountInr,
+    stripePaymentId,
+    stripeInvoiceId,
+    paymentMethod,
+    paymentStatus,
+    paymentDate,
+    nextBillingDate,
+    receiptUrl,
+    gstDetails
+  }: {
+    userId: string;
+    subscriptionId: number;
+    amountInr: number;
+    stripePaymentId: string;
+    stripeInvoiceId: string;
+    paymentMethod: string;
+    paymentStatus: string;
+    paymentDate: Date;
+    nextBillingDate: Date;
+    receiptUrl: string | null;
+    gstDetails: GSTDetails;
+  }, tx?: DrizzleTransaction) { // Added tx
+    const dbOrTx = tx || db;
+    await dbOrTx.insert(payment_history)
+      .values({
+        user_id: userId,
+        subscription_id: subscriptionId,
+        amount_inr: amountInr,
+        stripe_payment_id: stripePaymentId,
+        stripe_invoice_id: stripeInvoiceId,
+        payment_method: paymentMethod,
+        payment_status: paymentStatus,
+        payment_date: paymentDate,
+        next_billing_date: nextBillingDate,
+        receipt_url: receiptUrl,
+        gst_details: gstDetails
+      });
+      
+    // Cache invalidation moved
+    // await CacheInvalidator.invalidateUserSubscription(userId);
+    // const paymentsCacheKey = `user:${userId}:payments`;
+    // await cache.delete(paymentsCacheKey);
+  }
 }
 
 export const subscriptionService = new SubscriptionService();

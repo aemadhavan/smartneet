@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { topic_mastery, topics, subjects } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Get detailed topic mastery data including subject information
 export async function GET() {
@@ -13,8 +14,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const cacheKey = `user:${userId}:topic-mastery:detailed`;
+
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({ data: cachedData, source: 'cache' });
+    }
+
     // Query to get detailed topic mastery data with subject names
-    const detailedTopicMastery = await db
+    const detailedTopicMasteryFromDb = await db // Renamed to avoid confusion
       .select({
         mastery_id: topic_mastery.mastery_id,
         user_id: topic_mastery.user_id,
@@ -34,7 +43,10 @@ export async function GET() {
       .innerJoin(subjects, eq(topics.subject_id, subjects.subject_id))
       .where(eq(topic_mastery.user_id, userId));
 
-    return NextResponse.json(detailedTopicMastery);
+    // Cache the result
+    await cache.set(cacheKey, detailedTopicMasteryFromDb, 3600); // 3600 seconds = 1 hour
+
+    return NextResponse.json({ data: detailedTopicMasteryFromDb, source: 'database' });
   } catch (error) {
     console.error('Error fetching detailed topic mastery data:', error);
     return NextResponse.json(

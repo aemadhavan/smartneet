@@ -6,6 +6,8 @@ interface SubjectSelectorProps {
   subjects: Subject[];
   onSelect: (subject: Subject) => void;
   isPremium?: boolean; // Added isPremium prop to check premium status
+  loading?: boolean;
+  error?: string | null;
 }
 
 // Subject icon and styling configuration
@@ -60,12 +62,37 @@ const subjectIcons: Record<string, {
   }
 };
 
-export function SubjectSelector({ subjects, onSelect, isPremium = false }: SubjectSelectorProps) {
+export function SubjectSelector({ subjects, onSelect, isPremium = false, loading, error }: SubjectSelectorProps) {
   const [hoveredSubject, setHoveredSubject] = useState<number | null>(null);
 
   const getIconConfig = (subjectCode: string) => {
     return subjectIcons[subjectCode] || subjectIcons.default;
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="w-16 h-16 border-t-4 border-indigo-500 border-solid rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading subjects...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="max-w-5xl mx-auto text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-4">

@@ -1,35 +1,55 @@
 // File: src/app/practice/hooks/useSubjects.ts
 import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 import { Subject } from '../types';
+import { logger } from '@/lib/logger';
+
+// Fetcher function for SWR
+const fetcher = async (url: string) => {
+  const response = await fetch(url);
+  
+  if (!response.ok) {
+    const error = new Error('Failed to fetch subjects');
+    error.name = 'FetchError';
+    throw error;
+  }
+  
+  const data = await response.json();
+  return data.data || [];
+};
 
 export function useSubjects(subjectParam?: string | null) {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Step 1: Fetch available subjects
-  useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/subjects?isActive=true');
-        if (!response.ok) {
-          throw new Error('Failed to fetch subjects');
-        }
-        const data = await response.json();
-        setSubjects(data.data || []);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching subjects:', err);
-        setError('Failed to load subjects. Please try again.');
-        setLoading(false);
+  
+  // Use SWR for fetching subjects with stale-while-revalidate pattern
+  const { 
+    data: subjects = [], 
+    error: fetchError, 
+    isLoading,
+    mutate 
+  } = useSWR<Subject[]>(
+    '/api/subjects?isActive=true', 
+    fetcher, 
+    {
+      revalidateOnFocus: false, // Don't revalidate when window gets focus
+      revalidateIfStale: true,  // Revalidate if data is stale
+      dedupingInterval: 60000,  // Deduplicate requests with the same key for 60 seconds
+      errorRetryCount: 3,       // Retry 3 times on error
+      onError: (err) => {
+        logger.error('Error fetching subjects', {
+          error: err instanceof Error ? err.message : String(err),
+          context: 'useSubjects'
+        });
       }
-    };
-    fetchSubjects();
-  }, []);
+    }
+  );
 
-  // Step 2: Match subject from URL parameter to fetched subjects
+  // Error state derived from SWR error
+  const error = fetchError ? 
+    'Failed to load subjects. Please try again.' : 
+    null;
+
+  // Match subject from URL parameter to fetched subjects
   useEffect(() => {
     if (subjects.length > 0 && subjectParam) {
       const matchedSubject = subjects.find(
@@ -37,16 +57,26 @@ export function useSubjects(subjectParam?: string | null) {
           s.subject_name.toLowerCase() === subjectParam ||
           s.subject_code.toLowerCase() === subjectParam
       );
+      
       if (matchedSubject) {
         setSelectedSubject(matchedSubject);
       } else {
-        setError(`Subject "${subjectParam}" not found. Please select a valid subject.`);
-        setLoading(false);
+        logger.warn(`Subject "${subjectParam}" not found`, { context: 'useSubjects' });
       }
-    } else if (subjects.length > 0 && !subjectParam) {
-      setLoading(false);
     }
   }, [subjects, subjectParam]);
 
-  return { subjects, selectedSubject, setSelectedSubject, loading, error };
+  // Function to reload subjects data
+  const reloadSubjects = () => {
+    mutate(); // Trigger a revalidation of the data
+  };
+
+  return { 
+    subjects, 
+    selectedSubject, 
+    setSelectedSubject, 
+    loading: isLoading, 
+    error,
+    reloadSubjects // New function to reload data
+  };
 }

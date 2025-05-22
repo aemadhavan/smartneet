@@ -4,12 +4,21 @@ import { db } from '@/db';
 import { practice_sessions, topic_mastery } from '@/db';
 import { eq, count, sum, and, gte } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache'; // Import cache
 
 export async function GET() {
   try {
     const { userId } = await auth();
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
+    }
+
+    const cacheKey = `user:${userId}:stats`;
+
+    // Try to get from cache first
+    const cachedStats = await cache.get(cacheKey);
+    if (cachedStats) {
+      return NextResponse.json({ ...(cachedStats as Record<string, unknown>), source: 'cache' });
     }
 
     // Get current date for streak calculation
@@ -75,7 +84,7 @@ export async function GET() {
     // consecutive days streak from the database
     const streakCount = Number(yesterdayActivity[0]?.count) > 0 ? 4 : 0;
 
-    return NextResponse.json({
+    const userStats = {
       totalSessions,
       totalQuestionsAttempted,
       totalCorrectAnswers,
@@ -83,7 +92,14 @@ export async function GET() {
       totalDurationMinutes,
       streakCount,
       masteredTopics
-    });
+    };
+
+    // Cache the result for 15 minutes (900 seconds)
+    await cache.set(cacheKey, userStats, 900);
+
+    // Add source to the response
+    return NextResponse.json({ ...userStats, source: 'database' });
+
   } catch (error) {
     console.error('Error fetching user stats:', error);
     return new NextResponse("Internal Server Error", { status: 500 });
