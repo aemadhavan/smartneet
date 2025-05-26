@@ -97,7 +97,7 @@ export const topics = pgTable('topics', {
 export const subtopics = pgTable('subtopics', {
   subtopic_id: serial('subtopic_id').primaryKey(),
   topic_id: integer('topic_id').notNull().references(() => topics.topic_id),
-  subtopic_name: varchar('subtopic_name', { length: 100 }).notNull(),
+  subtopic_name: varchar('subtopic_name', { length: 500 }).notNull(),
   description: text('description'),
   is_active: boolean('is_active').default(true),
   created_at: timestamp('created_at').defaultNow(),
