@@ -95,67 +95,13 @@ export async function GET(req: NextRequest) {
       source: 'database'
     }, { status: 200 });
   } catch (error) {
-    console.error('Error fetching subtopics:', error);
+    // Log the detailed error for server-side inspection
+    console.error('Error fetching subtopics:', error instanceof Error ? error.message : String(error));
+    // Return a generic error message to the client
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch subtopics'
+      error: 'An unexpected error occurred while fetching subtopics.'
     }, { status: 500 });
   }
 }
 
-// POST /api/subtopics - Create a new subtopic
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    
-    // Your existing code to create a subtopic...
-    
-    // Use the utility function to invalidate caches
-    await invalidateSubtopicCaches(undefined, body.topic_id);
-    
-    // Return the response...
-    return NextResponse.json({
-      success: true,
-      message: 'Subtopic created successfully'
-    });
-  } catch (error) {
-    console.error('Error creating subtopic:', error);
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to create subtopic'
-    }, { status: 500 });
-  }
-}
-
-// Utility function to help with cache invalidation for subtopics
-async function invalidateSubtopicCaches(subtopicId?: number, topicId?: number) {
-  if (subtopicId) {
-    await cache.delete(`subtopic:${subtopicId}`);
-  }
-  
-  if (topicId) {
-    // Invalidate topic-specific subtopics list
-    await cache.delete(`api:subtopics:topicId:${topicId}:subjectId:undefined:isActive:undefined`);
-    await cache.delete(`api:subtopics:topicId:${topicId}:subjectId:undefined:isActive:true`);
-    await cache.delete(`api:subtopics:topicId:${topicId}:subjectId:undefined:isActive:false`);
-    
-    // Get subject_id for this topic
-    const topicResult = await db.select({ subject_id: topics.subject_id })
-      .from(topics)
-      .where(eq(topics.topic_id, topicId));
-    
-    if (topicResult.length > 0 && topicResult[0].subject_id) {
-      const subjectId = topicResult[0].subject_id;
-      
-      // Invalidate subject-specific subtopics list
-      await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:undefined`);
-      await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:true`);
-      await cache.delete(`api:subtopics:topicId:undefined:subjectId:${subjectId}:isActive:false`);
-    }
-  }
-  
-  // Also invalidate the general subtopics list
-  await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:undefined`);
-  await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:true`);
-  await cache.delete(`api:subtopics:topicId:undefined:subjectId:undefined:isActive:false`);
-}

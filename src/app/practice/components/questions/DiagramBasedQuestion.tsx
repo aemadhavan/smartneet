@@ -2,6 +2,7 @@
 import { OptionButton, DiagramDisplay } from '@/app/practice/components/ui';
 import { QuestionOption } from '@/app/practice/types';
 import { normalizeDiagramBasedDetails, extractDiagramLabelsFromText } from '@/app/practice/utils/questionUtils';
+import { logger } from '@/lib/logger';
 
 interface DiagramBasedQuestionProps {
   details: string | Record<string, unknown>;
@@ -18,11 +19,14 @@ export function DiagramBasedQuestion({
   selectedOption, 
   onOptionSelect 
 }: DiagramBasedQuestionProps) {
-  // Debug the inputs to help diagnose issues
-  console.log('DiagramBasedQuestion inputs:', { 
-    hasDetails: !!details, 
-    imageUrl,
-    questionTextLength: questionText?.length
+  // Log diagram question details for debugging
+  logger.debug('Rendering diagram-based question', { 
+    context: 'DiagramBasedQuestion',
+    data: {
+      hasDetails: !!details,
+      imageUrl,
+      questionTextLength: questionText?.length
+    }
   });
 
   // Generate a default image URL for certain question types if one is not provided
@@ -33,11 +37,13 @@ export function DiagramBasedQuestion({
       if (questionText.toLowerCase().includes('component') && 
           (questionText.toLowerCase().includes('cell') || 
            questionText.toLowerCase().includes('wall'))) {
+        logger.info('Using default cell components image', { context: 'DiagramBasedQuestion' });
         return '/images/diagrams/cell-components.jpg';
       }
       
       // For seed questions
       if (questionText.toLowerCase().includes('seed')) {
+        logger.info('Using default seed structure image', { context: 'DiagramBasedQuestion' });
         return '/images/diagrams/seed-structure.jpg';
       }
     }
@@ -53,8 +59,22 @@ export function DiagramBasedQuestion({
   
   // Check if normalization was successful
   if (!normalizedDetails || !normalizedDetails.diagram_url || !Array.isArray(normalizedDetails.options)) {
+    logger.error('Failed to normalize diagram question details', {
+      context: 'DiagramBasedQuestion',
+      data: {
+        hasDetails: !!details,
+        imageUrl: effectiveImageUrl,
+        hasNormalizedDetails: !!normalizedDetails,
+        hasDiagramUrl: !!normalizedDetails?.diagram_url,
+        hasOptions: Array.isArray(normalizedDetails?.options)
+      }
+    });
+    
     return (
-      <div className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700">
+      <div 
+        className="bg-yellow-50 dark:bg-yellow-900 p-4 rounded-md border border-yellow-200 dark:border-yellow-700"
+        role="alert"
+      >
         <p className="text-yellow-700 dark:text-yellow-200">Invalid diagram question details format.</p>
         <pre className="mt-2 text-xs overflow-auto max-h-40 bg-gray-100 dark:bg-gray-800 p-2 rounded text-gray-800 dark:text-gray-200">
           {JSON.stringify(details, null, 2)}
@@ -72,10 +92,19 @@ export function DiagramBasedQuestion({
     try {
       const extractedLabels = extractDiagramLabelsFromText(questionText);
       if (extractedLabels && extractedLabels.length > 0) {
+        logger.debug('Successfully extracted labels from question text', {
+          context: 'DiagramBasedQuestion',
+          data: { labelCount: extractedLabels.length }
+        });
         labels = extractedLabels;
+      } else {
+        logger.debug('No labels extracted from question text', { context: 'DiagramBasedQuestion' });
       }
     } catch (e) {
-      console.error('Error extracting labels from question text:', e);
+      logger.error('Error extracting labels from question text', {
+        context: 'DiagramBasedQuestion',
+        error: e instanceof Error ? e.message : String(e)
+      });
     }
   }
 
@@ -83,6 +112,7 @@ export function DiagramBasedQuestion({
   if (questionText && (!labels || labels.length === 0) && 
       questionText.toLowerCase().includes('component') && 
       questionText.toLowerCase().includes('wall')) {
+    logger.info('Using default cell component labels', { context: 'DiagramBasedQuestion' });
     labels = [
       { label_id: 'A', label_text: 'Cell Wall' },
       { label_id: 'B', label_text: 'Cell Membrane' },
@@ -103,12 +133,14 @@ export function DiagramBasedQuestion({
         <DiagramDisplay 
           imageUrl={normalizedDetails.diagram_url}
           labels={labels}
-          altText="Question diagram"
+          altText={`Diagram for question about ${
+            questionText.substring(0, 50).replace(/[?.,;!].*$/, '')
+          }`}
         />
       </div>
       
       {/* Answer options */}
-      <div className="space-y-3">
+      <div className="space-y-3" role="radiogroup" aria-label="Answer options">
         {normalizedDetails.options.map((option: QuestionOption, index: number) => (
           <OptionButton
             key={index}

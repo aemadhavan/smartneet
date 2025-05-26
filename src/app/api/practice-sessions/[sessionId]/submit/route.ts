@@ -9,127 +9,33 @@ import {
 } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { 
+  evaluateAnswer, 
+  parseQuestionDetails, 
+  getCorrectAnswerForQuestionType,
+  AnswerResult
+} from '@/lib/utils/answerEvaluation';
+import { logger } from '@/lib/logger';
+import { cacheService } from '@/lib/services/CacheService';
+import { RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
+import { z } from 'zod';
+import { 
+  SubmitAnswersBody, 
+  QuestionDetailsWithSessionInfo,
+  SubmitAnswersResponse
+} from '@/types/answer-submission';
 
-// TypeScript Interfaces for Question Details
-interface MultipleChoiceDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
+// Validation schema for answer submission
+const submitAnswersSchema = z.object({
+  answers: z.record(z.string(), z.union([
+    z.string(),
+    z.record(z.string(), z.string())
+  ]))
+});
 
-interface MatchingDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-  matching_details: {
-    items: Array<{
-      left_item_text: string;
-      left_item_label: string;
-      right_item_text: string;
-      right_item_label: string;
-    }>;
-    left_column_header?: string;
-    right_column_header?: string;
-  };
-}
-
-interface AssertionReasonDetails {
-  statements: Array<{
-    is_correct: boolean;
-    statement_text: string;
-    statement_label: string;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface SequenceOrderingDetails {
-  sequence_items: Array<{
-    item_text: string;
-    item_number: number;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface DiagramBasedDetails {
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-interface MultipleCorrectStatementsDetails {
-  statements: Array<{
-    is_correct: boolean;
-    statement_text: string;
-    statement_label: string;
-  }>;
-  options: Array<{
-    is_correct: boolean;
-    option_text: string;
-    option_number: string;
-  }>;
-}
-
-type QuestionDetails =
-  | MultipleChoiceDetails
-  | MatchingDetails
-  | AssertionReasonDetails
-  | SequenceOrderingDetails
-  | DiagramBasedDetails
-  | MultipleCorrectStatementsDetails;
-
-// Interface for individual result objects
-interface AnswerResult {
-  question_id: number;
-  is_correct: boolean;
-  marks_awarded: number;
-}
-
-interface SubmitAnswersBody {
-  answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
-}
-
-interface QuestionDetailsWithSessionInfo {
-  session_question_id: number;
-  details: QuestionDetails;
-  marks: number | null;
-  negative_marks: number | null;
-  question_type: string;
-}
-// type OptionBasedResponse = 
-//   | string 
-//   | number 
-//   | { option: string | number } 
-//   | { selectedOption: string | number }
-//   | { selectedMatches: string | number };
-
-interface ParsedOptionDetails {
-  option_number: string;
-  option_text: string;
-  is_correct: boolean;
-}
-
-// Interface for the raw shape of an option before validation and normalization
-interface RawOptionBeforeNormalization {
-  option_number: unknown;
-  option_text?: unknown;
-  is_correct: unknown;
-  [key: string]: unknown;
-}
-
+/**
+ * Submit answers for a practice session
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -147,6 +53,17 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `submit-session-answers:${sessionId}`, 
+      RATE_LIMITS.SUBMIT_SESSION_ANSWERS
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     // Verify session exists and belongs to user
     const [session] = await db
       .select({
@@ -162,18 +79,54 @@ export async function POST(
       );
 
     if (!session) {
+      logger.warn('Session not found for answer submission', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
     if (session.is_completed) {
+      logger.warn('Attempted to submit answers to already completed session', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        data: { sessionId }
+      });
       return NextResponse.json(
         { error: 'Session already completed' },
         { status: 400 }
       );
     }
 
-    // Parse the request body
-    const body: SubmitAnswersBody = await request.json();
+    // Parse and validate the request body
+    let body: SubmitAnswersBody;
+    try {
+      body = await request.json();
+      submitAnswersSchema.parse(body);
+    } catch (e) {
+      logger.error('Invalid answer submission format', {
+        userId,
+        context: 'practice-sessions/[sessionId]/submit.POST',
+        error: e instanceof Error ? e.message : String(e)
+      });
+      
+      if (e instanceof z.ZodError) {
+        return NextResponse.json(
+          { 
+            error: 'Invalid answer submission format',
+            details: e.errors
+          }, 
+          { status: 400 }
+        );
+      }
+      
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 }
+      );
+    }
+    
     const { answers = {} } = body;
 
     if (Object.keys(answers).length === 0) {
@@ -192,6 +145,7 @@ export async function POST(
         marks: questions.marks,
         negative_marks: questions.negative_marks,
         question_type: questions.question_type,
+        topic_id: questions.topic_id
       })
       .from(session_questions)
       .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
@@ -206,12 +160,21 @@ export async function POST(
     const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = 
       sessionQuestions.reduce((map, q) => {
         const parsedDetails = parseQuestionDetails(q.details);
+        if (!parsedDetails) {
+          logger.warn('Failed to parse question details', {
+            userId,
+            context: 'practice-sessions/[sessionId]/submit.POST',
+            data: { questionId: q.question_id }
+          });
+          return map;
+        }
         map[q.question_id.toString()] = {
           session_question_id: q.session_question_id,
           details: parsedDetails,
           marks: q.marks,
           negative_marks: q.negative_marks,
           question_type: q.question_type,
+          topic_id: q.topic_id
         };
         return map;
       }, {} as Record<string, QuestionDetailsWithSessionInfo>);
@@ -233,7 +196,13 @@ export async function POST(
     );
     
     const results: AnswerResult[] = [];
-    const evaluationLog: Record<string, unknown> = {};
+    const evaluationLog: Record<string, {
+      questionType: string;
+      userAnswer: unknown;
+      correctAnswer: unknown;
+      isCorrect: boolean;
+    }> = {};
+    const topicIdsWithNewAttempts = new Set<number>();
     
     // Process each answer and create records for new attempts only
     await db.transaction(async (tx) => {
@@ -250,13 +219,13 @@ export async function POST(
           continue; // Skip this question if it doesn't belong to the session
         }
 
-        // For debugging purposes
+        // For debugging and logging
         const correctAnswer = getCorrectAnswerForQuestionType(
           questionDetails.question_type, 
           questionDetails.details
         );
         
-        // Evaluate if the answer is correct using our improved function
+        // Evaluate if the answer is correct
         let isCorrect = false;
         try {
           isCorrect = evaluateAnswer(
@@ -274,7 +243,16 @@ export async function POST(
           };
           
         } catch (error) {
-          console.error('Error evaluating answer:', error);
+          logger.error('Error evaluating answer', {
+            userId,
+            context: 'practice-sessions/[sessionId]/submit.POST',
+            data: { 
+              sessionId, 
+              questionId, 
+              questionType: questionDetails.question_type 
+            },
+            error: error instanceof Error ? error.message : String(error)
+          });
           continue; // Skip this question if there's an error
         }
 
@@ -282,6 +260,11 @@ export async function POST(
         const marksAwarded = isCorrect
           ? questionDetails.marks ?? 0
           : -(questionDetails.negative_marks ?? 0);
+
+        // Track topic IDs for mastery updates if topic_id exists
+        if (questionDetails.topic_id) {
+          topicIdsWithNewAttempts.add(questionDetails.topic_id);
+        }
 
         // Create the question attempt record
         await tx
@@ -308,12 +291,30 @@ export async function POST(
       }
     });
 
-    // Add detailed evaluation log to the server logs
-    console.log('Answer evaluation results:', JSON.stringify(evaluationLog, null, 2));
+    // Log detailed evaluation results at debug level
+    logger.debug('Answer evaluation results', {
+      userId,
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      data: { sessionId, evaluationLog }
+    });
 
     // After the transaction, update session statistics
-    const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
+    const { updateSessionStats, updateTopicMastery } = await import('@/lib/utilities/sessionUtils');
+    
+    // Update session stats
     await updateSessionStats(sessionId, userId);
+    
+    // Update topic mastery for each attempted topic
+    for (const topicId of topicIdsWithNewAttempts) {
+      const attemptResult = results.find(r => {
+        const qId = r.question_id.toString();
+        return questionDetailsMap[qId]?.topic_id === topicId;
+      });
+      if (attemptResult) {
+        // Use only the first attempt for this topic
+        await updateTopicMastery(userId, topicId, attemptResult.is_correct);
+      }
+    }
 
     // Get the updated session stats
     const [updatedSession] = await db
@@ -327,7 +328,7 @@ export async function POST(
       .from(practice_sessions)
       .where(eq(practice_sessions.session_id, sessionId));
 
-    // Mark the session as completed if not already
+    // Mark the session as completed if all questions have been answered
     if (!updatedSession.is_completed) {
       await db
         .update(practice_sessions)
@@ -339,203 +340,49 @@ export async function POST(
         .where(eq(practice_sessions.session_id, sessionId));
     }
 
+    // Invalidate session caches
+    await cacheService.invalidateUserSessionCaches(userId, sessionId);
+
     // Return the response with the latest statistics
-    return NextResponse.json({
+    const responseData: SubmitAnswersResponse = {
       success: true,
       session_id: sessionId,
       total_answers: Object.keys(answers).length,
       total_correct: updatedSession.questions_correct ?? 0,
       accuracy: (updatedSession.questions_attempted ?? 0) > 0 
-        ? Math.round(((updatedSession.questions_correct ?? 0) / (updatedSession.questions_attempted ?? 1)) * 100) // Handle null check and division by zero
+        ? Math.round(((updatedSession.questions_correct ?? 0) / (updatedSession.questions_attempted ?? 1)) * 100)
         : 0,
       score: updatedSession.score ?? 0,
       max_score: updatedSession.max_score ?? 0,
-      results,
-      evaluation_summary: evaluationLog // Include this for debugging during development
+      results
+    };
+    
+    // Include evaluation summary in development environments only
+    if (process.env.NODE_ENV === 'development') {
+      responseData.evaluation_summary = evaluationLog;
+    }
+
+    logger.info('Successfully submitted answers', {
+      userId,
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      data: { 
+        sessionId,
+        questionsSubmitted: Object.keys(answers).length,
+        resultsCount: results.length
+      }
     });
+
+    return NextResponse.json(responseData);
   } catch (error) {
-    console.error('Error submitting answers:', error);
+    logger.error('Error processing answer submission', {
+      context: 'practice-sessions/[sessionId]/submit.POST',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Return a generic error message to the client
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
-
-function evaluateAnswer(
-  questionType: string,
-  details: QuestionDetails,
-  userAnswer: unknown
-): boolean {
-  try {
-    // Normalize userAnswer to simplify processing
-    const normalizedAnswer = normalizeUserAnswer(userAnswer);
-    
-    // If we couldn't extract a meaningful answer, return false
-    if (normalizedAnswer === null) {
-      console.warn('Could not normalize user answer:', userAnswer);
-      return false;
-    }
-
-    // Log for debugging
-    console.log(`Evaluating ${questionType}:`, { 
-      normalizedAnswer, 
-      details: JSON.stringify(details).substring(0, 100) + '...' 
-    });
-
-    // Evaluate based on question type
-    return evaluateOptionBasedAnswer(questionType, details, normalizedAnswer);
-  } catch (error) {
-    console.error(`Error evaluating answer for question type ${questionType}:`, error);
-    // Add detailed logging to help diagnose the issue
-    console.error('Question details:', JSON.stringify(details, null, 2));
-    console.error('User answer:', JSON.stringify(userAnswer, null, 2));
-    return false;
-  }
-}
-
-function normalizeUserAnswer(userAnswer: unknown): string | null {
-  // Handle different input formats consistently
-  if (userAnswer === null || userAnswer === undefined) {
-    return null;
-  }
-  
-  // Convert numeric answers to strings
-  if (typeof userAnswer === 'number') {
-    return userAnswer.toString();
-  }
-  
-  // Extract the normalized answer from various possible formats
-  if (typeof userAnswer === 'string') {
-    return userAnswer;
-  } 
-  
-  // Handle object-based answers
-  if (typeof userAnswer === 'object' && userAnswer !== null) {
-    const answerObj = userAnswer as Record<string, unknown>;
-    
-    // Check for nested option formats
-    const optionKeys = ['option', 'selectedOption', 'selectedMatches'];
-    for (const key of optionKeys) {
-      const optionValue = answerObj[key];
-      if (typeof optionValue === 'string' || typeof optionValue === 'number') {
-        return optionValue.toString();
-      }
-    }
-  }
-
-  // Could not normalize
-  console.warn('Could not normalize user answer:', userAnswer);
-  return null;
-}
-
-function evaluateOptionBasedAnswer(
-  questionType: string, 
-  details: QuestionDetails, 
-  normalizedAnswer: string
-): boolean {
-  // Ensure the details have options
-  if (!('options' in details) || !Array.isArray(details.options)) {
-    console.warn(`No options found for question type: ${questionType}`);
-    return false;
-  }
-
-  // Find matching option
-  return details.options.some(
-    (opt: ParsedOptionDetails) => 
-      opt.is_correct && opt.option_number.toString() === normalizedAnswer
-  );
-}
-
-function parseQuestionDetails(details: unknown): QuestionDetails {
-  // First, check if the details are already in the correct format
-  if (isQuestionDetails(details)) {
-    // Normalize options to ensure consistent structure
-    return {
-      ...details,
-      options: details.options.map(opt => ({
-        option_number: opt.option_number.toString(),
-        option_text: opt.option_text || '',
-        is_correct: !!opt.is_correct
-      }))
-    };
-  }
-
-  // If details is a string, try to parse it as JSON
-  if (typeof details === 'string') {
-    try {
-      const parsedDetails = JSON.parse(details);
-      
-      // Validate the parsed details
-      if (isQuestionDetails(parsedDetails)) {
-        return {
-          ...parsedDetails,
-          options: parsedDetails.options.map(opt => ({
-            option_number: opt.option_number.toString(),
-            option_text: opt.option_text || '',
-            is_correct: !!opt.is_correct
-          }))
-        };
-      }
-      
-      throw new Error('Parsed details do not match expected structure');
-    } catch (e) {
-      console.error('Failed to parse question details string:', e);
-      throw new Error('Invalid JSON format in question details');
-    }
-  }
-
-  // If we reach here, the details are in an invalid format
-  throw new Error('Invalid question details format');
-}
-
-// Function to extract correct answer for logging/debugging purposes
-function getCorrectAnswerForQuestionType(
-  questionType: string, 
-  details: QuestionDetails
-): string {
-  try {
-    // All supported question types have options
-    if ('options' in details && Array.isArray(details.options)) {
-      const correctOption = details.options.find((opt: ParsedOptionDetails) => opt.is_correct);
-      return correctOption 
-        ? `Option ${correctOption.option_number}: ${correctOption.option_text}` 
-        : 'Unknown';
-    }
-    
-    return 'No correct option found';
-  } catch (error) {
-    console.error('Error extracting correct answer:', error);
-    return 'Error extracting correct answer';
-  }
-}
-// Type guard for parsing details with improved type safety
-function isQuestionDetails(details: unknown): details is QuestionDetails {
-  if (typeof details !== 'object' || details === null) {
-    return false;
-  }
-
-  // Check for required properties based on known question types
-  const typedDetails = details as Partial<QuestionDetails>;
-
-  // Check for options array in the details
-  if (!Array.isArray(typedDetails.options)) {
-    return false;
-  }
-
-  // Validate options structure
-  return typedDetails.options.every(opt => {
-    if (typeof opt !== 'object' || opt === null) return false;
-    
-    const typedOpt = opt as RawOptionBeforeNormalization; // Use a specific type for looser check before normalization
-    return (
-      (typeof typedOpt.option_number === 'string' || typeof typedOpt.option_number === 'number') &&
-      (typedOpt.option_text === undefined || typedOpt.option_text === null || typeof typedOpt.option_text === 'string') &&
-      (typeof typedOpt.is_correct === 'boolean' || typeof typedOpt.is_correct === 'number') // Numbers 0 or 1 are often used for boolean
-    );
-  });
-}
-
-// function explainOptionBasedResponse(_response: OptionBasedResponse): string {
-//   return 'This function exists to provide type documentation for OptionBasedResponse';
-// }

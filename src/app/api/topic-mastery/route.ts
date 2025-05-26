@@ -1,9 +1,10 @@
 // src/app/api/topic-mastery/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { topic_mastery, topics } from '@/db/schema';
+import { topic_mastery, topics, subjects } from '@/db/schema'; // Added subjects
 import { eq, desc, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Get topic mastery data for a user
 export async function GET(request: NextRequest) {
@@ -16,6 +17,14 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const subjectIdParam = searchParams.get('subjectId');
     const subjectId = subjectIdParam ? parseInt(subjectIdParam) : undefined;
+
+    const cacheKey = `user:${userId}:topic-mastery:subject:${subjectId || 'all'}`;
+
+    // Try to get from cache first
+    const cachedData = await cache.get(cacheKey);
+    if (cachedData) {
+      return NextResponse.json({ data: cachedData, source: 'cache' });
+    }
     
     // Create base query
     const baseQuery = db
@@ -30,10 +39,12 @@ export async function GET(request: NextRequest) {
         accuracy_percentage: topic_mastery.accuracy_percentage,
         last_practiced: topic_mastery.last_practiced,
         streak_count: topic_mastery.streak_count,
-        subject_id: topics.subject_id
+        subject_id: topics.subject_id,
+        subject_name: subjects.subject_name // Added subject_name
       })
       .from(topic_mastery)
-      .innerJoin(topics, eq(topic_mastery.topic_id, topics.topic_id));
+      .innerJoin(topics, eq(topic_mastery.topic_id, topics.topic_id))
+      .innerJoin(subjects, eq(topics.subject_id, subjects.subject_id)); // Added join with subjects
     
     // Create conditions array
     const conditions = [eq(topic_mastery.user_id, userId)];
@@ -44,13 +55,19 @@ export async function GET(request: NextRequest) {
     }
     
     // Execute query with all conditions and ordering
-    const masteryData = await baseQuery
+    const masteryDataFromDb = await baseQuery // Renamed to avoid confusion
       .where(and(...conditions))
       .orderBy(desc(topic_mastery.last_practiced));
     
-    return NextResponse.json(masteryData);
+    // Cache the result
+    await cache.set(cacheKey, masteryDataFromDb, 3600); // 3600 seconds = 1 hour
+
+    return NextResponse.json({ data: masteryDataFromDb, source: 'database' });
   } catch (error) {
-    console.error('Error fetching topic mastery data:', error);
-    return NextResponse.json({ error: 'Failed to fetch topic mastery data' }, { status: 500 });
+    console.error('Error fetching topic mastery data:', error instanceof Error ? error.message : String(error));
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while fetching topic mastery data.' }, 
+      { status: 500 }
+    );
   }
 }

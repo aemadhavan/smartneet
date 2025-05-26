@@ -10,15 +10,19 @@ import {
 } from '@/db';
 import { and, eq } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
+import { cache } from '@/lib/cache';
+import { logger } from '@/lib/logger';
+import { cacheService } from '@/lib/services/CacheService';
+import { CACHE_TTLS, RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
+import { 
+  TopicPerformance,
+  CalculatedMetrics,
+  SessionSummaryResponse
+} from '@/types/session-summary';
 
-interface TopicPerformance {
-  topicId: number;
-  topicName: string;
-  questionsCorrect: number;
-  questionsTotal: number;
-  accuracy: number;
-}
-
+/**
+ * Get a summary of a practice session's performance
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -35,21 +39,61 @@ export async function GET(
     if (isNaN(sessionId)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
+
+    // Apply rate limiting
+    const rateLimitResponse = await applyRateLimit(
+      userId, 
+      `get-session-summary:${sessionId}`, 
+      RATE_LIMITS.GET_SESSION_SUMMARY
+    );
+    
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
+    const cacheKey = `session:${userId}:${sessionId}:summary`;
+
+    logger.debug('Fetching session summary', {
+      userId,
+      context: 'practice-sessions/[sessionId]/summary.GET',
+      data: { sessionId, cacheKey }
+    });
+
+    // Try to get from cache first
+    const cachedSummary = await cache.get<SessionSummaryResponse>(cacheKey);
+    if (cachedSummary) {
+      logger.debug('Cache hit for session summary', {
+        userId,
+        context: 'practice-sessions/[sessionId]/summary.GET',
+        data: { sessionId }
+      });
+      return NextResponse.json({ 
+        ...cachedSummary, 
+        source: 'cache' 
+      });
+    }
+    
+    // Ensure session stats are up-to-date before fetching summary
     const { updateSessionStats } = await import('@/lib/utilities/sessionUtils');
     await updateSessionStats(sessionId, userId);
 
     // Get the session details
-    const [session] = await db
-    .select()
-    .from(practice_sessions)
-    .where(
-      and(
-        eq(practice_sessions.session_id, sessionId),
-        eq(practice_sessions.user_id, userId)
-      )
-    );
+    const [sessionData] = await db
+      .select()
+      .from(practice_sessions)
+      .where(
+        and(
+          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.user_id, userId)
+        )
+      );
 
-    if (!session) {
+    if (!sessionData) {
+      logger.warn('Session not found for summary', {
+        userId,
+        context: 'practice-sessions/[sessionId]/summary.GET',
+        data: { sessionId }
+      });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
@@ -81,18 +125,18 @@ export async function GET(
       )
     );
 
-    // Process question data to calculate overall statistics
     const totalQuestions = sessionQuestionData.length;
     
-    // For tracking topic performance
+    // Process topic performance data
     const topicMap = new Map<number, {
       topicName: string;
       questionsTotal: number;
       questionsCorrect: number;
     }>();
 
-    const calculatedMetrics = sessionQuestionData.reduce((metrics, question) => {
-      // Track topic performance
+    // Calculate metrics from question data
+    const calculatedMetrics: CalculatedMetrics = sessionQuestionData.reduce((metrics, question) => {
+      // Track topic-level statistics
       if (!topicMap.has(question.topicId)) {
         topicMap.set(question.topicId, {
           topicName: question.topicName,
@@ -100,23 +144,21 @@ export async function GET(
           questionsCorrect: 0
         });
       }
-
+      
       const topicStats = topicMap.get(question.topicId)!;
       topicStats.questionsTotal++;
       
-      // Count correct questions and calculate metrics
+      // Count correct answers
       if (question.isCorrect) {
         metrics.questionsCorrect++;
         topicStats.questionsCorrect++;
       }
-
-      // Calculate score
+      
+      // Sum scores and time
       metrics.score += question.marksAwarded || 0;
       metrics.maxScore += question.marksPossible || 0;
-
-      // Track time
       metrics.totalTimeSeconds += question.timeTaken || 0;
-
+      
       return metrics;
     }, {
       questionsCorrect: 0,
@@ -125,10 +167,10 @@ export async function GET(
       totalTimeSeconds: 0
     });
 
-    // Convert time from seconds to minutes
+    // Convert seconds to minutes
     const calculatedTimeTakenMinutes = Math.round(calculatedMetrics.totalTimeSeconds / 60);
 
-    // Format topic performance data
+    // Create topic performance array from the map
     const topicPerformance: TopicPerformance[] = Array.from(topicMap.entries())
       .map(([topicId, stats]) => ({
         topicId,
@@ -139,45 +181,77 @@ export async function GET(
           ? Math.round((stats.questionsCorrect / stats.questionsTotal) * 100)
           : 0
       }))
-      .sort((a, b) => b.questionsTotal - a.questionsTotal); // Sort by number of questions
+      // Sort by most questions first
+      .sort((a, b) => b.questionsTotal - a.questionsTotal); 
 
-    // Format the summary data
-    const summary = {
+    const summaryData: SessionSummaryResponse = {
       sessionId,
-      totalQuestions: session.total_questions ?? 0,
-      questionsAttempted: session.questions_attempted ?? 0,
-      questionsCorrect: session.questions_correct ?? 0,
-      questionsIncorrect: (session.questions_attempted ?? 0) - (session.questions_correct ?? 0),
-      accuracy: (session.questions_attempted ?? 0) > 0 
-        ? Math.round(((session.questions_correct ?? 0) / (session.questions_attempted ?? 1)) * 100)
+      totalQuestions: sessionData.total_questions ?? 0,
+      questionsAttempted: sessionData.questions_attempted ?? 0,
+      questionsCorrect: sessionData.questions_correct ?? 0,
+      questionsIncorrect: (sessionData.questions_attempted ?? 0) - (sessionData.questions_correct ?? 0),
+      accuracy: (sessionData.questions_attempted ?? 0) > 0 
+        ? Math.round(((sessionData.questions_correct ?? 0) / (sessionData.questions_attempted ?? 1)) * 100)
         : 0,
       calculatedAccuracy: totalQuestions > 0 
         ? Math.round((calculatedMetrics.questionsCorrect / totalQuestions) * 100)
         : 0,
-      timeTakenMinutes: session.duration_minutes ?? calculatedTimeTakenMinutes, 
-      score: session.score ?? calculatedMetrics.score, 
-      maxScore: session.max_score || calculatedMetrics.maxScore,
-      topicPerformance
+      timeTakenMinutes: sessionData.duration_minutes ?? calculatedTimeTakenMinutes, 
+      score: sessionData.score ?? calculatedMetrics.score, 
+      maxScore: sessionData.max_score || calculatedMetrics.maxScore,
+      topicPerformance,
+      source: 'database'
     };
 
-    // Also update the session record with the final stats
-    await db.update(practice_sessions)
-    .set({
-      end_time: new Date(),
-      is_completed: true,
-      updated_at: new Date()
-    })
-    .where(
-      and(
-        eq(practice_sessions.session_id, sessionId),
-        eq(practice_sessions.user_id, userId)
-      )
-    );
+    // Ensure session is marked as completed if not already (idempotent)
+    if (!sessionData.is_completed) {
+      logger.info('Marking session as completed during summary', {
+        userId,
+        context: 'practice-sessions/[sessionId]/summary.GET',
+        data: { sessionId }
+      });
+      
+      await db.update(practice_sessions)
+        .set({
+          end_time: sessionData.end_time || new Date(), // Use existing end_time if already set
+          is_completed: true,
+          updated_at: new Date()
+        })
+        .where(
+          and(
+            eq(practice_sessions.session_id, sessionId),
+            eq(practice_sessions.user_id, userId)
+          )
+        );
+    }
+    
+    // Cache the result
+    await cache.set(cacheKey, summaryData, CACHE_TTLS.SESSION_SUMMARY_CACHE);
+    await cacheService.trackCacheKey(userId, cacheKey);
 
-    return NextResponse.json(summary);
+    logger.info('Generated session summary', {
+      userId,
+      context: 'practice-sessions/[sessionId]/summary.GET',
+      data: { 
+        sessionId, 
+        questionsTotal: totalQuestions,
+        accuracy: summaryData.accuracy,
+        topicCount: topicPerformance.length
+      }
+    });
+
+    return NextResponse.json(summaryData);
     
   } catch (error) {
-    console.error('Error generating session summary:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    logger.error('Error retrieving session summary', {
+      context: 'practice-sessions/[sessionId]/summary.GET',
+      error: error instanceof Error ? error.message : String(error)
+    });
+    
+    // Return a generic error message to the client
+    return NextResponse.json(
+      { error: 'An unexpected error occurred while generating the session summary.' }, 
+      { status: 500 }
+    );
   }
 }

@@ -5,6 +5,7 @@ import { session_questions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
+import { cache } from '@/lib/cache'; // Import cache
 
 // Schema for validating bookmark update request
 const bookmarkSchema = z.object({
@@ -55,6 +56,16 @@ export async function POST(request: NextRequest) {
 
     if (!updatedQuestion) {
       return NextResponse.json({ error: 'Session question not found' }, { status: 404 });
+    }
+
+    // Invalidate active session cache
+    try {
+      const activeSessionCacheKey = `session:${userId}:${sessionId}:active`;
+      await cache.delete(activeSessionCacheKey);
+      console.log(`Cache invalidated for active session after bookmark update: ${activeSessionCacheKey}`);
+    } catch (cacheError) {
+      console.error('Error during active session cache invalidation after bookmark update:', cacheError);
+      // Non-critical, so don't fail the request, but log it.
     }
 
     return NextResponse.json({

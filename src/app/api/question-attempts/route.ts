@@ -9,22 +9,12 @@ import {
 import { and, eq, sql } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
-
-type MultipleChoiceDetails = {
-  correctOption: string;
-};
-
-type MultipleCorrectStatementsDetails = {
-  correctOptions: string[];
-};
-
-type MultipleChoiceAnswer = {
-  selectedOption: string;
-};
-
-type MultipleCorrectStatementsAnswer = {
-  selectedOptions: string[];
-};
+import { 
+  evaluateAnswer, 
+  parseQuestionDetails, 
+  QuestionDetails 
+} from '@/lib/utils/answerEvaluation'; // Import centralized functions and types
+import { cache } from '@/lib/cache'; // Import cache
 
 // Schema for validating attempt submission
 const attemptSchema = z.object({
@@ -44,59 +34,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Try to get data from request body
+    // Expect JSON request body
     let requestData;
     try {
       requestData = await request.json();
     } catch (error) {
-      // If JSON parsing fails, try to get from URL parameters
-      console.log('Error parsing JSON in question-attempts, trying URL parameters...',error);
-      const searchParams = request.nextUrl.searchParams;
-      
-      // Extract parameters from URL
-      const session_id = searchParams.has('session_id') ? 
-        parseInt(searchParams.get('session_id') || '0') : undefined;
-      
-      const session_question_id = searchParams.has('session_question_id') ? 
-        parseInt(searchParams.get('session_question_id') || '0') : undefined;
-      
-      const question_id = searchParams.has('question_id') ? 
-        parseInt(searchParams.get('question_id') || '0') : undefined;
-      
-      // Parse user_answer from URL parameter if present
-      let user_answer;
-      try {
-        user_answer = searchParams.has('user_answer') ? 
-          JSON.parse(searchParams.get('user_answer') || '{}') : undefined;
-      } catch (parseError) {
-        console.error('Error parsing user_answer JSON:', parseError);
-        return NextResponse.json({ 
-          error: 'Invalid JSON format for user_answer parameter' 
-        }, { status: 400 });
-      }
-      
-      const time_taken_seconds = searchParams.has('time_taken_seconds') ? 
-        parseInt(searchParams.get('time_taken_seconds') || '0') : undefined;
-      
-      const user_notes = searchParams.get('user_notes') || undefined;
-
-      // Check if we have the required fields
-      if (!session_id || !session_question_id || !question_id || !user_answer) {
-        return NextResponse.json({ 
-          error: 'Missing required parameters: session_id, session_question_id, question_id, and user_answer are required' 
-        }, { status: 400 });
-      }
-      
-      requestData = {
-        session_id,
-        session_question_id,
-        question_id,
-        user_answer,
-        time_taken_seconds,
-        user_notes
-      };
-      
-      console.log('Using URL parameters for question attempt:', requestData);
+      console.error('Error parsing JSON request body in question-attempts:', error);
+      return NextResponse.json({ error: 'Invalid JSON request body' }, { status: 400 });
     }
 
     // Validate the data using the schema
@@ -120,8 +64,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Question not found' }, { status: 404 });
       }
 
-      // Evaluate if the answer is correct (implementation depends on question type)
-      const isCorrect = evaluateAnswer(questionDetails.question_type, questionDetails.details, validatedData.user_answer);
+      // Evaluate if the answer is correct using the centralized function
+      // The `questionDetails.details` from the DB should be a JSON object or string.
+      // `parseQuestionDetails` will handle converting it to the structured `QuestionDetails` type.
+      let parsedDetails: QuestionDetails;
+      try {
+        // Assuming questionDetails.details is the raw JSON from the database
+        parsedDetails = parseQuestionDetails(questionDetails.details); 
+      } catch (e) {
+        console.error("Error parsing question details in question-attempts route:", e);
+        return NextResponse.json({ error: 'Invalid question details format' }, { status: 500 });
+      }
+      
+      const isCorrect = evaluateAnswer(
+        questionDetails.question_type, 
+        parsedDetails, // Pass the parsed and structured details
+        validatedData.user_answer
+      );
       
       // Calculate marks awarded
       const marksAwarded = isCorrect ? (questionDetails.marks ?? 4) : -(questionDetails.negative_marks ?? 1);
@@ -156,6 +115,18 @@ export async function POST(request: NextRequest) {
 
       // Update topic mastery
       await updateTopicMastery(userId, questionDetails.topic_id, isCorrect);
+
+      // Invalidate relevant caches
+      try {
+        await cache.delete(`user:${userId}:stats`);
+        await cache.deletePattern(`user:${userId}:question-attempts:*`);
+        await cache.delete(`user:${userId}:question-type-distribution`);
+        await cache.delete(`session:${userId}:${validatedData.session_id}:active`);
+        console.log(`Cache invalidated for user ${userId} due to new question attempt in session ${validatedData.session_id}`);
+      } catch (cacheError) {
+        console.error('Error during cache invalidation in question-attempts:', cacheError);
+        // Non-critical, so don't fail the request, but log it.
+      }
 
       return NextResponse.json({
         attempt_id: result.attempt.attempt_id,
@@ -200,6 +171,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') ?? '20');
     const offset = parseInt(searchParams.get('offset') ?? '0');
 
+    // Define cache key
+    const cacheKey = `user:${userId}:question-attempts:qid:${questionId || 'all'}:sid:${sessionId || 'all'}:limit:${limit}:offset:${offset}`;
+
+    // Try to get from cache first
+    const cachedAttempts = await cache.get(cacheKey);
+    if (cachedAttempts) {
+      return NextResponse.json({ attempts: cachedAttempts, source: 'cache' });
+    }
+
     // Build query conditions
     const conditions = [eq(question_attempts.user_id, userId)];
     
@@ -220,41 +200,15 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
-    return NextResponse.json(attempts);
+    // Cache the result
+    await cache.set(cacheKey, attempts, 900); // 900 seconds = 15 minutes
+
+    return NextResponse.json({ attempts: attempts, source: 'database' });
   } catch (error) {
     console.error('Error fetching question attempts:', error);
     return NextResponse.json({ error: 'Failed to fetch question attempts' }, { status: 500 });
   }
 }
 
-// Helper function to evaluate answers based on question type
-function evaluateAnswer(
-  questionType: string,
-  questionDetails: unknown,
-  userAnswer: unknown
-): boolean {
-  switch (questionType) {
-    case 'MultipleChoice': {
-      const details = questionDetails as MultipleChoiceDetails;
-      const answer = userAnswer as MultipleChoiceAnswer;
-      return answer.selectedOption === details.correctOption;
-    }
-    case 'MultipleCorrectStatements': {
-      const details = questionDetails as MultipleCorrectStatementsDetails;
-      const answer = userAnswer as MultipleCorrectStatementsAnswer;
-      const correctAnswers = new Set(details.correctOptions);
-      const userAnswers = new Set(answer.selectedOptions);
-
-      if (correctAnswers.size !== userAnswers.size) return false;
-
-      for (const ans of userAnswers) {
-        if (!correctAnswers.has(ans)) return false;
-      }
-
-      return true;
-    }
-    default:
-      console.warn(`Evaluation for question type ${questionType} not fully implemented`);
-      return false;
-  }
-}
+// The local evaluateAnswer function and related types (MultipleChoiceDetails, etc.)
+// have been removed as they are now imported from '@/lib/utils/answerEvaluation.ts'.
