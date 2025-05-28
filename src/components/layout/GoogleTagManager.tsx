@@ -6,9 +6,10 @@ import Script from 'next/script';
  * GoogleTagManager component that adds Google Tag Manager scripts to the page
  * This should be included in the Header component
  */
-const GoogleTagManager = () => {
-  const GTM_ID = 'G-VEF6K86RLG'; // Google Tag Manager ID from the provided script
 
+const GoogleTagManager = () => {
+  //const GTM_ID = 'G-VEF6K86RLG'; // Google Tag Manager ID from the provided script
+const GTM_ID = 'GTM-WVBD7SRF'; 
   return (
     <>
       {/* Google Tag Manager - Script that goes in the head */}
