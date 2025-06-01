@@ -4,6 +4,7 @@ import imageUrlBuilder from "@sanity/image-url";
 import type { SanityImageSource } from "@sanity/image-url/lib/types/types";
 import { client } from "@/sanity/client";
 import Link from "next/link";
+import Image from "next/image";
 
 const POST_QUERY = `*[_type == "post" && slug.current == $slug][0]`;
 
@@ -56,12 +57,12 @@ export default async function PostPage({
 
       {/* Post Image */}
       {postImageUrl && (
-        <img
+        <Image
           src={postImageUrl}
           alt={post.title}
           className="w-full aspect-video rounded-xl mb-8 object-cover"
-          width="550"
-          height="310"
+          width={550}
+          height={310}
         />
       )}
 
@@ -84,7 +85,7 @@ export default async function PostPage({
           Ready to Test Your Knowledge?
         </h2>
         <p className="text-gray-600 mb-6">
-          Now that you've studied this topic, test your understanding with practice questions.
+          Now that you&apos;ve studied this topic, test your understanding with practice questions.
         </p>
         <Link 
           href="/practice"
