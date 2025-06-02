@@ -3,6 +3,30 @@
 import { QuestionAttempt, QuestionType } from '../components/interfaces';
 import { normalizeQuestionDetails, normalizeUserAnswer } from '../components/normalizers';
 
+interface Topic {
+  topicId: number;
+  topicName: string;
+}
+
+interface Subtopic {
+  subtopicId: number;
+  subtopicName: string;
+}
+
+interface RawTopic {
+  topic_id?: number;
+  topic_name?: string;
+  topicId?: number;
+  topicName?: string;
+}
+
+interface RawSubtopic {
+  subtopic_id?: number;
+  subtopic_name?: string;
+  subtopicId?: number;
+  subtopicName?: string;
+}
+
 /**
  * Safely parse details based on question type
  * @param questionType Type of the question
@@ -71,22 +95,22 @@ export function processQuestionAttempt(rawAttempt: Record<string, unknown>): Que
   );
   
   // Map topic property to expected camelCase
-  let topic = rawAttempt.topic as { topicId: number; topicName: string };
-  if (topic && (topic as any).topic_name) {
+  let topic = rawAttempt.topic as Topic;
+  if (topic && (topic as RawTopic).topic_name) {
     topic = {
-      topicId: (topic as any).topic_id || 0,
-      topicName: (topic as any).topic_name || '',
+      topicId: (topic as RawTopic).topic_id || 0,
+      topicName: (topic as RawTopic).topic_name || '',
     };
   } else if (!topic) {
     topic = { topicId: 0, topicName: '' };
   }
 
   // Map subtopic property to expected camelCase
-  let subtopic = rawAttempt.subtopic as { subtopicId: number; subtopicName: string } | undefined;
-  if (subtopic && (subtopic as any).subtopic_name) {
+  let subtopic = rawAttempt.subtopic as Subtopic | undefined;
+  if (subtopic && (subtopic as RawSubtopic).subtopic_name) {
     subtopic = {
-      subtopicId: (subtopic as any).subtopic_id || 0,
-      subtopicName: (subtopic as any).subtopic_name || '',
+      subtopicId: (subtopic as RawSubtopic).subtopic_id || 0,
+      subtopicName: (subtopic as RawSubtopic).subtopic_name || '',
     };
   }
 
@@ -98,7 +122,7 @@ export function processQuestionAttempt(rawAttempt: Record<string, unknown>): Que
     questionText,
     questionType,
     details: normalizedDetails,
-    explanation,
+    explanation: typeof explanation === 'string' ? explanation : null,
     userAnswer: normalizedUserAnswer,
     isCorrect,
     correctAnswer: normalizedCorrectAnswer,
