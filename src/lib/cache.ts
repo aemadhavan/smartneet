@@ -74,13 +74,15 @@ class Cache implements CacheProvider {
     try {
       // Set in Redis if available
       if (redisClient) {
-        await redisClient.set(key, value, { ex: ttl })
+        // Ensure TTL is a valid positive integer
+        const validTtl = Math.max(1, Math.floor(ttl));
+        await redisClient.set(key, value, { ex: validTtl });
       }
       
       // Also set in memory cache
-      memoryCache.set(key, value as Record<string, unknown>)
+      memoryCache.set(key, value as Record<string, unknown>);
     } catch (error) {
-      console.error('Cache set error:', error)
+      console.error('Cache set error:', error);
     }
   }
 

@@ -98,6 +98,8 @@ export default function PracticeClientPage() {
     }
   }, []);
   
+  const [isCompleting, setIsCompleting] = useState(false);
+  
   const {
     session,
     loading: sessionLoading,
@@ -108,7 +110,7 @@ export default function PracticeClientPage() {
     sessionCompleted,
     handleOptionSelect,
     handleNextQuestion,
-    handleCompleteSession,
+    handleCompleteSession: rawHandleCompleteSession,
     handleStartNewSession,
     createSession,
     handleRetry: sessionRetry
@@ -120,6 +122,16 @@ export default function PracticeClientPage() {
     subtopicId,
     handleSessionError
   );
+
+  // Wrap handleCompleteSession to set loading state
+  const handleCompleteSession = useCallback(async () => {
+    setIsCompleting(true);
+    try {
+      await rawHandleCompleteSession();
+    } finally {
+      setIsCompleting(false);
+    }
+  }, [rawHandleCompleteSession]);
 
   // Check if the topic is premium (not one of the first two topics)
   useEffect(() => {
@@ -370,6 +382,7 @@ export default function PracticeClientPage() {
               handleOptionSelect={handleOptionSelect}
               handleNextQuestion={handleNextQuestion}
               handleCompleteSession={handleCompleteSession}
+              isCompleting={isCompleting}
             />
           </div>
         ) : (

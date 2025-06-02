@@ -31,6 +31,7 @@ interface QuestionDisplayProps {
   isLastQuestion: boolean;
   onPreviousQuestion: () => void;
   currentQuestionIndex: number;
+  isCompleting?: boolean;
 }
 
 const QuestionDisplay = memo(function QuestionDisplay({
@@ -41,7 +42,8 @@ const QuestionDisplay = memo(function QuestionDisplay({
   onCompleteSession,
   isLastQuestion,
   onPreviousQuestion,
-  currentQuestionIndex
+  currentQuestionIndex,
+  isCompleting
 }: QuestionDisplayProps) {
   const [showExplanation] = useState(false);
   const questionRef = useRef<HTMLDivElement>(null);
@@ -377,8 +379,13 @@ const QuestionDisplay = memo(function QuestionDisplay({
           aria-label={isLastQuestion ? 
             (selectedOption ? "Complete session" : "Force complete session") : 
             "Go to next question"}
+          disabled={isCompleting}
         >
-          {actionButtonLabel}
+          {isCompleting ? (
+            <span className="flex items-center"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>Completing...</span>
+          ) : (
+            actionButtonLabel
+          )}
         </button>
       </div>
 

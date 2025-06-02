@@ -38,9 +38,19 @@ function safeParseDetails(
  * @returns A normalized QuestionAttempt object
  */
 export function processQuestionAttempt(rawAttempt: Record<string, unknown>): QuestionAttempt {
-  // Safely extract the question type
-  const questionType = rawAttempt.questionType as QuestionType;
-  
+  // Support both camelCase and snake_case for all relevant fields
+  const questionType = (rawAttempt.questionType || rawAttempt.question_type) as QuestionType;
+  const questionId = Number(rawAttempt.questionId || rawAttempt.question_id || 0);
+  const questionNumber = Number(rawAttempt.questionNumber || rawAttempt.question_number || 0);
+  const timeSpentSeconds = Number(rawAttempt.timeSpentSeconds || rawAttempt.time_spent_seconds || 0);
+  const questionText = String(rawAttempt.questionText || rawAttempt.question_text || '');
+  const explanation = typeof (rawAttempt.explanation || rawAttempt.explanation) === 'string' ? (rawAttempt.explanation || rawAttempt.explanation) : null;
+  const isCorrect = Boolean(rawAttempt.isCorrect || rawAttempt.is_correct);
+  const marksAwarded = Number(rawAttempt.marksAwarded || rawAttempt.marks_awarded || 0);
+  const maxMarks = Number(rawAttempt.maxMarks || rawAttempt.marks_available || rawAttempt.max_marks || 0);
+  const isImageBased = Boolean(rawAttempt.isImageBased || rawAttempt.is_image_based);
+  const imageUrl = (rawAttempt.imageUrl || rawAttempt.image_url) as string | null;
+
   // Safely parse details
   const parsedDetails = safeParseDetails(questionType, rawAttempt.details);
   
@@ -52,32 +62,52 @@ export function processQuestionAttempt(rawAttempt: Record<string, unknown>): Que
   
   const normalizedUserAnswer = normalizeUserAnswer(
     questionType,
-    rawAttempt.userAnswer
+    rawAttempt.userAnswer || rawAttempt.user_answer
   );
   
   const normalizedCorrectAnswer = normalizeUserAnswer(
     questionType,
-    rawAttempt.correctAnswer
+    rawAttempt.correctAnswer || rawAttempt.correct_answer
   );
   
+  // Map topic property to expected camelCase
+  let topic = rawAttempt.topic as { topicId: number; topicName: string };
+  if (topic && (topic as any).topic_name) {
+    topic = {
+      topicId: (topic as any).topic_id || 0,
+      topicName: (topic as any).topic_name || '',
+    };
+  } else if (!topic) {
+    topic = { topicId: 0, topicName: '' };
+  }
+
+  // Map subtopic property to expected camelCase
+  let subtopic = rawAttempt.subtopic as { subtopicId: number; subtopicName: string } | undefined;
+  if (subtopic && (subtopic as any).subtopic_name) {
+    subtopic = {
+      subtopicId: (subtopic as any).subtopic_id || 0,
+      subtopicName: (subtopic as any).subtopic_name || '',
+    };
+  }
+
   // Return the normalized question attempt
   return {
-    questionId: Number(rawAttempt.questionId || 0),
-    questionNumber: Number(rawAttempt.questionNumber || 0),
-    timeSpentSeconds: Number(rawAttempt.timeSpentSeconds || 0),
-    questionText: String(rawAttempt.questionText || ''),
+    questionId,
+    questionNumber,
+    timeSpentSeconds,
+    questionText,
     questionType,
     details: normalizedDetails,
-    explanation: typeof rawAttempt.explanation === 'string' ? rawAttempt.explanation : null,
+    explanation,
     userAnswer: normalizedUserAnswer,
-    isCorrect: Boolean(rawAttempt.isCorrect),
+    isCorrect,
     correctAnswer: normalizedCorrectAnswer,
-    marksAwarded: Number(rawAttempt.marksAwarded || 0),
-    maxMarks: Number(rawAttempt.maxMarks || 0),
-    topic: rawAttempt.topic as { topicId: number; topicName: string } || { topicId: 0, topicName: '' },
-    subtopic: rawAttempt.subtopic as { subtopicId: number; subtopicName: string } | undefined,
-    isImageBased: Boolean(rawAttempt.isImageBased),
-    imageUrl: rawAttempt.imageUrl as string | null
+    marksAwarded,
+    maxMarks,
+    topic,
+    subtopic,
+    isImageBased,
+    imageUrl
   };
 }
 

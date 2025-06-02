@@ -45,7 +45,7 @@ export default function useSessionReview(sessionId: number): UseSessionReviewRes
         const reviewData = await reviewResponse.json();
         
         // Use our new processor to normalize the question attempts
-        const normalizedAttempts = processQuestionAttempts(reviewData.attempts || []);
+        const normalizedAttempts = processQuestionAttempts(reviewData.questions || reviewData.attempts || []);
         setAttempts(normalizedAttempts);
         
         // Fetch summary data
