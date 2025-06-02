@@ -25,6 +25,20 @@ import {
   SubmitAnswersResponse
 } from '@/types/answer-submission';
 
+interface QuestionAttemptRecord {
+  user_id: string;
+  question_id: number;
+  session_id: number;
+  session_question_id: number;
+  attempt_number: number;
+  user_answer: unknown;
+  is_correct: boolean;
+  marks_awarded: number;
+  attempt_timestamp: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
 // Validation schema for answer submission
 const submitAnswersSchema = z.object({
   answers: z.record(z.string(), z.union([
@@ -48,8 +62,9 @@ export async function POST(
     }
 
     // Get session ID from params
-    const sessionId = parseInt((await params).sessionId);
-    if (isNaN(sessionId)) {
+    const sessionId = (await params).sessionId;
+    const sessionIdNum = parseInt(sessionId);
+    if (isNaN(sessionIdNum)) {
       return NextResponse.json({ error: 'Invalid session ID' }, { status: 400 });
     }
 
@@ -73,7 +88,7 @@ export async function POST(
       .from(practice_sessions)
       .where(
         and(
-          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.session_id, sessionIdNum),
           eq(practice_sessions.user_id, userId)
         )
       );
@@ -151,7 +166,7 @@ export async function POST(
       .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
       .where(
         and(
-          eq(session_questions.session_id, sessionId),
+          eq(session_questions.session_id, sessionIdNum),
           eq(session_questions.user_id, userId)
         )
       );
@@ -185,7 +200,7 @@ export async function POST(
       .from(question_attempts)
       .where(
         and(
-          eq(question_attempts.session_id, sessionId),
+          eq(question_attempts.session_id, sessionIdNum),
           eq(question_attempts.user_id, userId)
         )
       );
@@ -205,7 +220,7 @@ export async function POST(
     const topicIdsWithNewAttempts = new Set<number>();
     
     // Collect all new attempts to insert in a batch
-    const attemptsToInsert: any[] = [];
+    const attemptsToInsert: QuestionAttemptRecord[] = [];
     for (const questionId of Object.keys(answers)) {
       // Skip if this question already has an attempt
       if (existingAttemptIds.has(questionId)) {
@@ -270,7 +285,7 @@ export async function POST(
       attemptsToInsert.push({
         user_id: userId,
         question_id: parseInt(questionId),
-        session_id: sessionId,
+        session_id: sessionIdNum,
         session_question_id: questionDetails.session_question_id,
         attempt_number: 1, // First attempt
         user_answer: JSON.stringify({ option: userAnswer }),
@@ -306,7 +321,7 @@ export async function POST(
     const { updateSessionStats, updateTopicMastery } = await import('@/lib/utilities/sessionUtils');
     
     // Update session stats
-    await updateSessionStats(sessionId, userId);
+    await updateSessionStats(sessionIdNum, userId);
     
     // Update topic mastery for each attempted topic
     for (const topicId of topicIdsWithNewAttempts) {
@@ -330,7 +345,7 @@ export async function POST(
         is_completed: practice_sessions.is_completed
       })
       .from(practice_sessions)
-      .where(eq(practice_sessions.session_id, sessionId));
+      .where(eq(practice_sessions.session_id, sessionIdNum));
 
     // Mark the session as completed if all questions have been answered
     if (!updatedSession.is_completed) {
@@ -341,16 +356,16 @@ export async function POST(
           end_time: new Date(),
           updated_at: new Date()
         })
-        .where(eq(practice_sessions.session_id, sessionId));
+        .where(eq(practice_sessions.session_id, sessionIdNum));
     }
 
     // Invalidate session caches
-    await cacheService.invalidateUserSessionCaches(userId, sessionId);
+    await cacheService.invalidateUserSessionCaches(userId, sessionIdNum);
 
     // Return the response with the latest statistics
     const responseData: SubmitAnswersResponse = {
       success: true,
-      session_id: sessionId,
+      session_id: sessionIdNum,
       total_answers: Object.keys(answers).length,
       total_correct: updatedSession.questions_correct ?? 0,
       accuracy: (updatedSession.questions_attempted ?? 0) > 0 
@@ -366,13 +381,12 @@ export async function POST(
       responseData.evaluation_summary = evaluationLog;
     }
 
-    logger.info('Successfully submitted answers', {
-      userId,
+    logger.info('Answer submission processed successfully', {
       context: 'practice-sessions/[sessionId]/submit.POST',
       data: { 
-        sessionId,
-        questionsSubmitted: Object.keys(answers).length,
-        resultsCount: results.length
+        sessionId: sessionIdNum,
+        totalAnswers: Object.keys(answers).length,
+        totalCorrect: updatedSession.questions_correct ?? 0
       }
     });
 

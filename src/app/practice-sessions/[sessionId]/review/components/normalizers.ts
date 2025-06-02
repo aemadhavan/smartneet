@@ -92,6 +92,8 @@ interface LegacyAnswer {
   selection?: string | number;
   option?: string | number;
   selectedStatements?: string[];
+  selected_statements?: string[];
+  selected_option?: string | number;
   [key: string]: unknown;
 }
 
@@ -280,26 +282,21 @@ export function normalizeUserAnswer(questionType: QuestionType, rawAnswer: unkno
       
     case 'MultipleCorrectStatements':
       let selectedStatements: string[] = [];
-      let selectedOption: string = '';
       if (Array.isArray(answer)) {
         selectedStatements = answer.map(String);
       } else if (answer && typeof answer === 'object' && answer !== null) {
-        const typedAnswer = answer as any;
+        const typedAnswer = answer as LegacyAnswer;
         if (Array.isArray(typedAnswer.selectedStatements)) {
           selectedStatements = typedAnswer.selectedStatements.map(String);
         } else if (Array.isArray(typedAnswer.selected_statements)) {
           selectedStatements = typedAnswer.selected_statements.map(String);
         }
-        if (typedAnswer.selectedOption || typedAnswer.selected_option || typedAnswer.option) {
-          selectedOption = String(typedAnswer.selectedOption || typedAnswer.selected_option || typedAnswer.option);
-        }
       } else if (typeof answer === 'string' || typeof answer === 'number') {
-        selectedOption = String(answer);
+        selectedStatements = [String(answer)];
       }
       return {
         type: 'MultipleCorrectStatements',
-        selectedStatements,
-        selectedOption
+        selectedStatements
       };
       
     case 'AssertionReason':
