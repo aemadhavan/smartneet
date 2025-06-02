@@ -13,7 +13,6 @@ const topics = [
   {
     title: "Diversity in Living World",
     topicId: 1,
-    available: false,
     description: "Main topic covering diversity in living world concepts and principles.",
     subtopics: [
       { title: "The Living World", subtopicId: 1, slug: "the-living-world", available: true },

@@ -33,6 +33,7 @@ interface SessionContentProps {
   handleOptionSelect: (questionId: number, option: string) => void;
   handleNextQuestion: () => void;
   handleCompleteSession: () => void;
+  isCompleting?: boolean;
 }
 
 const SessionContent = memo(function SessionContent({
@@ -49,7 +50,8 @@ const SessionContent = memo(function SessionContent({
   setCurrentQuestionIndex,
   handleOptionSelect,
   handleNextQuestion,
-  handleCompleteSession
+  handleCompleteSession,
+  isCompleting
 }: SessionContentProps) {
   const currentQuestion = session.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === session.questions.length - 1;
@@ -81,6 +83,7 @@ const SessionContent = memo(function SessionContent({
           isLastQuestion={isLastQuestion}
           onPreviousQuestion={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
           currentQuestionIndex={currentQuestionIndex}
+          isCompleting={isCompleting}
         />
       </div>
 

@@ -204,92 +204,96 @@ export async function POST(
     }> = {};
     const topicIdsWithNewAttempts = new Set<number>();
     
-    // Process each answer and create records for new attempts only
-    await db.transaction(async (tx) => {
-      for (const questionId of Object.keys(answers)) {
-        // Skip if this question already has an attempt
-        if (existingAttemptIds.has(questionId)) {
-          continue;
-        }
-        
-        const userAnswer = answers[questionId];
-        const questionDetails = questionDetailsMap[questionId];
+    // Collect all new attempts to insert in a batch
+    const attemptsToInsert: any[] = [];
+    for (const questionId of Object.keys(answers)) {
+      // Skip if this question already has an attempt
+      if (existingAttemptIds.has(questionId)) {
+        continue;
+      }
+      
+      const userAnswer = answers[questionId];
+      const questionDetails = questionDetailsMap[questionId];
 
-        if (!questionDetails) {
-          continue; // Skip this question if it doesn't belong to the session
-        }
+      if (!questionDetails) {
+        continue; // Skip this question if it doesn't belong to the session
+      }
 
-        // For debugging and logging
-        const correctAnswer = getCorrectAnswerForQuestionType(
-          questionDetails.question_type, 
-          questionDetails.details
+      // For debugging and logging
+      const correctAnswer = getCorrectAnswerForQuestionType(
+        questionDetails.question_type, 
+        questionDetails.details
+      );
+      
+      // Evaluate if the answer is correct
+      let isCorrect = false;
+      try {
+        isCorrect = evaluateAnswer(
+          questionDetails.question_type,
+          questionDetails.details,
+          userAnswer
         );
         
-        // Evaluate if the answer is correct
-        let isCorrect = false;
-        try {
-          isCorrect = evaluateAnswer(
-            questionDetails.question_type,
-            questionDetails.details,
-            userAnswer
-          );
-          
-          // Store evaluation details for debugging
-          evaluationLog[questionId] = {
-            questionType: questionDetails.question_type,
-            userAnswer,
-            correctAnswer,
-            isCorrect
-          };
-          
-        } catch (error) {
-          logger.error('Error evaluating answer', {
-            userId,
-            context: 'practice-sessions/[sessionId]/submit.POST',
-            data: { 
-              sessionId, 
-              questionId, 
-              questionType: questionDetails.question_type 
-            },
-            error: error instanceof Error ? error.message : String(error)
-          });
-          continue; // Skip this question if there's an error
-        }
-
-        // Calculate marks awarded
-        const marksAwarded = isCorrect
-          ? questionDetails.marks ?? 0
-          : -(questionDetails.negative_marks ?? 0);
-
-        // Track topic IDs for mastery updates if topic_id exists
-        if (questionDetails.topic_id) {
-          topicIdsWithNewAttempts.add(questionDetails.topic_id);
-        }
-
-        // Create the question attempt record
-        await tx
-          .insert(question_attempts)
-          .values({
-            user_id: userId,
-            question_id: parseInt(questionId),
-            session_id: sessionId,
-            session_question_id: questionDetails.session_question_id,
-            attempt_number: 1, // First attempt
-            user_answer: JSON.stringify({ option: userAnswer }),
-            is_correct: isCorrect,
-            marks_awarded: marksAwarded,
-            attempt_timestamp: new Date(),
-            created_at: new Date(),
-            updated_at: new Date(),
-          });
-
-        results.push({
-          question_id: parseInt(questionId),
-          is_correct: isCorrect,
-          marks_awarded: marksAwarded,
+        // Store evaluation details for debugging
+        evaluationLog[questionId] = {
+          questionType: questionDetails.question_type,
+          userAnswer,
+          correctAnswer,
+          isCorrect
+        };
+        
+      } catch (error) {
+        logger.error('Error evaluating answer', {
+          userId,
+          context: 'practice-sessions/[sessionId]/submit.POST',
+          data: { 
+            sessionId, 
+            questionId, 
+            questionType: questionDetails.question_type 
+          },
+          error: error instanceof Error ? error.message : String(error)
         });
+        continue; // Skip this question if there's an error
       }
-    });
+
+      // Calculate marks awarded
+      const marksAwarded = isCorrect
+        ? questionDetails.marks ?? 0
+        : -(questionDetails.negative_marks ?? 0);
+
+      // Track topic IDs for mastery updates if topic_id exists
+      if (questionDetails.topic_id) {
+        topicIdsWithNewAttempts.add(questionDetails.topic_id);
+      }
+
+      // Prepare the question attempt record for batch insert
+      attemptsToInsert.push({
+        user_id: userId,
+        question_id: parseInt(questionId),
+        session_id: sessionId,
+        session_question_id: questionDetails.session_question_id,
+        attempt_number: 1, // First attempt
+        user_answer: JSON.stringify({ option: userAnswer }),
+        is_correct: isCorrect,
+        marks_awarded: marksAwarded,
+        attempt_timestamp: new Date(),
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+      results.push({
+        question_id: parseInt(questionId),
+        is_correct: isCorrect,
+        marks_awarded: marksAwarded,
+      });
+    }
+
+    // Perform the batch insert in a transaction
+    if (attemptsToInsert.length > 0) {
+      await db.transaction(async (tx) => {
+        await tx.insert(question_attempts).values(attemptsToInsert);
+      });
+    }
 
     // Log detailed evaluation results at debug level
     logger.debug('Answer evaluation results', {
