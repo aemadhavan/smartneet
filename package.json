@@ -21,7 +21,7 @@
     "db:migrate:safe": "tsx src/db/safe-migrate.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.19.3",
+    "@clerk/nextjs": "^6.20.2",
     "@hookform/resolvers": "^5.0.1",
     "@radix-ui/react-dialog": "^1.1.11",
     "@radix-ui/react-label": "^2.1.4",
