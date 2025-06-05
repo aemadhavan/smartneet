@@ -10,9 +10,12 @@ Sentry.init({
   integrations: [
     // Add our Profiling integration
   nodeProfilingIntegration(),
+  Sentry.browserTracingIntegration(),
+  Sentry.browserProfilingIntegration()
   ],
   tracesSampleRate: 1.0,
 profileSessionSampleRate: 1.0,
+tracePropagationTargets: ["localhost", /^https:\/\/smarterneet\.io\/api/],
 profileLifecycle: 'trace',
 });
 // Profiling happens automatically after setting it up with `Sentry.init()`.
