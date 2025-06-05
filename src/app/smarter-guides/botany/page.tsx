@@ -16,7 +16,7 @@ const topics = [
     description: "Main topic covering diversity in living world concepts and principles.",
     subtopics: [
       { title: "The Living World", subtopicId: 1, slug: "the-living-world", available: true },
-      { title: "Biological Classification", subtopicId: 2, slug: "biological-classification", available: false },
+      { title: "Biological Classification", subtopicId: 2, slug: "biological-classification", available: true },
       { title: "Plant Kingdom", subtopicId: 3, slug: "plant-kingdom", available: false },
     ],
   },
