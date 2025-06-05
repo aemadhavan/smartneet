@@ -9,11 +9,12 @@ Sentry.init({
   dsn: "https://a250abd21c7c2f1d0f938e90fa152ba1@o4509370465058816.ingest.us.sentry.io/4509370489765888",
   integrations: [
     // Add our Profiling integration
-  nodeProfilingIntegration(),
+    nodeProfilingIntegration(),
   ],
   tracesSampleRate: 1.0,
-profileSessionSampleRate: 1.0,
-profileLifecycle: 'trace',
+  profileSessionSampleRate: 1.0,
+  tracePropagationTargets: ["localhost", /^https:\/\/smarterneet\.com\/api/],
+  profileLifecycle: 'trace',
 });
 // Profiling happens automatically after setting it up with `Sentry.init()`.
 // All spans (unless those discarded by sampling) will have profiling data attached to them.

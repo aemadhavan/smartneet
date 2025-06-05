@@ -10,6 +10,16 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // Document Policy for JavaScript profiling - applies to all routes
+        source: "/:path*",
+        headers: [
+          {
+            key: "Document-Policy",
+            value: "js-profiling",
+          },
+        ],
+      },
+      {
         // Cache all static assets
         source: '/assets/:path*',
         headers: [
@@ -37,8 +47,6 @@ const nextConfig: NextConfig = {
     pagesBufferLength: 5,
   },
 };
-
-module.exports = nextConfig;
 
 export default withSentryConfig(nextConfig, {
 // For all available options, see:
