@@ -15,6 +15,10 @@ export const env = {
   // Redis configuration
   REDIS_URL: process.env.UPSTASH_REDIS_REST_URL || '',
   REDIS_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+
+  // Clerk configuration
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '',
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || '',
   
   // Cache TTL settings (in seconds)
   CACHE_TTL: parseInt(process.env.CACHE_TTL || String(DEFAULT_CACHE_TTL)),
@@ -24,9 +28,9 @@ export const env = {
   USER_PROGRESS_CACHE_TTL: parseInt(process.env.USER_PROGRESS_CACHE_TTL || String(DEFAULT_USER_PROGRESS_CACHE_TTL)),
   
   // Environment
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  IS_PRODUCTION: process.env.NODE_ENV === 'production',
-  IS_DEVELOPMENT: process.env.NODE_ENV === 'development',
+  NODE_ENV: (process.env.NODE_ENV || 'development').toLowerCase(),
+  IS_PRODUCTION: (process.env.NODE_ENV || '').toLowerCase() === 'production',
+  IS_DEVELOPMENT: (process.env.NODE_ENV || 'development').toLowerCase() === 'development',
   
   // Helper method to check if Redis is configured
   isRedisConfigured(): boolean {
