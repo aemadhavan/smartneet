@@ -11,7 +11,8 @@ const publicRoutes = createRouteMatcher([
   "/unsubscribe(.*)",
   "/api/waitlist(.*)",
   "/api/webhooks/stripe(.*)",
-  "/smarter-guides(.*)"
+  "/smarter-guides(.*)",
+  "/404"
 ]);
 
 // Apply middleware
