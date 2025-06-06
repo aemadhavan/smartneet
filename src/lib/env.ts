@@ -28,9 +28,9 @@ export const env = {
   USER_PROGRESS_CACHE_TTL: parseInt(process.env.USER_PROGRESS_CACHE_TTL || String(DEFAULT_USER_PROGRESS_CACHE_TTL)),
   
   // Environment
-  NODE_ENV: process.env.NODE_ENV || 'development',
-  IS_PRODUCTION: process.env.NODE_ENV === 'production',
-  IS_DEVELOPMENT: process.env.NODE_ENV === 'development',
+  NODE_ENV: (process.env.NODE_ENV || 'development').toLowerCase(),
+  IS_PRODUCTION: (process.env.NODE_ENV || '').toLowerCase() === 'production',
+  IS_DEVELOPMENT: (process.env.NODE_ENV || 'development').toLowerCase() === 'development',
   
   // Helper method to check if Redis is configured
   isRedisConfigured(): boolean {
