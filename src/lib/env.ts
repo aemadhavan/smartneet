@@ -15,6 +15,10 @@ export const env = {
   // Redis configuration
   REDIS_URL: process.env.UPSTASH_REDIS_REST_URL || '',
   REDIS_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+
+  // Clerk configuration
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '',
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || '',
   
   // Cache TTL settings (in seconds)
   CACHE_TTL: parseInt(process.env.CACHE_TTL || String(DEFAULT_CACHE_TTL)),
