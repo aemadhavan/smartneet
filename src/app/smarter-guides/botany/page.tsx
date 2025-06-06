@@ -17,7 +17,7 @@ const topics = [
     subtopics: [
       { title: "The Living World", subtopicId: 1, slug: "the-living-world", available: true },
       { title: "Biological Classification", subtopicId: 2, slug: "biological-classification", available: true },
-      { title: "Plant Kingdom", subtopicId: 3, slug: "plant-kingdom", available: false },
+      { title: "Plant Kingdom", subtopicId: 3, slug: "plant-kingdom", available: true },
     ],
   },
   {
