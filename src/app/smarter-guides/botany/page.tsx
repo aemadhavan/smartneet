@@ -26,7 +26,7 @@ const topics = [
     available: false,
     description: "Main topic covering structural organization in animals and plants concepts and principles.",
     subtopics: [
-      { title: "Morphology of Flowering Plants", subtopicId: 4, slug: "morphology-of-flowering-plants", available: false },
+      { title: "Morphology of Flowering Plants", subtopicId: 4, slug: "morphology-of-flowering-plants", available: true },
       { title: "Anatomy of Flowering Plants", subtopicId: 5, slug: "anatomy-of-flowering-plants", available: false },
     ],
   },
