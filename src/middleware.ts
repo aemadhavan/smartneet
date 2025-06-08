@@ -41,18 +41,22 @@ export default clerkMiddleware(async (auth, req) => {
   if (!publicRoutes(req)) {
     try {
       await auth.protect();
-    } catch {
+    } catch (error) {
+      console.error('Middleware error:', error);
       // Always redirect to sign-in if not authenticated
       const signInUrl = new URL('/sign-in', req.url);
       signInUrl.searchParams.set('redirect_url', req.url);
-      return Response.redirect(signInUrl);
+      const response = Response.redirect(signInUrl);
+      return response;
     }
   }
 });
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-    '/(api|trpc)(.*)'
+    // Match all paths except static files and API routes that don't need auth
+    '/((?!_next/static|_next/image|favicon.ico|images|.well-known).*)',
+    // Match API routes that need auth
+    '/api/((?!waitlist|webhooks/stripe|subscription-plans).*)'
   ],
 };
