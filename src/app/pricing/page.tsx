@@ -19,7 +19,7 @@ type SubscriptionPlan = {
 };
 
 async function getPlans() {
-  const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/subscription-plans`, {
+  const res = await fetch('/api/subscription-plans', {
     cache: 'no-store',
   });
   if (!res.ok) throw new Error('Failed to fetch subscription plans');
