@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // List all public routes here
 const publicRoutes = createRouteMatcher([
@@ -39,20 +40,17 @@ export default clerkMiddleware(async (auth, req) => {
 
   // If not a public route, require authentication
   if (!publicRoutes(req)) {
-    try {
-      await auth.protect();
-    } catch {
-      // Always redirect to sign-in if not authenticated
+    const { userId } = await auth();
+    if (!userId) {
       const signInUrl = new URL('/sign-in', req.url);
       signInUrl.searchParams.set('redirect_url', req.url);
-      return Response.redirect(signInUrl);
+      return NextResponse.redirect(signInUrl);
     }
   }
 });
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-    '/(api|trpc)(.*)'
+    '/((?!_next/static|_next/image|favicon.ico|images|.well-known).*)',
   ],
 };
