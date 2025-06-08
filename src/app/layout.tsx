@@ -5,6 +5,7 @@ import './globals.css';
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from '@clerk/nextjs';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from "@vercel/analytics/next"
 
 /**
  * This is the root layout for the application.
