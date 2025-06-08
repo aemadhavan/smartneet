@@ -20,6 +20,7 @@ type SubscriptionPlan = {
 
 async function getPlans() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  console.log('BASE URL:', baseUrl);
   const res = await fetch(`${baseUrl}/api/subscription-plans`, {
     cache: 'no-store',
   });
