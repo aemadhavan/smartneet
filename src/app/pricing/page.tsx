@@ -70,7 +70,7 @@ export default function PricingPage() {
           throw new Error('Failed to fetch subscription plans');
         }
         const plansData = await plansResponse.json();
-        console.log('Plans data:', plansData);
+        //console.log('Plans data:', plansData);
         setPlans(plansData.plans);
         
         // Fetch user subscription if logged in

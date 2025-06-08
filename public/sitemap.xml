@@ -1,58 +1,100 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage -->
   <url>
-    <loc>https://smartneet.com</loc>
+    <loc>https://smarterneet.com</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
+  
+  <!-- Core Marketing Pages -->
   <url>
-    <loc>https://smartneet.com/about-us</loc>
+    <loc>https://smarterneet.com/about-us</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+  
+  <!-- Main Content Pages -->
   <url>
-    <loc>https://smartneet.com/pricing</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://smartneet.com/sign-in</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://smartneet.com/sign-up</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://smartneet.com/dashboard</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://smartneet.com/practice</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>https://smartneet.com/smarter-guides</loc>
+    <loc>https://smarterneet.com/smarter-guides</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  
+  <!-- Subject Pages -->
   <url>
-    <loc>https://smartneet.com/privacy-policy</loc>
+    <loc>https://smarterneet.com/biology</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  
+  <!-- Smarter Guides Specific Pages -->
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>  
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/the-living-world</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://smartneet.com/terms-of-service</loc>
+    <loc>https://www.smarterneet.com/smarter-guides/botany/biological-classification</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://smartneet.com/cookie-policy</loc>
+    <loc>https://www.smarterneet.com/smarter-guides/botany/plant-kingdom</loc>
+    <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.6</priority>
   </url>
-</urlset> 
+  <url>
+    <loc>https://www.smarterneet.com/smarter-guides/botany/morphology-of-flowering-plants</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.smarterneet.com/smarter-guides/botany/anatomy-of-flowering-plants</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/zoology</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url> 
+  
+  <!-- Legal Pages -->
+  <url>
+    <loc>https://smarterneet.com/privacy-policy</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/terms-of-service</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/cookie-policy</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>
