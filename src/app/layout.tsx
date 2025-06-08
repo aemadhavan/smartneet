@@ -27,6 +27,7 @@ const geistMono = Geist_Mono({
  * Includes expanded description, keywords, Open Graph, and Twitter Card tags.
  */
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://smarterneet.com'),
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
   description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
   keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation',

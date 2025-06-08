@@ -13,8 +13,9 @@ const publicRoutes = createRouteMatcher([
   "/api/webhooks/stripe(.*)",
   "/smarter-guides(.*)",
   "/404",
-  "/monitoring(.*)",  // Add monitoring endpoint to public routes
-  "/pricing(.*)",      // Make pricing page public
+  "/monitoring(.*)",
+  "/pricing(.*)",
+  "/api/subscription-plans(.*)",  // Make subscription plans API public
 ]);
 
 // Apply middleware
@@ -22,7 +23,14 @@ export default clerkMiddleware(async (auth, req) => {
   // Skip middleware for static files and images
   if (req.nextUrl.pathname.startsWith('/_next') || 
       req.nextUrl.pathname.startsWith('/static') ||
-      req.nextUrl.pathname.startsWith('/favicon.ico')) {
+      req.nextUrl.pathname.startsWith('/favicon.ico') ||
+      req.nextUrl.pathname.startsWith('/images') ||
+      req.nextUrl.pathname.startsWith('/.well-known')) {
+    return;
+  }
+
+  // Handle 404s gracefully
+  if (req.nextUrl.pathname === '/404') {
     return;
   }
 
@@ -40,7 +48,8 @@ export default clerkMiddleware(async (auth, req) => {
         return Response.redirect(signInUrl);
       }
       
-      // In development, allow the request to continue
+      // In development, allow the request to continue but log the error
+      console.warn('Auth failed in development mode:', error);
       return;
     }
   }

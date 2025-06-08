@@ -34,20 +34,29 @@ interface PricingUserSectionProps {
   plans: SubscriptionPlan[];
 }
 
-function SearchParamsWrapper({ children, setCanceled }: { children: React.ReactNode; setCanceled: (canceled: boolean) => void }) {
+function SearchParamsWrapper({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const canceled = searchParams?.get('canceled') === 'true';
-  useEffect(() => {
-    setCanceled(canceled);
-  }, [canceled, setCanceled]);
-  return <>{children}</>;
+  
+  return (
+    <>
+      {canceled && (
+        <div className="max-w-lg mx-auto mb-8 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 flex items-center">
+          <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mr-2 flex-shrink-0" />
+          <p className="text-yellow-700 dark:text-yellow-400">
+            Your checkout session was canceled. You have not been charged.
+          </p>
+        </div>
+      )}
+      {children}
+    </>
+  );
 }
 
 export default function PricingUserSection({ plans }: PricingUserSectionProps) {
   const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutPlanId, setCheckoutPlanId] = useState<number | null>(null);
-  const [canceled, setCanceled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,31 +130,23 @@ export default function PricingUserSection({ plans }: PricingUserSectionProps) {
 
   return (
     <>
-      <SearchParamsWrapper setCanceled={setCanceled}>
-        {canceled && (
-          <div className="max-w-lg mx-auto mb-8 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 flex items-center">
-            <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mr-2 flex-shrink-0" />
-            <p className="text-yellow-700 dark:text-yellow-400">
-              Your checkout session was canceled. You have not been charged.
-            </p>
+      <SearchParamsWrapper>
+        {error && (
+          <div className="max-w-md mx-auto bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-6 mb-6">
+            <div className="flex items-center mb-4">
+              <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mr-2" />
+              <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">Error</h2>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Dismiss
+            </button>
           </div>
         )}
       </SearchParamsWrapper>
-      {error && (
-        <div className="max-w-md mx-auto bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-6 mb-6">
-          <div className="flex items-center mb-4">
-            <AlertCircle className="h-6 w-6 text-red-600 dark:text-red-400 mr-2" />
-            <h2 className="text-xl font-semibold text-red-600 dark:text-red-400">Error</h2>
-          </div>
-          <p className="text-gray-700 dark:text-gray-300 mb-4">{error}</p>
-          <button
-            onClick={() => setError(null)}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
         {plans.map((plan) => {
           const isUserOnThisPlan = userSubscription?.plan?.plan_id === plan.plan_id;
