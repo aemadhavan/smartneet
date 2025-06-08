@@ -27,7 +27,7 @@ const topics = [
     description: "Main topic covering structural organization in animals and plants concepts and principles.",
     subtopics: [
       { title: "Morphology of Flowering Plants", subtopicId: 4, slug: "morphology-of-flowering-plants", available: true },
-      { title: "Anatomy of Flowering Plants", subtopicId: 5, slug: "anatomy-of-flowering-plants", available: false },
+      { title: "Anatomy of Flowering Plants", subtopicId: 5, slug: "anatomy-of-flowering-plants", available: true },
     ],
   },
   {
@@ -36,8 +36,8 @@ const topics = [
     available: false,
     description: "Main topic covering cell structure and function concepts and principles.",
     subtopics: [
-      { title: "Cell - The Unit of Life", subtopicId: 6, slug: "cell-the-unit-of-life", available: false },
-      { title: "Cell Cycle and Cell Division", subtopicId: 7, slug: "cell-cycle-and-cell-division", available: false },
+      { title: "Cell - The Unit of Life", subtopicId: 6, slug: "cell-the-unit-of-life", available: true },
+      { title: "Cell Cycle and Cell Division", subtopicId: 7, slug: "cell-cycle-and-cell-division", available: true },
     ],
   },
   {
