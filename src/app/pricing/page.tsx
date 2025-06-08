@@ -1,7 +1,6 @@
 // src/app/pricing/page.tsx
 import { Suspense } from 'react';
-import { formatAmountForDisplay } from '@/lib/stripe';
-import { Check, AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import PricingUserSection from './PricingUserSection';
 
 // Types
@@ -32,8 +31,12 @@ export default async function PricingPage() {
   let error: string | null = null;
   try {
     plans = await getPlans();
-  } catch (err: any) {
-    error = err.message || 'An unknown error occurred';
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      error = err.message || 'An unknown error occurred';
+    } else {
+      error = 'An unknown error occurred';
+    }
   }
 
   if (error) {

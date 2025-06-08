@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
@@ -66,7 +66,7 @@ export default function PricingUserSection({ plans }: PricingUserSectionProps) {
             setUserSubscription(subData.subscription);
           }
         }
-      } catch (err) {
+      } catch {
         // Ignore error, just show as not subscribed
       } finally {
         setLoading(false);
@@ -107,8 +107,12 @@ export default function PricingUserSection({ plans }: PricingUserSectionProps) {
       } else {
         throw new Error('Invalid response from server');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unknown error occurred during checkout');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'An unknown error occurred during checkout');
+      } else {
+        setError('An unknown error occurred during checkout');
+      }
     } finally {
       setIsCheckingOut(false);
       setCheckoutPlanId(null);

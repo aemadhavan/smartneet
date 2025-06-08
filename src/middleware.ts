@@ -13,7 +13,8 @@ const publicRoutes = createRouteMatcher([
   "/api/webhooks/stripe(.*)",
   "/smarter-guides(.*)",
   "/404",
-  "/monitoring(.*)"  // Add monitoring endpoint to public routes
+  "/monitoring(.*)",  // Add monitoring endpoint to public routes
+  "/pricing(.*)",      // Make pricing page public
 ]);
 
 // Apply middleware
