@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# Protect API routes from crawling
+Disallow: /api/
+
+# Protect user-specific authenticated pages
+Disallow: /dashboard/
+Disallow: /practice/
+Disallow: /sessions/
+Disallow: /admin/
+
+# Protect authentication pages from indexing
+Disallow: /sign-in
+Disallow: /sign-up
+
+# Allow important public content for SEO
+Allow: /biology/
+Allow: /smarter-guides/
+Allow: /about-us
+Allow: /pricing
+
+# Set crawl delay to prevent server overload
+Crawl-delay: 1
+
+# Sitemap location
+Sitemap: https://smartneet.com/sitemap.xml
