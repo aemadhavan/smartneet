@@ -46,7 +46,7 @@ const topics = [
     available: false,
     description: "Main topic covering plant physiology concepts and principles.",
     subtopics: [
-      { title: "Photosynthesis in Higher Plants", subtopicId: 8, slug: "photosynthesis-in-higher-plants", available: false },
+      { title: "Photosynthesis in Higher Plants", subtopicId: 8, slug: "photosynthesis-in-higher-plants", available: true },
       { title: "Respiration in Plants", subtopicId: 9, slug: "respiration-in-plants", available: false },
       { title: "Plant Growth and Development", subtopicId: 10, slug: "plant-growth-and-development", available: false },
     ],
