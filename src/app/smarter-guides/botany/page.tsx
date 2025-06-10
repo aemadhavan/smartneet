@@ -6,6 +6,17 @@ import { ChevronRight } from "lucide-react"
 export const metadata: Metadata = {
   title: "Botany - NEET Preparation",
   description: "Comprehensive botany study guide for NEET exam preparation",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'),
+  openGraph: {
+    title: "Botany - NEET Preparation",
+    description: "Comprehensive botany study guide for NEET exam preparation",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Botany - NEET Preparation",
+    description: "Comprehensive botany study guide for NEET exam preparation",
+  },
 }
 
 // Updated topics based on actual database structure from Excel
