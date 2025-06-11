@@ -58,8 +58,8 @@ const topics = [
     description: "Main topic covering plant physiology concepts and principles.",
     subtopics: [
       { title: "Photosynthesis in Higher Plants", subtopicId: 8, slug: "photosynthesis-in-higher-plants", available: true },
-      { title: "Respiration in Plants", subtopicId: 9, slug: "respiration-in-plants", available: false },
-      { title: "Plant Growth and Development", subtopicId: 10, slug: "plant-growth-and-development", available: false },
+      { title: "Respiration in Plants", subtopicId: 9, slug: "respiration-in-plants", available: true },
+      { title: "Plant Growth and Development", subtopicId: 10, slug: "plant-growth-and-development", available: true },
     ],
   },
   {
@@ -68,7 +68,7 @@ const topics = [
     available: false,
     description: "Main topic covering reproduction concepts and principles.",
     subtopics: [
-      { title: "Sexual Reproduction in Flowering Plant", subtopicId: 11, slug: "sexual-reproduction-in-flowering-plant", available: false },
+      { title: "Sexual Reproduction in Flowering Plant", subtopicId: 11, slug: "sexual-reproduction-in-flowering-plant", available: true },
     ],
   },
   {
@@ -77,8 +77,8 @@ const topics = [
     available: false,
     description: "Main topic covering genetics and evolution concepts and principles.",
     subtopics: [
-      { title: "Principle of Inheritance and Variation", subtopicId: 12, slug: "principle-of-inheritance-and-variation", available: false },
-      { title: "Molecular Basis of Inheritance", subtopicId: 13, slug: "molecular-basis-of-inheritance", available: false },
+      { title: "Principle of Inheritance and Variation", subtopicId: 12, slug: "principle-of-inheritance-and-variation", available: true },
+      { title: "Molecular Basis of Inheritance", subtopicId: 13, slug: "molecular-basis-of-inheritance", available: true },
     ],
   },
   {
@@ -87,7 +87,7 @@ const topics = [
     available: false,
     description: "Main topic covering biology and human welfare concepts and principles.",
     subtopics: [
-      { title: "Microbes in Human Welfare", subtopicId: 14, slug: "microbes-in-human-welfare", available: false },
+      { title: "Microbes in Human Welfare", subtopicId: 14, slug: "microbes-in-human-welfare", available: true },
     ],
   },
   {
@@ -96,9 +96,9 @@ const topics = [
     available: false,
     description: "Main topic covering ecology and environment concepts and principles.",
     subtopics: [
-      { title: "Organisms and Population", subtopicId: 15, slug: "organisms-and-population", available: false },
-      { title: "Ecosystem", subtopicId: 16, slug: "ecosystem", available: false },
-      { title: "Biodiversity and Conservation", subtopicId: 17, slug: "biodiversity-and-conservation", available: false },
+      { title: "Organisms and Population", subtopicId: 15, slug: "organisms-and-population", available: true },
+      { title: "Ecosystem", subtopicId: 16, slug: "ecosystem", available: true },
+      { title: "Biodiversity and Conservation", subtopicId: 17, slug: "biodiversity-and-conservation", available: true },
     ],
   },
 ]
