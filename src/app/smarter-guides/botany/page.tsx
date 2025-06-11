@@ -97,7 +97,7 @@ const topics = [
     description: "Main topic covering ecology and environment concepts and principles.",
     subtopics: [
       { title: "Organisms and Population", subtopicId: 15, slug: "organisms-and-population", available: true },
-      { title: "Ecosystem", subtopicId: 16, slug: "ecosystem", available: false },
+      { title: "Ecosystem", subtopicId: 16, slug: "ecosystem", available: true },
       { title: "Biodiversity and Conservation", subtopicId: 17, slug: "biodiversity-and-conservation", available: true },
     ],
   },
