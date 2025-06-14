@@ -7,6 +7,27 @@ const nextConfig: NextConfig = {
   experimental: {
     // Any other experimental options can go here
   },
+  webpack: (config, { dev, isServer }) => {
+    // Optimize webpack cache serialization
+    if (!dev) {
+      config.cache = {
+        ...config.cache,
+        type: 'filesystem',
+        buildDependencies: {
+          config: [__filename],
+        },
+        cacheDirectory: '.next/cache',
+        compression: 'gzip',
+        maxAge: 172800000, // 2 days
+        store: 'pack',
+        version: '1.0.0',
+        // Use Buffer for cache serialization
+        serialize: (data) => Buffer.from(JSON.stringify(data)),
+        deserialize: (data) => JSON.parse(data.toString()),
+      };
+    }
+    return config;
+  },
   async headers() {
     return [
       {
