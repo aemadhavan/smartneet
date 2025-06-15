@@ -1,22 +1,22 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import Link from "next/link";
 
-const fadeIn = {
+const fadeIn: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { 
     opacity: 1, 
     y: 0,
     transition: { 
-      type: "spring",
+      type: "spring" as const,
       stiffness: 100,
       damping: 15
     }
   }
 };
 
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -26,13 +26,13 @@ const staggerContainer = {
   }
 };
 
-const heroImageAnimate = {
+const heroImageAnimate: Variants = {
   hidden: { scale: 0.8, opacity: 0 },
   visible: { 
     scale: 1, 
     opacity: 1, 
     transition: { 
-      type: "spring",
+      type: "spring" as const,
       stiffness: 50,
       delay: 0.2 
     } 

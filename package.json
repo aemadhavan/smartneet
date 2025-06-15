@@ -18,7 +18,8 @@
     "db:migrate:all": "tsx src/db/migrate.ts",
     "db:verify": "tsx src/db/verify-schema.ts",
     "db:migrate:future": "tsx src/db/future-migrations.ts",
-    "db:migrate:safe": "tsx src/db/safe-migrate.ts"
+    "db:migrate:safe": "tsx src/db/safe-migrate.ts",
+    "update-stripe-version": "ts-node scripts/update-stripe-version.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.20.2",
@@ -57,8 +58,8 @@
     "next-sanity": "^9.12.0",
     "postcss": "^8.5.3",
     "postgres": "^3.4.5",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-hook-form": "^7.56.1",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.1",
@@ -97,8 +98,8 @@
     "uuid": "^11.1.0"
   },
   "overrides": {
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-reconciler": "0.29.0",
     "ink": {
       "react": "19.0.0"

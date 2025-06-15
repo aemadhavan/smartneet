@@ -1,20 +1,21 @@
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import Link from "next/link";
 import { stats } from "../data/stats";
 
-const fadeIn = {
+const fadeIn: Variants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
       opacity: 1, 
       y: 0,
       transition: { 
-        type: "spring",
+        type: "spring" as const,
         stiffness: 100,
         damping: 15
       }
     }
-  };
-  const staggerContainer = {
+};
+
+const staggerContainer: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -22,21 +23,22 @@ const fadeIn = {
         staggerChildren: 0.1
       }
     }
-  };
-  const heroImageAnimate = {
+};
+
+const heroImageAnimate: Variants = {
     hidden: { scale: 0.8, opacity: 0 },
     visible: { 
       scale: 1, 
       opacity: 1, 
       transition: { 
-        type: "spring",
+        type: "spring" as const,
         stiffness: 50,
         delay: 0.2 
       } 
     }
-  };
-  
-  const numberCounter = {
+};
+
+const numberCounter: Variants = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
@@ -44,9 +46,9 @@ const fadeIn = {
         duration: 1
       }
     }
-  };
+};
 
-  export const HeroSection = () => {
+export const HeroSection = () => {
     return (
             <section className="relative overflow-hidden bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
             {/* Animated background elements */}
