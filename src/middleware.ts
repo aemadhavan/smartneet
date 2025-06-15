@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // List all public routes here
 const publicRoutes = createRouteMatcher([
@@ -21,7 +22,7 @@ const publicRoutes = createRouteMatcher([
 ]);
 
 // Apply middleware
-export default clerkMiddleware(async (auth, req) => {
+const middleware = async (auth: any, req: NextRequest) => {
   // Skip static files and images
   if (
     req.nextUrl.pathname.startsWith('/_next') ||
@@ -30,11 +31,6 @@ export default clerkMiddleware(async (auth, req) => {
     req.nextUrl.pathname.startsWith('/images') ||
     req.nextUrl.pathname.startsWith('/.well-known')
   ) {
-    return;
-  }
-
-  // Allow 404 page
-  if (req.nextUrl.pathname === '/404') {
     return;
   }
 
@@ -47,10 +43,13 @@ export default clerkMiddleware(async (auth, req) => {
       return NextResponse.redirect(signInUrl);
     }
   }
-});
+};
+
+export default clerkMiddleware(middleware);
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|.well-known).*)',
+    // Match all routes except static files, images, and 404
+    '/((?!_next/static|_next/image|favicon.ico|images|.well-known|404).*)',
   ],
 };
