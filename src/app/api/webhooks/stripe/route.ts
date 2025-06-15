@@ -85,8 +85,9 @@ async function handleSubscriptionChange(subscriptionData: Stripe.Subscription) {
     }
   });
 
-  // Cache invalidation after successful transaction
-  await CacheInvalidator.invalidateUserSubscription(userId);
+  if (userId) {
+    await CacheInvalidator.invalidateUserSubscription(userId);
+  }
 }
 
 async function handleSubscriptionDeleted(subscriptionData: Stripe.Subscription) {
@@ -261,6 +262,9 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
         }
       }, tx); // Pass tx
       console.log(`Payment recorded successfully for invoice: ${invoice.id}`);
+
+      // Cache invalidation after successful transaction
+      await CacheInvalidator.invalidateUserSubscription(finalUserId || subscription.user_id);
     } catch (error) {
       console.error('Error handling payment success:', error);
       throw error; 
@@ -299,6 +303,10 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
     // For now, assuming it can be called outside a transaction or handles its own.
     // If it were to be part of a transaction here, we'd need to start one: db.transaction(async (tx) => { ... })
     await subscriptionService.updateSubscriptionFromStripe(stripeSubscriptionId, userIdForCache || undefined); // Pass userId if available
+    // Cache invalidation after successful transaction
+    if (userIdForCache) {
+      await CacheInvalidator.invalidateUserSubscription(userIdForCache);
+    }
   } catch (error) {
     console.error('Error handling payment failure:', error);
     throw error;
