@@ -22,7 +22,7 @@ const publicRoutes = createRouteMatcher([
 ]);
 
 // Apply middleware
-const middleware = async (auth: any, req: NextRequest) => {
+const middleware = async (auth: () => Promise<{ userId: string | null }>, req: NextRequest) => {
   // Skip static files and images
   if (
     req.nextUrl.pathname.startsWith('/_next') ||
