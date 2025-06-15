@@ -1,102 +1,78 @@
-import {withSentryConfig} from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from "next";
+import path from 'path';
 
 const nextConfig: NextConfig = {
-  /* config options here */
   serverExternalPackages: ['drizzle-orm'],
+  
   experimental: {
-    // Any other experimental options can go here
+    optimizePackageImports: [
+      // Add your UI libraries here, example:
+      '@mantine/core',
+      '@mantine/hooks'
+    ]
   },
-  webpack: (config, { dev, isServer }) => {
-    // Optimize webpack cache serialization
+
+  webpack: (config, { dev }) => {
     if (!dev) {
       config.cache = {
-        ...config.cache,
         type: 'filesystem',
         buildDependencies: {
-          config: [__filename],
+          config: [path.resolve(__dirname, 'next.config.ts')]
         },
-        cacheDirectory: '.next/cache',
+        cacheDirectory: path.resolve(process.cwd(), '.next/cache'),
         compression: 'gzip',
         maxAge: 172800000, // 2 days
-        store: 'pack',
-        version: '1.0.0',
-        // Use Buffer for cache serialization
-        serialize: (data) => Buffer.from(JSON.stringify(data)),
-        deserialize: (data) => JSON.parse(data.toString()),
+        version: '1.0.0'
       };
     }
     return config;
   },
+
   async headers() {
     return [
       {
-        // Document Policy for JavaScript profiling - applies to all routes
         source: "/:path*",
         headers: [
           {
             key: "Document-Policy",
-            value: "js-profiling",
-          },
-        ],
+            value: "js-profiling"
+          }
+        ]
       },
       {
-        // Cache all static assets
         source: '/assets/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
+            value: 'public, max-age=31536000, immutable'
+          }
+        ]
       },
       {
-        // Cache public images
         source: '/images/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=86400, stale-while-revalidate=3600',
-          },
-        ],
-      },
+            value: 'public, max-age=86400, stale-while-revalidate=3600'
+          }
+        ]
+      }
     ];
   },
+
   onDemandEntries: {
-    // Keep the Redis connection alive in development
     maxInactiveAge: 60 * 60 * 1000, // 1 hour
-    pagesBufferLength: 5,
-  },
+    pagesBufferLength: 5
+  }
 };
 
 export default withSentryConfig(nextConfig, {
-// For all available options, see:
-// https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
-org: "inner-sharp-consulting-pty-ltd",
-project: "smarterneet",
-
-// Only print logs for uploading source maps in CI
-silent: !process.env.CI,
-
-// For all available options, see:
-// https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-// Upload a larger set of source maps for prettier stack traces (increases build time)
-widenClientFileUpload: true,
-
-// Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-// This can increase your server load as well as your hosting bill.
-// Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-// side errors will fail.
-tunnelRoute: "/monitoring",
-
-// Automatically tree-shake Sentry logger statements to reduce bundle size
-disableLogger: true,
-
-// Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
-// See the following for more information:
-// https://docs.sentry.io/product/crons/
-// https://vercel.com/docs/cron-jobs
-automaticVercelMonitors: true,
+  org: "inner-sharp-consulting-pty-ltd",
+  project: "smarterneet",
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+  disableLogger: true,
+  automaticVercelMonitors: true
 });

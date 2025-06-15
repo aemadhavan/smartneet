@@ -9,6 +9,11 @@ import { headers } from 'next/headers';
 import Stripe from 'stripe';
 import { CacheInvalidator } from '@/lib/cacheInvalidation';
 
+// Validate Stripe instance
+if (!stripe) {
+  throw new Error('Stripe is not properly initialized. Check your environment variables and configuration.');
+}
+
 // Helper function to safely access Stripe object properties
 function getStripeProperty<T>(obj: unknown, property: string): T | undefined {
   if (obj && typeof obj === 'object' && property in obj) {

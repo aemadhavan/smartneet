@@ -1,10 +1,12 @@
 // src/lib/stripe.ts
 import { loadStripe, Stripe as StripeClient } from '@stripe/stripe-js';
 import Stripe from 'stripe';
+import { STRIPE_CONFIG, getPaymentMethods } from '../config/stripe';
 
 // Initialize Stripe server-side instance with better error handling
 let stripe: Stripe | null = null;
 let secretKey: string = '';
+
 if (typeof window === 'undefined') {
   secretKey = process.env.STRIPE_SECRET_KEY || '';
   if (!secretKey) {
@@ -12,15 +14,18 @@ if (typeof window === 'undefined') {
   }
 
   if (secretKey) {
-    stripe = new Stripe(secretKey, {
-      apiVersion: '2025-04-30.basil', // Use the latest API version
-      appInfo: {
-        name: 'NEET Exam Prep Platform',
-        version: '1.0.0',
-      },
-    });
+    try {
+      stripe = new Stripe(secretKey, {
+        apiVersion: STRIPE_CONFIG.API_VERSION,
+        appInfo: STRIPE_CONFIG.APP_INFO,
+      });
+    } catch (error) {
+      console.error('Error initializing Stripe:', error);
+    }
   }
 }
+
+// Export the stripe instance
 export { stripe };
 
 // Initialize Stripe client-side with proper error handling
@@ -41,7 +46,7 @@ export const getStripe = () => {
 export const formatAmountForDisplay = (amount: number): string => {
   const formatter = new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'INR',
+    currency: STRIPE_CONFIG.PAYMENT_SETTINGS.CURRENCY.toUpperCase(),
     minimumFractionDigits: 0,
   });
   return formatter.format(amount);
@@ -98,12 +103,12 @@ export async function createCheckoutSession({
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      billing_address_collection: 'required',
+      payment_method_types: getPaymentMethods(),
+      billing_address_collection: STRIPE_CONFIG.FEATURES.ENABLE_ADDRESS_COLLECTION ? 'required' : 'auto',
       customer: customerId,
       customer_update: {
-        name: 'auto',    // Add this line to allow name updates
-        address: 'auto'  // Also allow address updates
+        name: 'auto',
+        address: 'auto'
       },
       line_items: [
         {
@@ -123,9 +128,9 @@ export async function createCheckoutSession({
         },
       },
       tax_id_collection: {
-        enabled: true, // For GST collection
+        enabled: STRIPE_CONFIG.FEATURES.ENABLE_TAX_COLLECTION,
       },
-      allow_promotion_codes: true, // Enable promo codes
+      allow_promotion_codes: STRIPE_CONFIG.FEATURES.ENABLE_PROMO_CODES,
     });
 
     return { sessionId: session.id };
