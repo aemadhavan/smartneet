@@ -1,5 +1,6 @@
 // src/components/layout/Header.tsx
 import Link from 'next/link';
+import Image from 'next/image';
 import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
 import GoogleTagManager from './GoogleTagManager';
 
@@ -16,8 +17,18 @@ const Header = () => {
       
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo and brand name */}
-        <Link href="/" className="flex items-center space-x-2">
-          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+        <Link href="/" className="flex items-center space-x-4">
+          <Image
+            src="/smarterneet-logo.jpeg"
+            alt="SmarterNEET Logo"
+            width={64}
+            height={64}
+            className="rounded-full object-contain"
+            priority
+            unoptimized
+            loading="eager"
+          />
+          <span className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             SmarterNEET
           </span>
         </Link>
