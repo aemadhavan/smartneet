@@ -2,6 +2,7 @@
 
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { DiagramBasedDetails, DiagramBasedAnswer } from '../interfaces';
 
 interface DiagramBasedProps {
@@ -32,17 +33,23 @@ export default function DiagramBased({
 
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {questionText ?? 'No question text available'}
+      <div className="text-gray-700 dark:text-gray-300">
+        <LaTeXRenderer 
+          content={questionText ?? 'No question text available'}
+          className="whitespace-pre-line"
+        />
       </div>
       
       {/* Display diagram image - always show if isImageBased or if we have an imageUrl */}
       {(isImageBased || imageUrl) && (
         <div className="my-4">
           {diagramDescription && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2 italic">
-              {diagramDescription}
-            </p>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-2 italic">
+              <LaTeXRenderer 
+                content={diagramDescription}
+                inline={true}
+              />
+            </div>
           )}
           <Image
             src={imageUrl || ''}
@@ -112,9 +119,11 @@ export default function DiagramBased({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className={`${textColorClass} font-medium`}>
-                    {option.text}
-                  </p>
+                  <LaTeXRenderer 
+                    content={option.text}
+                    className={`${textColorClass} font-medium`}
+                    inline={true}
+                  />
                 </div>
                 <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                   {isUserSelection && (

@@ -1,6 +1,7 @@
 // src/components/questions/QuestionViewer.tsx
 import { useState, useEffect } from 'react';
 import useQuestionById from '@/hooks/useQuestionById';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import {
   Question,
   QuestionDetails,
@@ -265,11 +266,11 @@ export function QuestionViewer({
         </span>
       </div>
 
-      {/* Question text */}
+      {/* Question text with LaTeX support */}
       <div className="mb-6">
-        <div 
+        <LaTeXRenderer 
+          content={question.question_text}
           className="prose prose-indigo dark:prose-invert max-w-none text-gray-800 dark:text-gray-100"
-          dangerouslySetInnerHTML={{ __html: question.question_text }}
         />
       </div>
 
@@ -353,13 +354,13 @@ export function QuestionViewer({
         )}
       </div>
 
-      {/* Explanation section */}
+      {/* Explanation section with LaTeX support */}
       {showExplanation && question.explanation && (
         <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-100 dark:border-blue-800">
           <h3 className="text-lg font-medium text-blue-800 dark:text-blue-100 mb-2">Explanation</h3>
-          <div 
+          <LaTeXRenderer 
+            content={question.explanation}
             className="prose prose-sm prose-blue dark:prose-invert max-w-none text-gray-700 dark:text-gray-200"
-            dangerouslySetInnerHTML={{ __html: question.explanation }}
           />
         </div>
       )}

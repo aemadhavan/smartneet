@@ -225,3 +225,26 @@
     opacity: 1;
   }
 }
+/* LaTeX styling improvements */
+.latex-content .katex {
+  font-size: 1em;
+}
+
+.latex-content .katex-display {
+  margin: 0.5em 0;
+}
+
+/* Chemistry-specific styling */
+.latex-content .katex .mord {
+  color: inherit;
+}
+
+/* Dark mode support for LaTeX */
+.dark .latex-content .katex {
+  color: inherit;
+}
+
+/* Ensure proper line height for inline math */
+.latex-content .katex .base {
+  vertical-align: baseline;
+}

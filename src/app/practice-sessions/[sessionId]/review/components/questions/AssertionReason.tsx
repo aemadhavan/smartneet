@@ -2,6 +2,7 @@
 
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { AssertionReasonDetails, AssertionReasonAnswer } from '../interfaces';
 
 interface AssertionReasonProps {
@@ -13,9 +14,6 @@ interface AssertionReasonProps {
   questionText?: string;
 }
 
-/**
- * Component for rendering Assertion-Reason questions
- */
 export default function AssertionReason({ 
   details, 
   userAnswer, 
@@ -24,7 +22,6 @@ export default function AssertionReason({
   imageUrl,
   questionText
 }: AssertionReasonProps) {
-  // Get direct values from normalized data
   const userSelection = userAnswer.selectedOption;
   const correctOption = correctAnswer.selectedOption;
   const options = details.options;
@@ -35,7 +32,6 @@ export default function AssertionReason({
   let statement1 = '';
   let statement2 = '';
 
-  // If assertion contains both statements, try to extract them
   if (assertion && assertion.includes('Assertion') && assertion.includes('Reason')) {
     const assertionMatch = assertion.match(/Assertion A:?\s*([^.\n]+)/i);
     const reasonMatch = assertion.match(/Reason R:?\s*([^.\n]+)/i);
@@ -48,7 +44,6 @@ export default function AssertionReason({
       statement2 = reasonMatch[1].trim();
     }
   } else {
-    // Use separate assertion and reason fields
     statement1 = assertion || '';
     statement2 = reason || '';
   }
@@ -74,8 +69,11 @@ export default function AssertionReason({
 
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {questionText ?? 'No question text available'}
+      <div className="text-gray-700 dark:text-gray-300">
+        <LaTeXRenderer 
+          content={questionText ?? 'No question text available'}
+          className="whitespace-pre-line"
+        />
       </div>
 
       {isImageBased && imageUrl && (
@@ -98,30 +96,34 @@ export default function AssertionReason({
         {statement1 && (
           <div className="mb-2">
             <span className="font-semibold text-gray-700 dark:text-gray-300">Assertion A:</span>
-            <p className="text-gray-600 dark:text-gray-400 ml-4">
-              {statement1}
-            </p>
+            <div className="text-gray-600 dark:text-gray-400 ml-4">
+              <LaTeXRenderer 
+                content={statement1}
+                inline={true}
+              />
+            </div>
           </div>
         )}
         {statement2 && (
           <div>
             <span className="font-semibold text-gray-700 dark:text-gray-300">Reason R:</span>
-            <p className="text-gray-600 dark:text-gray-400 ml-4">
-              {statement2}
-            </p>
+            <div className="text-gray-600 dark:text-gray-400 ml-4">
+              <LaTeXRenderer 
+                content={statement2}
+                inline={true}
+              />
+            </div>
           </div>
         )}
       </div>
 
       <div className="space-y-2 mt-4">
         {options.map((option, idx) => {
-          // Determine the status of this option
           const isUserSelection = userSelection === option.id;
           const isCorrectOption = correctOption === option.id || option.isCorrect;
           const isCorrectSelection = isUserSelection && isCorrectOption;
           const isIncorrectSelection = isUserSelection && !isCorrectOption;
           
-          // Style determination logic
           let bgColorClass = 'bg-gray-50 dark:bg-gray-800';
           let borderColorClass = 'border-gray-200 dark:border-gray-700';
           let textColorClass = 'text-gray-700 dark:text-gray-300';
@@ -166,9 +168,11 @@ export default function AssertionReason({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className={`${textColorClass} font-medium`}>
-                    {option.text}
-                  </p>
+                  <LaTeXRenderer 
+                    content={option.text}
+                    className={`${textColorClass} font-medium`}
+                    inline={true}
+                  />
                 </div>
                 <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                   {isUserSelection && (

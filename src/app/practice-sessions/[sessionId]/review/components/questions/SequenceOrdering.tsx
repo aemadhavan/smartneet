@@ -2,6 +2,7 @@
 
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { SequenceOrderingDetails, SequenceOrderingAnswer } from '../interfaces';
 
 interface SequenceOrderingProps {
@@ -40,8 +41,11 @@ export default function SequenceOrdering({
 
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {questionText ?? introText ?? 'No question text available'}
+      <div className="text-gray-700 dark:text-gray-300">
+        <LaTeXRenderer 
+          content={questionText ?? introText ?? 'No question text available'}
+          className="whitespace-pre-line"
+        />
       </div>
       
       {isImageBased && imageUrl && (
@@ -114,9 +118,11 @@ export default function SequenceOrdering({
                   </div>
                 </div>
                 <div className="flex-1">
-                  <p className={`${textColorClass} font-medium`}>
-                    {option.text}
-                  </p>
+                  <LaTeXRenderer 
+                    content={option.text}
+                    className={`${textColorClass} font-medium`}
+                    inline={true}
+                  />
                 </div>
                 <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                   {isUserSelection && (
@@ -149,9 +155,15 @@ export default function SequenceOrdering({
           <div className="grid grid-cols-1 gap-2">
             {items.map((item, idx) => (
               <div key={idx} className="p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                <div className="flex items-center">
-                  <span className="font-medium text-gray-700 dark:text-gray-300 mr-2">{item.id}:</span>
-                  <span className="text-gray-600 dark:text-gray-400">{item.text}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 dark:text-gray-300 mr-2 flex-shrink-0">{item.id}:</span>
+                  <div className="flex-1">
+                    <LaTeXRenderer 
+                      content={item.text}
+                      className="text-gray-600 dark:text-gray-400"
+                      inline={true}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -170,7 +182,10 @@ export default function SequenceOrdering({
                   <span className="text-green-600 dark:text-green-400 mx-1">→</span>
                 )}
                 <div className="px-3 py-1 bg-green-100 dark:bg-green-800/40 rounded-full text-green-800 dark:text-green-300 font-medium">
-                  {item}
+                  <LaTeXRenderer 
+                    content={item}
+                    inline={true}
+                  />
                 </div>
               </div>
             ))}

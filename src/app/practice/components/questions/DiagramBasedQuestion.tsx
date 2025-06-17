@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/DiagramBasedQuestion.tsx
 import { OptionButton, DiagramDisplay } from '@/app/practice/components/ui';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { QuestionOption } from '@/app/practice/types';
 import { normalizeDiagramBasedDetails, extractDiagramLabelsFromText } from '@/app/practice/utils/questionUtils';
 import { logger } from '@/lib/logger';
@@ -124,9 +125,12 @@ export function DiagramBasedQuestion({
   return (
     <div>
       {normalizedDetails.diagram_details?.description && (
-        <p className="mb-4 text-gray-700 dark:text-gray-300">
-          {normalizedDetails.diagram_details.description}
-        </p>
+        <div className="mb-4">
+          <LaTeXRenderer 
+            content={normalizedDetails.diagram_details.description}
+            className="text-gray-700 dark:text-gray-300"
+          />
+        </div>
       )}
       <div className="mb-6">
         {/* Use our reusable DiagramDisplay component */}
