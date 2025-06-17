@@ -18,6 +18,8 @@ const publicRoutes = createRouteMatcher([
   "/monitoring(.*)",
   "/pricing(.*)",
   "/api/subscription-plans(.*)",
+  "/sitemap.xml",
+  "/robots.txt",
   // Add more public routes as needed
 ]);
 
@@ -29,7 +31,11 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
     req.nextUrl.pathname.startsWith('/static') ||
     req.nextUrl.pathname.startsWith('/favicon.ico') ||
     req.nextUrl.pathname.startsWith('/images') ||
-    req.nextUrl.pathname.startsWith('/.well-known')
+    req.nextUrl.pathname.startsWith('/.well-known') ||
+    req.nextUrl.pathname.startsWith('/smarterneet-logo.jpeg') ||
+    req.nextUrl.pathname.startsWith('/smarteneet.svg') ||
+    req.nextUrl.pathname.startsWith('/sitemap.xml') ||
+    req.nextUrl.pathname.startsWith('/robots.txt')
   ) {
     return;
   }
@@ -50,6 +56,6 @@ export default clerkMiddleware(middleware);
 export const config = {
   matcher: [
     // Match all routes except static files, images, and 404
-    '/((?!_next/static|_next/image|favicon.ico|images|.well-known|404).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|.well-known|404|smarterneet-logo.jpeg|smarteneet.svg|sitemap.xml|robots.txt).*)',
   ],
 };
