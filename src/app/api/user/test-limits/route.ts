@@ -88,7 +88,12 @@ export async function GET(request: Request) {
           // Get user subscription with timeout protection
           const subscription = await subscriptionService.getUserSubscription(userId);
           
-          if (!subscription) {
+          // Always reset daily counter if needed
+          await subscriptionService.resetDailyCounterIfNeeded(userId, subscription);
+          // Fetch updated subscription after potential reset
+          const updatedSubscription = await subscriptionService.getUserSubscription(userId);
+          
+          if (!updatedSubscription) {
             console.log(`No subscription found for user ${userId}, using free plan`);
             return DEFAULT_FREE_SUBSCRIPTION;
           }
@@ -97,13 +102,13 @@ export async function GET(request: Request) {
           const plans = await db
             .select()
             .from(subscription_plans)
-            .where(eq(subscription_plans.plan_id, subscription.plan_id))
+            .where(eq(subscription_plans.plan_id, updatedSubscription.plan_id))
             .limit(1);
           
           const plan = plans.length > 0 ? plans[0] : null;
           
           if (!plan) {
-            console.log(`No plan found for subscription ${subscription.subscription_id}, using free plan`);
+            console.log(`No plan found for subscription ${updatedSubscription.subscription_id}, using free plan`);
             return DEFAULT_FREE_SUBSCRIPTION;
           }
           
@@ -114,7 +119,7 @@ export async function GET(request: Request) {
           const isUnlimited = plan.test_limit_daily === null;
           
           // Calculate remaining tests
-          const testsUsedToday = subscription.tests_used_today || 0;
+          const testsUsedToday = updatedSubscription.tests_used_today || 0;
           const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
           const remainingToday = isUnlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limitPerDay - testsUsedToday);
           
@@ -129,11 +134,11 @@ export async function GET(request: Request) {
               reason: canTake ? null : (reason || null) // Ensure reason is never undefined
             },
             subscription: {
-              id: subscription.subscription_id,
+              id: updatedSubscription.subscription_id,
               planName: plan.plan_name,
               planCode: plan.plan_code,
-              status: subscription.status,
-              lastTestDate: subscription.last_test_date ? new Date(subscription.last_test_date).toISOString() : null
+              status: updatedSubscription.status,
+              lastTestDate: updatedSubscription.last_test_date ? new Date(updatedSubscription.last_test_date).toISOString() : null
             }
           };
         };
