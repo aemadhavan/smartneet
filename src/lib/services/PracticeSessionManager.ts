@@ -4,12 +4,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { cache } from '@/lib/cache';
 import { logger } from '@/lib/logger';
 import { subscriptionService } from './SubscriptionService';
-import { questionPoolService } from './QuestionPoolService';
+import { questionPoolService, QuestionWithDetails } from './QuestionPoolService';
 import { 
   practice_sessions, 
   session_questions,
-  user_subscriptions,
-  questions
+  user_subscriptions
 } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -26,7 +25,7 @@ interface SessionCreationRequest {
 
 interface SessionCreationResult {
   sessionId: number;
-  questions: typeof questions.$inferSelect[];
+  questions: QuestionWithDetails[];
   idempotencyKey: string;
 }
 
@@ -48,8 +47,10 @@ export class PracticeSessionManager {
     if (existingResult) {
       logger.info('Session creation - idempotency hit', {
         userId: request.userId,
-        idempotencyKey: finalIdempotencyKey,
-        existingSessionId: existingResult.sessionId
+        data: {
+          idempotencyKey: finalIdempotencyKey,
+          existingSessionId: existingResult.sessionId
+        }
       });
       return existingResult;
     }
@@ -136,10 +137,12 @@ export class PracticeSessionManager {
 
       logger.info('Session created successfully', {
         userId: request.userId,
-        sessionId: result.sessionId,
-        questionCount: result.questions.length,
-        duration: Date.now() - startTime,
-        idempotencyKey: finalIdempotencyKey
+        data: {
+          sessionId: result.sessionId,
+          questionCount: result.questions.length,
+          duration: Date.now() - startTime,
+          idempotencyKey: finalIdempotencyKey
+        }
       });
 
       return result;
@@ -172,7 +175,7 @@ export class PracticeSessionManager {
       return currentValue === lockValue;
     } catch (error) {
       logger.error('Failed to acquire session creation lock', {
-        lockKey,
+        data: { lockKey },
         error: error instanceof Error ? error.message : String(error)
       });
       return false;
@@ -187,7 +190,7 @@ export class PracticeSessionManager {
       await cache.delete(lockKey);
     } catch (error) {
       logger.warn('Failed to release session creation lock', {
-        lockKey,
+        data: { lockKey },
         error: error instanceof Error ? error.message : String(error)
       });
     }
@@ -271,7 +274,7 @@ export class PracticeSessionManager {
       } catch (error) {
         logger.warn('Failed to invalidate cache key', {
           userId,
-          cacheKey: key,
+          data: { cacheKey: key },
           error: error instanceof Error ? error.message : String(error)
         });
       }
@@ -337,8 +340,10 @@ export class PracticeSessionManager {
     if (result.length > 0) {
       logger.info('Completed abandoned sessions', {
         userId,
-        sessionCount: result.length,
-        sessionIds: result.map(s => s.session_id)
+        data: {
+          sessionCount: result.length,
+          sessionIds: result.map(s => s.session_id)
+        }
       });
     }
 

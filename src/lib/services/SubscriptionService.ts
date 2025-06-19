@@ -281,7 +281,7 @@ export class SubscriptionService {
   /**
    * Reset daily test counter if it's a new day
    */
-  private async resetDailyCounterIfNeeded(userId: string, subscription: UserSubscription) {
+  async resetDailyCounterIfNeeded(userId: string, subscription: UserSubscription) {
     try {
       const today = new Date();
       const lastTestDate = subscription.last_test_date;

@@ -257,8 +257,10 @@ export class ImprovedSubscriptionService {
 
     logger.info('Created default subscription', {
       userId,
-      subscriptionId: newSubscription.subscription_id,
-      planId: freePlan.plan_id
+      data: {
+        subscriptionId: newSubscription.subscription_id,
+        planId: freePlan.plan_id
+      }
     });
 
     return newSubscription;
@@ -275,7 +277,7 @@ export class ImprovedSubscriptionService {
     const shouldReset = !lastTestDate || 
       !this.isSameUTCDay(new Date(lastTestDate), now);
 
-    if (shouldReset && subscription.tests_used_today > 0) {
+    if (shouldReset && (subscription.tests_used_today || 0) > 0) {
       // Reset counter
       await tx
         .update(user_subscriptions)
@@ -312,6 +314,7 @@ export class ImprovedSubscriptionService {
         plan_id: planId,
         plan_name: 'Free Plan',
         plan_code: 'free',
+        description: 'Default free plan',
         test_limit_daily: 3,
         price_inr: 0,
         price_id_stripe: '',
@@ -416,6 +419,7 @@ export class ImprovedSubscriptionService {
         plan_id: 1,
         plan_name: 'Free Plan',
         plan_code: 'free',
+        description: 'Default free plan',
         test_limit_daily: 3,
         price_inr: 0,
         price_id_stripe: '',
@@ -449,7 +453,7 @@ export class ImprovedSubscriptionService {
       return currentValue === lockValue;
     } catch (error) {
       logger.error('Failed to acquire subscription lock', {
-        lockKey,
+        data: { lockKey },
         error: error instanceof Error ? error.message : String(error)
       });
       return false;
@@ -464,7 +468,7 @@ export class ImprovedSubscriptionService {
       await cache.delete(lockKey);
     } catch {
       logger.warn('Failed to release subscription lock', {
-        lockKey
+        data: { lockKey }
       });
     }
   }
@@ -483,7 +487,7 @@ export class ImprovedSubscriptionService {
       try {
         await cache.delete(key);
       } catch {
-        logger.warn('Failed to invalidate cache', { userId, key });
+        logger.warn('Failed to invalidate cache', { userId, data: { key } });
       }
     }
   }
