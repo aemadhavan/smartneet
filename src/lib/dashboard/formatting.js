@@ -16,16 +16,19 @@ export const getMasteryColor = (level) => {
   };
   
   /**
-   * Formats a date string
+   * Formats a date string with local date and time
    * @param {string} dateString - Date string to format
-   * @returns {string} Formatted date
+   * @returns {string} Formatted date and time
    */
   export const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return date.toLocaleString('en-US', { 
       month: 'short', 
       day: 'numeric', 
-      year: 'numeric' 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   };
   

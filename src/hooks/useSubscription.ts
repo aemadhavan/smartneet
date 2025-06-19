@@ -18,9 +18,15 @@ export interface SubscriptionData {
 }
 
 // Create a client-side API function to fetch subscription data
-const fetchSubscriptionData = async (userId: string) => {
+const fetchSubscriptionData = async (userId: string, skipCache = false) => {
   try {
-    const response = await fetch(`/api/subscription?userId=${userId}`);
+    const url = `/api/subscription?userId=${userId}${skipCache ? '&t=' + Date.now() : ''}`;
+    const response = await fetch(url, {
+      headers: skipCache ? {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      } : {}
+    });
     if (!response.ok) {
       throw new Error('Failed to fetch subscription data');
     }
@@ -44,6 +50,7 @@ export function useSubscription() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     async function getSubscriptionData() {
@@ -67,8 +74,8 @@ export function useSubscription() {
       try {
         setIsLoading(true);
         
-        // Fetch subscription data from API endpoint instead of direct service call
-        const result = await fetchSubscriptionData(userId);
+        // Fetch subscription data from API endpoint (skip cache on refresh)
+        const result = await fetchSubscriptionData(userId, refreshTrigger > 0);
         
         if (result.success) {
           const subData = result.data;
@@ -106,7 +113,7 @@ export function useSubscription() {
     }
 
     getSubscriptionData();
-  }, [userId, isLoaded, isSignedIn]);
+  }, [userId, isLoaded, isSignedIn, refreshTrigger]);
 
   /**
    * Check if the user can access a specific topic based on its index
@@ -122,12 +129,20 @@ export function useSubscription() {
     return subscriptionData.isPremium || subscriptionData.remainingTests > 0;
   };
 
+  /**
+   * Refresh subscription data from the server
+   */
+  const refreshSubscriptionData = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   return {
     ...subscriptionData,
     isLoading,
     error,
     canAccessTopic,
-    canTakeTest
+    canTakeTest,
+    refreshSubscriptionData
   };
 }
 

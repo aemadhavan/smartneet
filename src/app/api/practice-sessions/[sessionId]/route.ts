@@ -184,7 +184,10 @@ export async function GET(
         question_subtopic_name: subtopics.subtopic_name,
       })
       .from(session_questions)
-      .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
+      .innerJoin(questions, and(
+        eq(session_questions.question_id, questions.question_id),
+        eq(questions.is_active, true)
+      ))
       .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
       .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
       .where(eq(session_questions.session_id, sessionId))

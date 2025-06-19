@@ -17,6 +17,7 @@ export class CacheService {
       // Always invalidate these patterns
       patterns.push(`user:${userId}:subscription`);
       patterns.push(`user:${userId}:tests:*`);
+      patterns.push(`api:practice-sessions:user:${userId}:*`);
       
       // If specific session, only invalidate that session
       if (sessionId) {
@@ -92,6 +93,28 @@ export class CacheService {
         userId,
         context: 'CacheService.trackCacheKey',
         data: { cacheKey },
+        error: error instanceof Error ? error : String(error)
+      });
+    }
+  }
+
+  /**
+   * Invalidate the test limits cache for a user
+   */
+  async invalidateUserTestLimits(userId: string): Promise<void> {
+    try {
+      await cache.delete(`user:${userId}:test-limits`);
+      if (typeof revalidatePath === 'function') {
+        revalidatePath(`/api/user/test-limits`);
+      }
+      logger.info('Invalidated user test limits cache', {
+        userId,
+        context: 'CacheService.invalidateUserTestLimits',
+      });
+    } catch (error) {
+      logger.error('Error invalidating user test limits cache', {
+        userId,
+        context: 'CacheService.invalidateUserTestLimits',
         error: error instanceof Error ? error : String(error)
       });
     }

@@ -1,7 +1,7 @@
 // lib/services/QuestionService.ts
 import { db } from '@/db'
 import { questions, topics, subtopics } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { cache, withCache } from '../cache'
 
 export class QuestionService {
@@ -11,7 +11,10 @@ export class QuestionService {
   async getQuestionsByTopic(topicId: number) {
     return withCache(
       async (id: number) => {
-        return db.select().from(questions).where(eq(questions.topic_id, id))
+        return db.select().from(questions).where(and(
+          eq(questions.topic_id, id),
+          eq(questions.is_active, true)
+        ))
       },
       `topic:${topicId}:questions`,
       1800 // Cache for 30 minutes
@@ -24,7 +27,10 @@ export class QuestionService {
   async getQuestionsBySubtopic(subtopicId: number) {
     return withCache(
       async (id: number) => {
-        return db.select().from(questions).where(eq(questions.subtopic_id, id))
+        return db.select().from(questions).where(and(
+          eq(questions.subtopic_id, id),
+          eq(questions.is_active, true)
+        ))
       },
       `subtopic:${subtopicId}:questions`,
       1800 // Cache for 30 minutes
@@ -59,7 +65,10 @@ export class QuestionService {
       .from(questions)
       .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
       .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
-      .where(eq(questions.question_id, questionId))
+      .where(and(
+        eq(questions.question_id, questionId),
+        eq(questions.is_active, true)
+      ))
     
     const question = result[0] || null
     

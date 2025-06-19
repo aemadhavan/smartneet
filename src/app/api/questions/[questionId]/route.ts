@@ -7,7 +7,7 @@ import {
   subtopics, 
   subjects 
 } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { cache } from '@/lib/cache';
 
@@ -68,7 +68,10 @@ export async function GET(
     .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
     .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
     .leftJoin(subjects, eq(questions.subject_id, subjects.subject_id))
-    .where(eq(questions.question_id, questionId))
+    .where(and(
+      eq(questions.question_id, questionId),
+      eq(questions.is_active, true)
+    ))
     .limit(1);
 
     if (!question || question.length === 0) {

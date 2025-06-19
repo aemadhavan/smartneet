@@ -5,26 +5,20 @@ import { count } from 'drizzle-orm';
 import { 
   practice_sessions, 
   subjects,
-  topics,
-  session_questions
+  topics
 } from '@/db/schema';
 import { and, eq, desc } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { cache } from '@/lib/cache';
-import { 
-  checkSubscriptionLimitServerAction, 
-  incrementTestUsage 
-} from '@/lib/middleware/subscriptionMiddleware';
 import { applyRateLimit, RATE_LIMITS, CACHE_TTLS } from '@/lib/middleware/rateLimitMiddleware';
 import { logger } from '@/lib/logger';
-import { questionPoolService } from '@/lib/services/QuestionPoolService';
 import { cacheService } from '@/lib/services/CacheService';
+import { practiceSessionManager } from '@/lib/services/PracticeSessionManager';
 import { 
   CreateSessionRequest, 
   UpdateSessionRequest, 
   PaginatedSessionsResponse,
-  SessionQuestionInsert,
   SessionResponse
 } from '@/types/practice-sessions';
 
@@ -73,6 +67,9 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Get idempotency key from header
+    const idempotencyKey = request.headers.get('x-idempotency-key');
 
     // Apply rate limiting using middleware
     const rateLimitResponse = await applyRateLimit(
@@ -130,137 +127,55 @@ export async function POST(request: NextRequest) {
     try {
       const validatedData = createSessionSchema.parse(requestData);
       
-      // Generate idempotency key from request or headers
-      const idempotencyKey = request.headers.get('x-idempotency-key') || 
-                            `${userId}:${validatedData.subject_id}:${validatedData.session_type}:${Date.now()}`;
-      
-      // Check if we've already processed this request
-      const cacheKey = `idempotency:${userId}:${idempotencyKey}`;
-      const cachedResponse = await cache.get<{ sessionId: number }>(cacheKey);
-      if (cachedResponse) {
-        logger.info('Using cached idempotent response', {
-          userId,
-          context: 'practice-sessions.POST',
-          data: { idempotencyKey, sessionId: cachedResponse.sessionId }
-        });
-        return NextResponse.json(cachedResponse, { status: 200 });
-      }
+      // Use the new PracticeSessionManager for robust session creation
+      const result = await practiceSessionManager.createSession({
+        userId,
+        subjectId: validatedData.subject_id,
+        topicId: validatedData.topic_id,
+        subtopicId: validatedData.subtopic_id,
+        questionCount: validatedData.question_count,
+        sessionType: validatedData.session_type
+      }, idempotencyKey || undefined);
 
-      // Set a lock to prevent concurrent processing of the same request
-      const lockKey = `lock:${cacheKey}`;
-      try {
-        await cache.set(lockKey, true, 30); // 30 second lock
-        const lockExists = await cache.get(lockKey);
-        if (!lockExists) {
-          logger.warn('Failed to acquire lock for session creation', {
-            userId,
-            context: 'practice-sessions.POST',
-            data: { idempotencyKey }
-          });
-          return NextResponse.json({ error: 'Request is being processed' }, { status: 409 });
+      logger.info('Created new practice session via PracticeSessionManager', {
+        userId,
+        context: 'practice-sessions.POST',
+        data: { 
+          sessionId: result.sessionId,
+          questionCount: result.questions.length,
+          idempotencyKey: result.idempotencyKey
         }
+      });
 
-        // Check subscription limits before creating a new session
-        const subscriptionCheck = await checkSubscriptionLimitServerAction(userId);
-        if (!subscriptionCheck.success) {
-          return NextResponse.json({
-            error: subscriptionCheck.message,
-            limitReached: subscriptionCheck.limitReached,
-            upgradeRequired: true
-          }, { status: 403 });
-        }
-
-        // Use a transaction for the entire session creation process
-        const result = await db.transaction(async (tx) => {
-          // Create new session in database
-          const [newSession] = await tx.insert(practice_sessions).values({
-            user_id: userId,
-            subject_id: validatedData.subject_id,
-            topic_id: validatedData.topic_id,
-            subtopic_id: validatedData.subtopic_id,
-            session_type: validatedData.session_type,
-            duration_minutes: validatedData.duration_minutes,
-            total_questions: validatedData.question_count,
-            questions_attempted: 0,
-            questions_correct: 0,
-            is_completed: false,
-            start_time: new Date()
-          }).returning();
-
-          // Get personalized questions using the service
-          const sessionQuestions = await questionPoolService.getPersonalizedQuestions(
-            userId, 
-            validatedData.subject_id, 
-            validatedData.topic_id, 
-            validatedData.subtopic_id, 
-            validatedData.question_count
-          );
-
-          // Check if we have enough questions
-          if (sessionQuestions.length === 0) {
-            throw new Error('No questions available for the selected criteria');
-          }
-
-          // Use a Set to track question IDs and prevent duplicates
-          const questionIdSet = new Set<number>();
-          const valuesToInsert: SessionQuestionInsert[] = [];
-          
-          sessionQuestions.forEach((question, index) => {
-            // Skip duplicate questions
-            if (questionIdSet.has(question.question_id)) {
-              return;
-            }
-            
-            questionIdSet.add(question.question_id);
-            valuesToInsert.push({
-              session_id: newSession.session_id,
-              question_id: question.question_id,
-              question_order: index + 1,
-              is_bookmarked: false,
-              time_spent_seconds: 0,
-              user_id: userId,
-              topic_id: question.topic_id
-            });
-          });
-          
-          // Batch insert questions instead of doing them one by one
-          if (valuesToInsert.length > 0) {
-            await tx.insert(session_questions).values(valuesToInsert);
-          }
-
-          return {
-            sessionId: newSession.session_id,
-            questions: sessionQuestions
-          };
-        });
-
-        // Increment test usage for subscription tracking
-        await incrementTestUsage(userId);
-
-        // Invalidate user's practice sessions list cache
-        await cacheService.invalidateUserSessionCaches(userId);
-
-        // Store the result in the idempotency cache
-        await cache.set(cacheKey, result, CACHE_TTLS.IDEMPOTENCY_KEY);
-        
-        logger.info('Created new practice session', {
-          userId,
-          context: 'practice-sessions.POST',
-          data: { 
-            sessionId: result.sessionId,
-            questionCount: result.questions.length,
-            idempotencyKey
-          }
-        });
-
-        return NextResponse.json(result);
-      } finally {
-        // Release the lock by setting it to expire immediately
-        if (lockKey) {
-          await cache.set(lockKey, false, 0);
-        }
-      }
+      return NextResponse.json({
+        sessionId: result.sessionId,
+        questions: result.questions
+      });
     } catch (e) {
+      // Check if it's a subscription limit error first
+      if (e instanceof Error && (
+        e.message.includes('daily limit') || 
+        e.message.includes('subscription limit') ||
+        e.message.includes('Cannot take test') ||
+        e.message.includes('premium users') ||
+        e.message.includes('upgrade to premium')
+      )) {
+        logger.warn('Session creation blocked due to subscription limits', {
+          userId,
+          context: 'practice-sessions.POST',
+          error: e.message
+        });
+        
+        return NextResponse.json(
+          { 
+            error: e.message,
+            limitReached: true,
+            upgradeRequired: e.message.includes('premium')
+          }, 
+          { status: 403 }
+        );
+      }
+      
       // If it's a Zod error, provide more focused information
       if (e instanceof z.ZodError) {
         logger.warn('Validation error in session creation', {

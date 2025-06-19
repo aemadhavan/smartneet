@@ -19,7 +19,10 @@
     "db:verify": "tsx src/db/verify-schema.ts",
     "db:migrate:future": "tsx src/db/future-migrations.ts",
     "db:migrate:safe": "tsx src/db/safe-migrate.ts",
-    "update-stripe-version": "ts-node scripts/update-stripe-version.ts"
+    "update-stripe-version": "ts-node scripts/update-stripe-version.ts",
+    "diagnose:practice": "node scripts/run-practice-diagnostics.js diagnose",
+    "fix:practice-issues": "node scripts/run-practice-diagnostics.js fix",
+    "fix:practice-issues:execute": "node scripts/run-practice-diagnostics.js fix-execute"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.20.2",

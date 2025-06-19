@@ -131,7 +131,8 @@ export class QuestionPoolService {
       // Build conditions array
       const conditions = [
         eq(questions.subject_id, subjectId),
-        eq(questions.source_type, 'AI_Generated')
+        eq(questions.source_type, 'AI_Generated'),
+        eq(questions.is_active, true)
       ];
       
       // Add topic filter if specified

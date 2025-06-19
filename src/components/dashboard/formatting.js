@@ -17,18 +17,21 @@ export const getMasteryColor = (level) => {
   };
   
   /**
-   * Format date to a readable string
+   * Format date to a readable string with local date and time
    * @param {string} dateString - ISO date string
-   * @returns {string} - Formatted date string (e.g., "Jan 15, 2025")
+   * @returns {string} - Formatted date and time string (e.g., "Jan 15, 2025, 2:30 PM")
    */
   export const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
     });
   };
   
