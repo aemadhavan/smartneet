@@ -60,7 +60,7 @@ export default function PracticeClientPage() {
   
   // More detailed loading states
   const [isInitializing, setIsInitializing] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
+  const [, setRetryCount] = useState(0);
   const [sessionInitialized, setSessionInitialized] = useState(false);
   
   // Get subscription limit status 
@@ -113,7 +113,7 @@ export default function PracticeClientPage() {
     handleCompleteSession: rawHandleCompleteSession,
     handleStartNewSession,
     createSession,
-    handleRetry: sessionRetry
+    handleRetry: sessionRetry,
   } = usePracticeSession(
     // Don't automatically create session until we check limits
     null, 
@@ -175,13 +175,12 @@ export default function PracticeClientPage() {
 
   // More robust session initialization with retries and better error handling
   useEffect(() => {
+    let cancelled = false;
     const initSession = async () => {
-      // Skip if we've already initialized or if we're in the subject selection screen
       if (sessionInitialized || !selectedSubject || accessDenied) {
         setIsInitializing(false);
         return;
       }
-      
       // Wait for limit status to be available (max 3 seconds)
       let waitTime = 0;
       const maxWaitTime = 3000; // 3 seconds
@@ -192,34 +191,34 @@ export default function PracticeClientPage() {
         waitTime += checkInterval;
       }
       
-      // If we have limit status or we've waited too long, proceed
       try {
         if (limitStatus && !limitStatus.canTake) {
           // Show limit notification if user can't take more tests
           setLimitMessage(limitStatus.reason || "You've reached your daily practice limit");
           setShowLimitNotification(true);
         } else {
-          // Create session if user can take more tests or if we're using default limits
+          console.log('Creating new session for subject:', selectedSubject, 'at', new Date().toISOString());
           const newSession = await createSession(selectedSubject);
-          
-          if (newSession) {
-            // Session created successfully
+          if (!cancelled && newSession) {
             setSessionInitialized(true);
-            // Increment the refresh key to force a re-fetch
             setLimitsRefreshKey(prev => prev + 1);
-            // Refetch limits after creating session to update the counter
             refetchLimits();
           }
         }
       } catch (error) {
-        console.error('Failed to initialize session:', error);
+        if (!cancelled) {
+          console.error('Failed to initialize session:', error);
+        }
       } finally {
-        setIsInitializing(false);
+        if (!cancelled) {
+          setIsInitializing(false);
+        }
       }
     };
     
     initSession();
-  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, retryCount]);
+    return () => { cancelled = true; };
+  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized]);
 
   // Combined loading state
   const loading = isInitializing || subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
@@ -233,16 +232,14 @@ export default function PracticeClientPage() {
     setAccessDenied(false);
     setSessionInitialized(false);
     setRetryCount(prev => prev + 1);
+    setLimitsRefreshKey(prev => prev + 1);
     refetchLimits();
     sessionRetry();
-    
     if (selectedSubject) {
-      // Force re-initialization of the subject
-      const tempSubject = { ...selectedSubject };
-      setSelectedSubject(null);
-      setTimeout(() => setSelectedSubject(tempSubject), 100);
+      // Instead of resetting subject to null and back, just trigger session creation by incrementing retryCount
+      // This avoids double session creation
     }
-  }, [selectedSubject, setSelectedSubject, refetchLimits, sessionRetry]);
+  }, [selectedSubject, refetchLimits, sessionRetry]);
 
   // Handle subject selection
   const handleSubjectSelect = useCallback((subject: Subject) => {
@@ -256,7 +253,6 @@ export default function PracticeClientPage() {
   // Handle start new session with improved timing
   const handleStartNewSessionWithRefresh = useCallback(() => {
     handleStartNewSession();
-    // After a small delay to allow the session to be created
     setTimeout(() => {
       setLimitsRefreshKey(prev => prev + 1);
       refetchLimits();

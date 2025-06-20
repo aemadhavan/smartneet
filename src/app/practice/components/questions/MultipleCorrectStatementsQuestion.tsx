@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/MultipleCorrectStatementsQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { Statement, QuestionOption } from '@/app/practice/types';
 
 interface MultipleCorrectStatementsQuestionProps {
@@ -38,19 +39,26 @@ export function MultipleCorrectStatementsQuestion({
         <>
           {details.statement_details.intro_text && (
             <div className="mb-4">
-              <p className="text-gray-800 dark:text-gray-200" 
-                dangerouslySetInnerHTML={{ __html: details.statement_details.intro_text }} />
+              <LaTeXRenderer 
+                content={details.statement_details.intro_text}
+                className="text-gray-800 dark:text-gray-200"
+              />
             </div>
           )}
           <div className="mb-6 space-y-3 border-b border-gray-200 dark:border-gray-700 pb-4">
             {details.statement_details.statements?.map((statement, index) => (
               <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
                 <div className="flex">
-                  <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">
+                  <span className="font-medium mr-2 text-gray-900 dark:text-gray-100 flex-shrink-0">
                     {statement.statement_label}:
                   </span>
-                  <div className="text-gray-800 dark:text-gray-200" 
-                    dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+                  <div className="flex-1">
+                    <LaTeXRenderer 
+                      content={statement.statement_text}
+                      className="text-gray-800 dark:text-gray-200"
+                      inline={true}
+                    />
+                  </div>
                 </div>
               </div>
             ))}

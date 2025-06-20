@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/AssertionReasonQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { Statement, QuestionOption, AssertionReasonDetails } from '@/app/practice/types';
 import { parseJsonDetails, extractStatementsFromText } from '@/app/practice/utils/questionUtils';
 
@@ -73,7 +74,11 @@ export function AssertionReasonQuestion({
           {statements.map((statement, index) => (
             <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
               <p className="font-medium mb-1 text-gray-900 dark:text-gray-100">{statement.statement_label}:</p>
-              <p className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: statement.statement_text }} />
+              <LaTeXRenderer 
+                content={statement.statement_text}
+                className="text-gray-800 dark:text-gray-200"
+                inline={true}
+              />
             </div>
           ))}
         </div>

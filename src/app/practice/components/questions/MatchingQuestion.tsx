@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/MatchingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { normalizeMatchingDetails, parseMatchingQuestion } from '@/app/practice/utils/questionUtils';
 
 interface MatchingQuestionProps {
@@ -96,9 +97,10 @@ export function MatchingQuestion({
     return (
       <div>
         <div className="mb-4 bg-blue-50 dark:bg-blue-900 p-3 rounded-md border border-blue-200 dark:border-blue-700">
-          <p className="text-blue-700 dark:text-blue-200">
-            This question requires matching items from different columns. Please refer to the question text.
-          </p>
+          <LaTeXRenderer 
+            content="This question requires matching items from different columns. Please refer to the question text."
+            className="text-blue-700 dark:text-blue-200"
+          />
         </div>
         
         <div className="space-y-3">
@@ -139,7 +141,7 @@ interface RenderItemType {
   right_item_text: string;
 }
 
-// Helper function to render the matching question UI
+// Helper function to render the matching question UI with LaTeX support
 function renderMatchingQuestion(
   options: RenderOptionType[],
   items: RenderItemType[],
@@ -155,10 +157,16 @@ function renderMatchingQuestion(
           <thead>
             <tr>
               <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                {leftHeader}
+                <LaTeXRenderer 
+                  content={leftHeader}
+                  className="font-medium"
+                />
               </th>
               <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200">
-                {rightHeader}
+                <LaTeXRenderer 
+                  content={rightHeader}
+                  className="font-medium"
+                />
               </th>
             </tr>
           </thead>
@@ -166,12 +174,28 @@ function renderMatchingQuestion(
             {items.map((item, index) => (
               <tr key={index} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
                 <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-gray-200">
-                  <span className="font-medium mr-2">{item.left_item_label}.</span>
-                  {item.left_item_text}
+                  <div className="flex items-start">
+                    <span className="font-medium mr-2 flex-shrink-0">{item.left_item_label}.</span>
+                    <div className="flex-1">
+                      <LaTeXRenderer 
+                        content={item.left_item_text}
+                        className="text-gray-800 dark:text-gray-200"
+                        inline={true}
+                      />
+                    </div>
+                  </div>
                 </td>
                 <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-800 dark:text-gray-200">
-                  <span className="font-medium mr-2">{item.right_item_label}.</span>
-                  {item.right_item_text}
+                  <div className="flex items-start">
+                    <span className="font-medium mr-2 flex-shrink-0">{item.right_item_label}.</span>
+                    <div className="flex-1">
+                      <LaTeXRenderer 
+                        content={item.right_item_text}
+                        className="text-gray-800 dark:text-gray-200"
+                        inline={true}
+                      />
+                    </div>
+                  </div>
                 </td>
               </tr>
             ))}

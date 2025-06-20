@@ -2,6 +2,7 @@
 
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { MatchingDetails, MatchingAnswer } from '../interfaces';
 
 interface MatchingProps {
@@ -32,8 +33,11 @@ export default function Matching({
 
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {questionText ?? 'No question text available'}
+      <div className="text-gray-700 dark:text-gray-300">
+        <LaTeXRenderer 
+          content={questionText ?? 'No question text available'}
+          className="whitespace-pre-line"
+        />
       </div>
       
       {isImageBased && imageUrl && (
@@ -59,10 +63,18 @@ export default function Matching({
             <thead>
               <tr>
                 <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-r border-gray-200 dark:border-gray-700">
-                  {matchingColumns.left.header}
+                  <LaTeXRenderer 
+                    content={matchingColumns.left.header}
+                    className="font-medium"
+                    inline={true}
+                  />
                 </th>
                 <th className="px-4 py-3 bg-gray-50 dark:bg-gray-800 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
-                  {matchingColumns.right.header}
+                  <LaTeXRenderer 
+                    content={matchingColumns.right.header}
+                    className="font-medium"
+                    inline={true}
+                  />
                 </th>
               </tr>
             </thead>
@@ -74,10 +86,30 @@ export default function Matching({
                 return (
                   <tr key={idx} className="border-b border-gray-200 dark:border-gray-700">
                     <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300 border-r border-gray-200 dark:border-gray-700">
-                      {leftItem.id}. {leftItem.text}
+                      <div className="flex items-start">
+                        <span className="font-medium mr-2 flex-shrink-0">{leftItem.id}.</span>
+                        <div className="flex-1">
+                          <LaTeXRenderer 
+                            content={leftItem.text}
+                            className="text-gray-800 dark:text-gray-300"
+                            inline={true}
+                          />
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-800 dark:text-gray-300">
-                      {rightItem ? `${rightItem.id}. ${rightItem.text}` : ''}
+                      {rightItem && (
+                        <div className="flex items-start">
+                          <span className="font-medium mr-2 flex-shrink-0">{rightItem.id}.</span>
+                          <div className="flex-1">
+                            <LaTeXRenderer 
+                              content={rightItem.text}
+                              className="text-gray-800 dark:text-gray-300"
+                              inline={true}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 );
@@ -143,9 +175,11 @@ export default function Matching({
                     </div>
                   </div>
                   <div className="flex-1">
-                    <p className={`${textColorClass} font-medium`}>
-                      {option.text}
-                    </p>
+                    <LaTeXRenderer 
+                      content={option.text}
+                      className={`${textColorClass} font-medium`}
+                      inline={true}
+                    />
                   </div>
                   <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                     {isSelected && (

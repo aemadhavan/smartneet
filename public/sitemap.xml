@@ -38,7 +38,9 @@
     <lastmod>2025-06-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
-  </url>  
+  </url>
+  
+  <!-- Botany Subtopic Pages -->
   <url>
     <loc>https://smarterneet.com/smarter-guides/botany/the-living-world</loc>
     <lastmod>2025-06-08</lastmod>
@@ -46,31 +48,102 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.smarterneet.com/smarter-guides/botany/biological-classification</loc>
+    <loc>https://smarterneet.com/smarter-guides/botany/biological-classification</loc>
     <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.smarterneet.com/smarter-guides/botany/plant-kingdom</loc>
+    <loc>https://smarterneet.com/smarter-guides/botany/plant-kingdom</loc>
     <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.smarterneet.com/smarter-guides/botany/morphology-of-flowering-plants</loc>
+    <loc>https://smarterneet.com/smarter-guides/botany/morphology-of-flowering-plants</loc>
     <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://www.smarterneet.com/smarter-guides/botany/anatomy-of-flowering-plants</loc>
+    <loc>https://smarterneet.com/smarter-guides/botany/anatomy-of-flowering-plants</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/cell-the-unit-of-life</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/cell-cycle-and-cell-division</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/photosynthesis-in-higher-plants</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/respiration-in-plants</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/plant-growth-and-development</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/sexual-reproduction-in-flowering-plant</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/principle-of-inheritance-and-variation</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/molecular-basis-of-inheritance</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/microbes-in-human-welfare</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/organisms-and-population</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/ecosystem</loc>
+    <lastmod>2025-06-08</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://smarterneet.com/smarter-guides/botany/biodiversity-and-conservation</loc>
     <lastmod>2025-06-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
-  
   <url>
     <loc>https://smarterneet.com/smarter-guides/zoology</loc>
     <lastmod>2025-06-08</lastmod>

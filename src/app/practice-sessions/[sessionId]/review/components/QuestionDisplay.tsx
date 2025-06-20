@@ -20,11 +20,13 @@ export default function QuestionDisplay({
             Question {currentIndex + 1} of {totalQuestions}
           </span>
           <span className={`px-2 py-1 rounded-md text-sm ${
-            currentAttempt.isCorrect 
+            currentAttempt.isCorrect === null
+              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
+              : currentAttempt.isCorrect 
               ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
               : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
           }`}>
-            {currentAttempt.isCorrect ? 'Correct' : 'Incorrect'}
+            {currentAttempt.isCorrect === null ? 'Not Answered' : currentAttempt.isCorrect ? 'Correct' : 'Incorrect'}
           </span>
         </div>
         <div>

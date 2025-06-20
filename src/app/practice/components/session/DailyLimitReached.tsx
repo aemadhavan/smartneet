@@ -12,6 +12,18 @@ const DailyLimitReached = memo(function DailyLimitReached({
   reason = "You've reached your daily practice test limit. Upgrade to Premium for unlimited practice tests.",
   onRetry
 }: DailyLimitReachedProps) {
+  // Calculate next UTC midnight in user's local time
+  const now = new Date();
+  const nextUtcMidnight = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() + 1,
+    0, 0, 0, 0
+  ));
+  const localTimeString = nextUtcMidnight.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const localDateString = nextUtcMidnight.toLocaleDateString();
+  const resetMessage = `You can take more tests after ${localTimeString} on ${localDateString} (your local time).`;
+
   return (
     <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
       <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
@@ -25,10 +37,12 @@ const DailyLimitReached = memo(function DailyLimitReached({
         </div>
         
         <div className="p-6">
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
+          <p className="text-gray-600 dark:text-gray-300 mb-2">
             {reason}
           </p>
-          
+          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+            {resetMessage}
+          </p>
           <div className="flex flex-col sm:flex-row gap-3 mt-4">
             <Link
               href="/pricing"

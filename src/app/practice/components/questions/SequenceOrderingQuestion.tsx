@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/SequenceOrderingQuestion.tsx
 import { OptionButton } from '@/app/practice/components/ui';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { SequenceOrderingDetails } from '@/app/practice/types'; // Import the specific type
 
 interface SequenceOrderingQuestionProps {
@@ -28,14 +29,23 @@ export function SequenceOrderingQuestion({
   return (
     <div>
       <div className="mb-6 space-y-2 border-b border-gray-200 dark:border-gray-700 pb-4">
-        <p className="font-medium mb-2 text-gray-900 dark:text-gray-100">
-          {details.intro_text || 'Arrange in correct sequence:'}
-        </p>
+        <LaTeXRenderer 
+          content={details.intro_text || 'Arrange in correct sequence:'}
+          className="font-medium mb-2 text-gray-900 dark:text-gray-100"
+        />
         {sequenceItems.map((item, index) => (
           <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded mb-2">
             <div className="flex">
-              <span className="font-medium mr-2 text-gray-900 dark:text-gray-100">{item.item_number}.</span>
-              <div className="text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: item.item_text }} />
+              <span className="font-medium mr-2 text-gray-900 dark:text-gray-100 flex-shrink-0">
+                {item.item_number}.
+              </span>
+              <div className="flex-1">
+                <LaTeXRenderer 
+                  content={item.item_text}
+                  className="text-gray-800 dark:text-gray-200"
+                  inline={true}
+                />
+              </div>
             </div>
           </div>
         ))}

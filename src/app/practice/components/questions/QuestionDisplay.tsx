@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { 
   Question, 
   QuestionDetails,
@@ -45,7 +46,7 @@ const QuestionDisplay = memo(function QuestionDisplay({
   currentQuestionIndex,
   isCompleting
 }: QuestionDisplayProps) {
-  const [showExplanation] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
   const questionRef = useRef<HTMLDivElement>(null);
 
   // Move forceCompleteSession before renderQuestionContent
@@ -55,6 +56,11 @@ const QuestionDisplay = memo(function QuestionDisplay({
       onCompleteSession();
     }
   }, [onCompleteSession]);
+
+  // Toggle explanation function
+  const toggleExplanation = useCallback(() => {
+    setShowExplanation(prev => !prev);
+  }, []);
 
   // Focus the question when it changes
   useEffect(() => {
@@ -333,14 +339,11 @@ const QuestionDisplay = memo(function QuestionDisplay({
         </div>
       </div>
 
-      {/* Question text */}
+      {/* Question text with LaTeX support */}
       <div className="mb-6">
-        <div 
+        <LaTeXRenderer 
+          content={question.question_text}
           className="prose prose-indigo dark:prose-invert max-w-none text-gray-800 dark:text-gray-100"
-          dangerouslySetInnerHTML={{ __html: question.question_text }}
-          aria-label="Question text"
-          role="textbox"
-          aria-readonly="true"
         />
       </div>
 
@@ -365,6 +368,14 @@ const QuestionDisplay = memo(function QuestionDisplay({
           Previous
         </button>
 
+        {/* Show/Hide Explanation Button */}
+        <button
+          onClick={toggleExplanation}
+          className="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-100 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800"
+        >
+          {showExplanation ? 'Hide Explanation' : 'Show Explanation'}
+        </button>
+
         <button
           onClick={isLastQuestion ? 
             (selectedOption ? onCompleteSession : forceCompleteSession) : 
@@ -382,24 +393,28 @@ const QuestionDisplay = memo(function QuestionDisplay({
           disabled={isCompleting}
         >
           {isCompleting ? (
-            <span className="flex items-center"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>Completing...</span>
+            <span className="flex items-center">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>
+              Completing...
+            </span>
           ) : (
             actionButtonLabel
           )}
         </button>
       </div>
 
-      {/* Explanation section */}
+      {/* Explanation section with LaTeX support */}
       {showExplanation && question.explanation && (
         <div 
           className="mt-6 p-4 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-100 dark:border-blue-800"
           aria-live="polite"
         >
-          <h3 className="text-lg font-medium text-blue-800 dark:text-blue-100 mb-2" id="explanation-heading">Explanation</h3>
-          <div 
+          <h3 className="text-lg font-medium text-blue-800 dark:text-blue-100 mb-2" id="explanation-heading">
+            Explanation
+          </h3>
+          <LaTeXRenderer 
+            content={question.explanation}
             className="prose prose-sm prose-blue dark:prose-invert max-w-none text-gray-700 dark:text-gray-200"
-            dangerouslySetInnerHTML={{ __html: question.explanation }}
-            aria-labelledby="explanation-heading"
           />
         </div>
       )}

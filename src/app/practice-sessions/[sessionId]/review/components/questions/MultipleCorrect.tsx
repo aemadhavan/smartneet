@@ -2,6 +2,7 @@
 
 import { CheckCircle, XCircle } from 'lucide-react';
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { MultipleCorrectDetails, MultipleCorrectAnswer } from '../interfaces';
 
 interface MultipleCorrectProps {
@@ -50,8 +51,11 @@ export default function MultipleCorrect({
 
   return (
     <div className="space-y-4">
-      <div className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
-        {questionText ?? introText ?? 'No question text available'}
+      <div className="text-gray-700 dark:text-gray-300">
+        <LaTeXRenderer 
+          content={questionText ?? introText ?? 'No question text available'}
+          className="whitespace-pre-line"
+        />
       </div>
       
       {isImageBased && imageUrl && (
@@ -108,17 +112,19 @@ export default function MultipleCorrect({
                       </div>
                     </div>
                     <div className="flex-1">
-                      <p className={`font-medium ${
-                        isSelected && isCorrect 
-                          ? 'text-green-800 dark:text-green-300' 
-                          : isSelected && !isCorrect 
-                          ? 'text-red-800 dark:text-red-300' 
-                          : isCorrect 
-                          ? 'text-green-800 dark:text-green-300' 
-                          : 'text-gray-700 dark:text-gray-300'
-                      }`}>
-                        {statement.text}
-                      </p>
+                      <LaTeXRenderer 
+                        content={statement.text}
+                        className={`font-medium ${
+                          isSelected && isCorrect 
+                            ? 'text-green-800 dark:text-green-300' 
+                            : isSelected && !isCorrect 
+                            ? 'text-red-800 dark:text-red-300' 
+                            : isCorrect 
+                            ? 'text-green-800 dark:text-green-300' 
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                        inline={true}
+                      />
                     </div>
                     <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                       {isCorrect && (
@@ -177,17 +183,19 @@ export default function MultipleCorrect({
                       </div>
                     </div>
                     <div className="flex-1">
-                      <p className={`font-medium ${
-                        isSelected && isCorrect 
-                          ? 'text-green-800 dark:text-green-300' 
-                          : isSelected && !isCorrect 
-                          ? 'text-red-800 dark:text-red-300' 
-                          : isCorrect 
-                          ? 'text-green-800 dark:text-green-300' 
-                          : 'text-gray-700 dark:text-gray-300'
-                      }`}>
-                        {option.text}
-                      </p>
+                      <LaTeXRenderer 
+                        content={option.text}
+                        className={`font-medium ${
+                          isSelected && isCorrect 
+                            ? 'text-green-800 dark:text-green-300' 
+                            : isSelected && !isCorrect 
+                            ? 'text-red-800 dark:text-red-300' 
+                            : isCorrect 
+                            ? 'text-green-800 dark:text-green-300' 
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                        inline={true}
+                      />
                     </div>
                     <div className="flex-shrink-0 ml-3 flex items-center space-x-2">
                       {isSelected && (

@@ -4,18 +4,62 @@ import useSWR from 'swr';
 import { Subject } from '../types';
 import { logger } from '@/lib/logger';
 
-// Fetcher function for SWR
+// Fetcher function for SWR with improved error handling
 const fetcher = async (url: string) => {
-  const response = await fetch(url);
-  
-  if (!response.ok) {
-    const error = new Error('Failed to fetch subjects');
-    error.name = 'FetchError';
+  try {
+    const response = await fetch(url, {
+      // Add timeout to prevent hanging requests
+      signal: AbortSignal.timeout(30000) // 30 second timeout
+    });
+    
+    if (!response.ok) {
+      // Parse error response for better error messages
+      const errorData = await response.json().catch(() => ({}));
+      
+      if (response.status === 503) {
+        const error = new Error('Service temporarily unavailable. Please try again in a moment.');
+        error.name = 'ServiceUnavailable';
+        throw error;
+      }
+      
+      if (response.status >= 500) {
+        const error = new Error('Server error occurred. Please try again later.');
+        error.name = 'ServerError';
+        throw error;
+      }
+      
+      const error = new Error(errorData.error || 'Failed to fetch subjects');
+      error.name = 'FetchError';
+      throw error;
+    }
+    
+    const data = await response.json();
+    
+    // Handle fallback data from API
+    if (data.fallback) {
+      logger.warn('Received fallback data due to connection issues', { 
+        context: 'useSubjects',
+        data: { source: data.source }
+      });
+    }
+    
+    return data.data || [];
+  } catch (error) {
+    // Handle network errors specifically
+    if (error instanceof Error && error.name === 'AbortError') {
+      const timeoutError = new Error('Request timed out. Please check your connection and try again.');
+      timeoutError.name = 'TimeoutError';
+      throw timeoutError;
+    }
+    
+    if (error instanceof Error && error.name === 'TypeError' && error.message.includes('fetch')) {
+      const networkError = new Error('Network connection failed. Please check your internet connection.');
+      networkError.name = 'NetworkError';
+      throw networkError;
+    }
+    
     throw error;
   }
-  
-  const data = await response.json();
-  return data.data || [];
 };
 
 export function useSubjects(subjectParam?: string | null) {
@@ -44,9 +88,9 @@ export function useSubjects(subjectParam?: string | null) {
     }
   );
 
-  // Error state derived from SWR error
+  // Error state derived from SWR error with specific messaging
   const error = fetchError ? 
-    'Failed to load subjects. Please try again.' : 
+    (fetchError.message || 'Failed to load subjects. Please try again.') : 
     null;
 
   // Match subject from URL parameter to fetched subjects
