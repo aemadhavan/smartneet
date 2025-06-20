@@ -2,6 +2,8 @@
 "use client";
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 // Define subject card interfaces
 interface SubjectCard {
@@ -15,6 +17,22 @@ interface SubjectCard {
 }
 
 const BiologyPage = () => {
+  const router = useRouter();
+  const [loadingStates, setLoadingStates] = useState<{[key: number]: boolean}>({});
+
+  const handleStartPractice = (subjectCode: string, subjectId: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    if (loadingStates[subjectId]) return;
+    
+    setLoadingStates(prev => ({ ...prev, [subjectId]: true }));
+    
+    // Navigate after showing spinner briefly
+    setTimeout(() => {
+      router.push(`/biology/${subjectCode.toLowerCase()}`);
+      setLoadingStates(prev => ({ ...prev, [subjectId]: false }));
+    }, 500);
+  };
+
   // Define biology subject cards
   const subjects: SubjectCard[] = [
     {
@@ -71,8 +89,19 @@ const BiologyPage = () => {
               </div>
               <p className="text-gray-600 mb-4">{subject.description}</p>
               <div className="mt-auto pt-4">
-                <button className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-                  Start Studying
+                <button 
+                  onClick={(e) => handleStartPractice(subject.code, subject.id, e)}
+                  disabled={loadingStates[subject.id]}
+                  className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loadingStates[subject.id] ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Loading...
+                    </>
+                  ) : (
+                    'Start Practice'
+                  )}
                 </button>
               </div>
             </div>

@@ -17,6 +17,12 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
+    
+    // If already on the same page, don't show loading
+    if (pathname === href) {
+      return;
+    }
+    
     setIsLoading(true);
     router.push(href);
   };
