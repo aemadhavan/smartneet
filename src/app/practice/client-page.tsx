@@ -2,7 +2,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import SessionCompletePage from './complete';
 import { 
   SubjectSelector, 
@@ -63,8 +63,8 @@ export default function PracticeClientPage() {
   const [, setRetryCount] = useState(0);
   const [sessionInitialized, setSessionInitialized] = useState(false);
   
-  // Performance monitoring
-  const [performanceMetrics, setPerformanceMetrics] = useState({
+  // Performance monitoring using useRef to avoid dependency issues
+  const performanceMetrics = useRef({
     pageLoadStart: Date.now(),
     subjectsLoadTime: 0,
     limitsCheckTime: 0,
@@ -213,9 +213,9 @@ export default function PracticeClientPage() {
           // Log performance metrics
           console.log('Performance Metrics:', {
             sessionCreation: sessionEndTime - sessionStartTime,
-            totalPageLoad: sessionEndTime - performanceMetrics.pageLoadStart,
-            subjectsLoad: performanceMetrics.subjectsLoadTime,
-            limitsCheck: performanceMetrics.limitsCheckTime
+            totalPageLoad: sessionEndTime - performanceMetrics.current.pageLoadStart,
+            subjectsLoad: performanceMetrics.current.subjectsLoadTime,
+            limitsCheck: performanceMetrics.current.limitsCheckTime
           });
           
           if (!cancelled && newSession) {
