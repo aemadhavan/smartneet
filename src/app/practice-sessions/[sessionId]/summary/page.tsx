@@ -35,6 +35,7 @@ const PracticeSessionSummary = () => {
   const [sessionData, setSessionData] = useState<SessionSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [navigating, setNavigating] = useState<string | null>(null);
 
   useEffect(() => {
     // Extract session ID from URL
@@ -351,19 +352,43 @@ const PracticeSessionSummary = () => {
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-4 justify-end">
         <button 
-          onClick={() => window.location.href = '/dashboard'}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50"
+          onClick={() => {
+            setNavigating('dashboard');
+            window.location.href = '/dashboard';
+          }}
+          disabled={navigating !== null}
+          className={`px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50 transition-colors duration-200 ${
+            navigating === 'dashboard' ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          Back to Dashboard
+          {navigating === 'dashboard' ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 inline-block mr-2"></div>
+              Loading...
+            </>
+          ) : (
+            'Back to Dashboard'
+          )}
         </button>
-        <button className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-700 font-medium hover:bg-gray-50">
-          Download Report
-        </button>
+        
         <button 
-          onClick={() => window.location.href = '/practice/'}
-          className="px-4 py-2 bg-indigo-600 rounded-md text-white font-medium hover:bg-indigo-700"
+          onClick={() => {
+            setNavigating('practice');
+            window.location.href = '/practice/';
+          }}
+          disabled={navigating !== null}
+          className={`px-4 py-2 bg-indigo-600 rounded-md text-white font-medium hover:bg-indigo-700 transition-colors duration-200 ${
+            navigating === 'practice' ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          Start New Practice
+          {navigating === 'practice' ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
+              Loading...
+            </>
+          ) : (
+            'Start New Practice'
+          )}
         </button>
       </div>
     </div>

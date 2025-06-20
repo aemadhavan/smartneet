@@ -35,11 +35,9 @@ interface ClockProps {
 }
 
 export default function SessionCompletePage({ 
-  sessionId, 
-  onStartNewSession 
+  sessionId
 }: { 
-  sessionId: number; 
-  onStartNewSession: () => void;
+  sessionId: number;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -84,7 +82,8 @@ export default function SessionCompletePage({
 
   const handleNewSessionClick = () => {
     setNewSessionLoading(true);
-    onStartNewSession();
+    // Use window.location.href for a full page navigation to clear all state
+    window.location.href = '/practice';
   };
 
   const handleDashboardClick = () => {

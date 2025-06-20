@@ -111,7 +111,6 @@ export default function PracticeClientPage() {
     handleOptionSelect,
     handleNextQuestion,
     handleCompleteSession: rawHandleCompleteSession,
-    handleStartNewSession,
     createSession,
     handleRetry: sessionRetry,
   } = usePracticeSession(
@@ -177,7 +176,8 @@ export default function PracticeClientPage() {
   useEffect(() => {
     let cancelled = false;
     const initSession = async () => {
-      if (sessionInitialized || !selectedSubject || accessDenied) {
+      // Prevent automatic session creation after completion, when access is denied, or already initialized
+      if (sessionInitialized || !selectedSubject || accessDenied || sessionCompleted) {
         setIsInitializing(false);
         return;
       }
@@ -218,7 +218,7 @@ export default function PracticeClientPage() {
     
     initSession();
     return () => { cancelled = true; };
-  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized]);
+  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, sessionCompleted]);
 
   // Combined loading state
   const loading = isInitializing || subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
@@ -230,7 +230,10 @@ export default function PracticeClientPage() {
   const handleRetry = useCallback(() => {
     setShowLimitNotification(false);
     setAccessDenied(false);
-    setSessionInitialized(false);
+    // Don't reset sessionInitialized if session is completed
+    if (!sessionCompleted) {
+      setSessionInitialized(false);
+    }
     setRetryCount(prev => prev + 1);
     setLimitsRefreshKey(prev => prev + 1);
     refetchLimits();
@@ -239,25 +242,20 @@ export default function PracticeClientPage() {
       // Instead of resetting subject to null and back, just trigger session creation by incrementing retryCount
       // This avoids double session creation
     }
-  }, [selectedSubject, refetchLimits, sessionRetry]);
+  }, [selectedSubject, refetchLimits, sessionRetry, sessionCompleted]);
 
   // Handle subject selection
   const handleSubjectSelect = useCallback((subject: Subject) => {
     // Clear any previous notifications
     setShowLimitNotification(false);
     setAccessDenied(false);
-    setSessionInitialized(false);
+    // Don't reset sessionInitialized if session is completed
+    if (!sessionCompleted) {
+      setSessionInitialized(false);
+    }
     setSelectedSubject(subject);
-  }, [setSelectedSubject]);
+  }, [setSelectedSubject, sessionCompleted]);
 
-  // Handle start new session with improved timing
-  const handleStartNewSessionWithRefresh = useCallback(() => {
-    handleStartNewSession();
-    setTimeout(() => {
-      setLimitsRefreshKey(prev => prev + 1);
-      refetchLimits();
-    }, 300);
-  }, [handleStartNewSession, refetchLimits]);
 
   // Create session title based on filtering parameters
   const getSessionTitle = useCallback(() => {
@@ -287,7 +285,6 @@ export default function PracticeClientPage() {
     return (
       <SessionCompletePage
         sessionId={session.sessionId}
-        onStartNewSession={handleStartNewSessionWithRefresh}
       />
     );
   }
