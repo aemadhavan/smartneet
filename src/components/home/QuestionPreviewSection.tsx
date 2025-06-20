@@ -31,6 +31,18 @@ const staggerContainer: Variants = {
 export const QuestionPreviewSection = () => {
   const [activeTab, setActiveTab] = useState("Biology");
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+  const [showResults, setShowResults] = useState<Record<number, boolean>>({});
+  
+  const handleOptionClick = (questionId: number, optionId: string) => {
+    setSelectedAnswers(prev => ({ ...prev, [questionId]: optionId }));
+    setShowResults(prev => ({ ...prev, [questionId]: true }));
+  };
+
+  const handleTryAgain = (questionId: number) => {
+    setSelectedAnswers(prev => ({ ...prev, [questionId]: "" }));
+    setShowResults(prev => ({ ...prev, [questionId]: false }));
+  };
   
   return (
     <section className="py-16 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
@@ -104,18 +116,46 @@ More previous year questions are coming soon. Stay tuned!​</p>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">{q.question}</h3>
                 
                 <div className="space-y-3 mb-4">
-                  {q.options.map((option) => (
-                    <div 
-                      key={option.id}
-                      className={`p-3 border rounded-md cursor-pointer transition-all ${
-                        option.correct && expandedQuestion === q.id
-                          ? "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100"
-                          : "border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-800 dark:text-gray-200"
-                      }`}
-                    >
-                      {option.id}. {option.text}
-                    </div>
-                  ))}
+                  {q.options.map((option) => {
+                    const isSelected = selectedAnswers[q.id] === option.id;
+                    const showResult = showResults[q.id];
+                    const isCorrect = option.correct;
+                    
+                    let optionClasses = "p-3 border rounded-md cursor-pointer transition-all ";
+                    
+                    if (showResult) {
+                      if (isSelected && isCorrect) {
+                        optionClasses += "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100";
+                      } else if (isSelected && !isCorrect) {
+                        optionClasses += "border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-900/30 text-gray-900 dark:text-gray-100";
+                      } else if (isCorrect) {
+                        optionClasses += "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100";
+                      } else {
+                        optionClasses += "border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 opacity-60";
+                      }
+                    } else {
+                      optionClasses += "border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-800 dark:text-gray-200";
+                    }
+                    
+                    return (
+                      <div 
+                        key={option.id}
+                        onClick={() => !showResult && handleOptionClick(q.id, option.id)}
+                        className={optionClasses}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{option.id}. {option.text}</span>
+                          {showResult && (
+                            <span className="ml-2">
+                              {isSelected && isCorrect && "✓"}
+                              {isSelected && !isCorrect && "✗"}
+                              {!isSelected && isCorrect && "✓"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
                 
                 <div className="flex justify-between items-center">
@@ -128,9 +168,14 @@ More previous year questions are coming soon. Stay tuned!​</p>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  <button className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-md hover:bg-indigo-200 dark:hover:bg-indigo-800 text-sm font-medium">
-                    Save Question
-                  </button>
+                  {showResults[q.id] && (
+                    <button 
+                      onClick={() => handleTryAgain(q.id)}
+                      className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 text-sm font-medium"
+                    >
+                      Try Again
+                    </button>
+                  )}
                 </div>
               </div>
               

@@ -52,7 +52,7 @@ const QuestionDisplay = memo(function QuestionDisplay({
   // Move forceCompleteSession before renderQuestionContent
   const forceCompleteSession = useCallback(() => {
     // Using a more accessible dialog approach
-    if (window.confirm('There appears to be an issue with some questions. Would you like to complete the session anyway?')) {
+    if (window.confirm('Some questions not answered. Would you like to continue and complete the session anyway?')) {
       onCompleteSession();
     }
   }, [onCompleteSession]);
