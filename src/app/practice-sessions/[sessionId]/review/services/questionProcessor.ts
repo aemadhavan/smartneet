@@ -69,7 +69,11 @@ export function processQuestionAttempt(rawAttempt: Record<string, unknown>): Que
   const timeSpentSeconds = Number(rawAttempt.timeSpentSeconds || rawAttempt.time_spent_seconds || 0);
   const questionText = String(rawAttempt.questionText || rawAttempt.question_text || '');
   const explanation = typeof (rawAttempt.explanation || rawAttempt.explanation) === 'string' ? (rawAttempt.explanation || rawAttempt.explanation) : null;
-  const isCorrect = Boolean(rawAttempt.isCorrect || rawAttempt.is_correct);
+  const isCorrect = (rawAttempt.isCorrect !== null && rawAttempt.isCorrect !== undefined) 
+    ? Boolean(rawAttempt.isCorrect) 
+    : (rawAttempt.is_correct !== null && rawAttempt.is_correct !== undefined)
+    ? Boolean(rawAttempt.is_correct)
+    : null;
   const marksAwarded = Number(rawAttempt.marksAwarded || rawAttempt.marks_awarded || 0);
   const maxMarks = Number(rawAttempt.maxMarks || rawAttempt.marks_available || rawAttempt.max_marks || 0);
   const isImageBased = Boolean(rawAttempt.isImageBased || rawAttempt.is_image_based);
