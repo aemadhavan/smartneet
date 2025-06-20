@@ -123,6 +123,21 @@ export async function GET(request: Request) {
           const limitPerDay = plan.test_limit_daily || 3; // Default to 3 for free tier
           const remainingToday = isUnlimited ? Number.MAX_SAFE_INTEGER : Math.max(0, limitPerDay - testsUsedToday);
           
+          console.log(`[DEBUG] Test limits calculation for user ${userId}:`, {
+            testsUsedToday,
+            limitPerDay,
+            remainingToday,
+            isUnlimited,
+            canTake,
+            lastTestDate: updatedSubscription.last_test_date ? 
+              (updatedSubscription.last_test_date instanceof Date ? 
+                updatedSubscription.last_test_date.toISOString() : 
+                String(updatedSubscription.last_test_date)) : null,
+            lastTestDateType: typeof updatedSubscription.last_test_date,
+            planName: plan.plan_name,
+            source: 'database'
+          });
+          
           // Build response
           return {
             limitStatus: {

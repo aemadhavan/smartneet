@@ -6,7 +6,8 @@ import {
   topics,
   subtopics,
   practice_sessions,
-  session_questions
+  session_questions,
+  questions
 } from '@/db';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
@@ -302,15 +303,78 @@ export async function GET(
       subtopicMap = new Map(subtopicsData.map(st => [st.subtopic_id, st]));
     }
 
+    // Fetch all questions in the session (regardless of attempts)
+    const questionIds = sessionQsData.map(sq => sq.question_id);
+    const allQuestionsInSession = await withRetry(async () => {
+      return db.query.questions.findMany({
+        where: inArray(questions.question_id, questionIds),
+        columns: {
+          question_id: true,
+          question_text: true,
+          question_type: true,
+          details: true,
+          explanation: true,
+          marks: true,
+          negative_marks: true,
+          difficulty_level: true,
+          topic_id: true,
+          subtopic_id: true,
+          is_image_based: true,
+          image_url: true
+        }
+      });
+    });
+
+    // Create a map for quick question lookup
+    const questionMap = new Map(allQuestionsInSession.map(q => [q.question_id, q]));
+
+    // Update topic and subtopic collection to include data from all questions
+    allQuestionsInSession.forEach(question => {
+      if (question.topic_id) {
+        topicIdsFromAttempts.add(question.topic_id);
+      }
+      if (question.subtopic_id) {
+        subtopicIdsFromAttempts.add(question.subtopic_id);
+      }
+    });
+
+    // Re-fetch topics and subtopics with updated IDs
+    topicMap = new Map<number, { topic_id: number; topic_name: string }>();
+    if (topicIdsFromAttempts.size > 0) {
+      const topicsData = await withRetry(async () => {
+        return db.query.topics.findMany({
+          where: inArray(topics.topic_id, Array.from(topicIdsFromAttempts)),
+          columns: { topic_id: true, topic_name: true }
+        });
+      });
+      topicMap = new Map(topicsData.map(t => [t.topic_id, t]));
+    }
+
+    subtopicMap = new Map<number, { subtopic_id: number; subtopic_name: string }>();
+    if (subtopicIdsFromAttempts.size > 0) {
+      const subtopicsData = await withRetry(async () => {
+        return db.query.subtopics.findMany({
+          where: inArray(subtopics.subtopic_id, Array.from(subtopicIdsFromAttempts)),
+          columns: { subtopic_id: true, subtopic_name: true }
+        });
+      });
+      subtopicMap = new Map(subtopicsData.map(st => [st.subtopic_id, st]));
+    }
+
     // Combine all data to create detailed review questions
     const detailedReviewQuestions: DetailedReviewQuestion[] = sessionQsData.map(sq => {
-      const attempt = attempts.find(a => a.question_id === sq.question_id); 
+      const attempt = attempts.find(a => a.question_id === sq.question_id);
+      const question = questionMap.get(sq.question_id); 
 
-      const topicInfoFromMap = attempt?.question.topic_id ? topicMap.get(attempt.question.topic_id) : null;
+      // Use question data from the questions table, fall back to attempt data if needed
+      const topicId = question?.topic_id || attempt?.question.topic_id;
+      const subtopicId = question?.subtopic_id || attempt?.question.subtopic_id;
+      
+      const topicInfoFromMap = topicId ? topicMap.get(topicId) : null;
       
       let subtopicInfoFromMap = null;
-      if (attempt?.question.subtopic_id) {
-        const subtopicData = subtopicMap.get(attempt.question.subtopic_id);
+      if (subtopicId) {
+        const subtopicData = subtopicMap.get(subtopicId);
         if (subtopicData) {
           subtopicInfoFromMap = {
             subtopicId: subtopicData.subtopic_id,
@@ -319,32 +383,32 @@ export async function GET(
         }
       }
       
-      const questionDetails = attempt?.question.details as NormalizedQuestionDetails | null;
-      const questionType = attempt?.question.question_type as QuestionType | undefined;
+      const questionDetails = (question?.details || attempt?.question.details) as NormalizedQuestionDetails | null;
+      const questionType = (question?.question_type || attempt?.question.question_type) as QuestionType | undefined;
 
       return {
         question_id: sq.question_id,
         question_order: sessionQuestionDetailsMap[sq.question_id]?.order ?? 0, 
         time_spent_seconds: sessionQuestionDetailsMap[sq.question_id]?.timeSpent ?? 0, 
         is_bookmarked: sessionQuestionDetailsMap[sq.question_id]?.isBookmarked ?? false, 
-        question_text: attempt?.question.question_text || "N/A (Question data missing)",
-        question_type: questionType || "N/A",
+        question_text: question?.question_text || attempt?.question.question_text || "Question data missing",
+        question_type: questionType || "Unknown",
         details: questionDetails ?? undefined,
-        explanation: attempt?.question.explanation ?? undefined,
-        user_answer: attempt?.user_answer as NormalizedAnswer | null ?? undefined,
+        explanation: question?.explanation || attempt?.question.explanation || undefined,
+        user_answer: (attempt?.user_answer as NormalizedAnswer | null) ?? undefined,
         is_correct: attempt?.is_correct ?? null,
         correct_answer: questionDetails && questionType ? getCorrectAnswer(questionDetails, questionType) : undefined,
         marks_awarded: attempt?.marks_awarded ?? 0,
-        marks_available: attempt?.question.marks ?? 0,
-        negative_marks: attempt?.question.negative_marks ?? 0,
-        difficulty_level: attempt?.question.difficulty_level ?? undefined,
+        marks_available: question?.marks || attempt?.question.marks || 0,
+        negative_marks: question?.negative_marks || attempt?.question.negative_marks || 0,
+        difficulty_level: question?.difficulty_level || attempt?.question.difficulty_level || undefined,
         topic: {
           topic_id: topicInfoFromMap?.topic_id,
           topic_name: topicInfoFromMap?.topic_name || "Unknown Topic"
         },
         subtopic: subtopicInfoFromMap ?? undefined,
-        is_image_based: attempt?.question.is_image_based ?? false,
-        image_url: attempt?.question.image_url ?? undefined
+        is_image_based: question?.is_image_based || attempt?.question.is_image_based || false,
+        image_url: question?.image_url || attempt?.question.image_url || undefined
       };
     });
 

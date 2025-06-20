@@ -1,6 +1,6 @@
 // src/app/practice-sessions/[sessionId]/review/components/questions/MultipleChoice.tsx
 
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { MultipleChoiceDetails, MultipleChoiceAnswer } from '../interfaces';
@@ -23,12 +23,30 @@ export default function MultipleChoice({
   questionText
 }: MultipleChoiceProps) {
   // Get direct values from normalized data
-  const userSelection = userAnswer.selectedOption;
-  const correctOption = correctAnswer.selectedOption;
+  const userSelection = userAnswer?.selectedOption;
+  const correctOption = correctAnswer?.selectedOption;
   const options = details.options;
+  
+  // Check if the question was not answered
+  const isUnanswered = !userSelection || userSelection === null || userSelection === undefined;
 
   return (
     <div className="space-y-4">
+      {/* Unanswered question indicator */}
+      {isUnanswered && (
+        <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+          <div className="flex items-center space-x-2">
+            <Clock size={16} className="text-amber-600 dark:text-amber-400" />
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              Not Answered
+            </span>
+            <span className="text-xs text-amber-600 dark:text-amber-400">
+              This question was skipped or not attempted during the test
+            </span>
+          </div>
+        </div>
+      )}
+      
       <div className="text-gray-700 dark:text-gray-300">
         <LaTeXRenderer 
           content={questionText ?? 'No question text available'}

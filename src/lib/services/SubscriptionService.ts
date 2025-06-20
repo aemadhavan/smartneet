@@ -283,16 +283,35 @@ export class SubscriptionService {
    */
   async resetDailyCounterIfNeeded(userId: string, subscription: UserSubscription) {
     try {
-      const today = new Date();
+      const now = new Date();
       const lastTestDate = subscription.last_test_date;
       
+      console.log(`[DEBUG] Reset check for user ${userId}:`, {
+        lastTestDate: lastTestDate ? (lastTestDate instanceof Date ? lastTestDate.toISOString() : String(lastTestDate)) : null,
+        lastTestDateType: typeof lastTestDate,
+        today: now.toISOString(),
+        testsUsedToday: subscription.tests_used_today,
+        isSameDay: lastTestDate ? this.isSameDay(lastTestDate, now) : false
+      });
+      
       // If no tests taken or last test was on a different day, reset counter
-      if (!lastTestDate || !this.isSameDay(lastTestDate, today)) {
-        await db.update(user_subscriptions) // Assuming this standalone update is fine without tx
-          .set({ tests_used_today: 0 })
+      if (!lastTestDate || !this.isSameDay(lastTestDate, now)) {
+        console.log(`[DEBUG] Resetting counter for user ${userId} - new day detected`);
+        
+        await db.update(user_subscriptions)
+          .set({ 
+            tests_used_today: 0,
+            updated_at: now
+          })
           .where(eq(user_subscriptions.user_id, userId));
         
-        // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
+        // Clear cache to ensure fresh data
+        const cacheKey = `user:${userId}:subscription`;
+        await cache.delete(cacheKey).catch(() => {}); // Ignore cache errors
+        
+        console.log(`[DEBUG] Counter reset complete for user ${userId}`);
+      } else {
+        console.log(`[DEBUG] No reset needed for user ${userId} - same day`);
       }
     } catch (error) {
       console.error(`Error resetting counter for user ${userId}:`, error);
@@ -301,8 +320,9 @@ export class SubscriptionService {
   }
 
   /**
-   * Check if two dates are on the same day
+   * Check if two dates are on the same UTC day
    * Safe handling for various date formats from the database
+   * Uses UTC consistently to ensure all users reset at the same time
    */
   private isSameDay(date1: Date | string | number | null | undefined, date2: Date): boolean {
     if (!date1) return false;
@@ -311,9 +331,26 @@ export class SubscriptionService {
       // Convert to Date object if it's not already
       const d1 = date1 instanceof Date ? date1 : new Date(date1);
       
-      return d1.getFullYear() === date2.getFullYear() &&
-             d1.getMonth() === date2.getMonth() &&
-             d1.getDate() === date2.getDate();
+      // Use UTC methods consistently for true UTC day comparison
+      const utcYear1 = d1.getUTCFullYear();
+      const utcMonth1 = d1.getUTCMonth();
+      const utcDate1 = d1.getUTCDate();
+      
+      const utcYear2 = date2.getUTCFullYear();
+      const utcMonth2 = date2.getUTCMonth();
+      const utcDate2 = date2.getUTCDate();
+      
+      const isSame = (utcYear1 === utcYear2 && utcMonth1 === utcMonth2 && utcDate1 === utcDate2);
+      
+      console.log(`[DEBUG] UTC Date comparison:`, {
+        date1: d1.toISOString(),
+        date2: date2.toISOString(),
+        date1UTC: `${utcYear1}-${utcMonth1 + 1}-${utcDate1}`,
+        date2UTC: `${utcYear2}-${utcMonth2 + 1}-${utcDate2}`,
+        isSame
+      });
+      
+      return isSame;
     } catch (error) {
       console.error('Error comparing dates:', error);
       return false;

@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   CheckCircle, 
   XCircle, 
   RotateCcw, 
   BookOpen,
-  BarChart
+  BarChart,
+  Loader2
 } from 'lucide-react';
 
 interface SessionSummary {
@@ -45,6 +45,9 @@ export default function SessionCompletePage({
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<SessionSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [newSessionLoading, setNewSessionLoading] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   useEffect(() => {
     // Fetch session summary from our API
@@ -72,6 +75,22 @@ export default function SessionCompletePage({
 
     fetchSummary();
   }, [sessionId]);
+
+  const handleReviewClick = () => {
+    setReviewLoading(true);
+    // The Link component will handle navigation, but we need to track loading
+    router.push(`/practice-sessions/${sessionId}/review`);
+  };
+
+  const handleNewSessionClick = () => {
+    setNewSessionLoading(true);
+    onStartNewSession();
+  };
+
+  const handleDashboardClick = () => {
+    setDashboardLoading(true);
+    router.push('/dashboard');
+  };
 
   if (loading) {
     return (
@@ -269,29 +288,50 @@ export default function SessionCompletePage({
       </div>
       
       <div className="flex flex-wrap justify-center gap-4">
-        <Link 
-          href={`/practice-sessions/${sessionId}/review`}
-          className="bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center"
-        >
-          <BookOpen size={18} className="mr-2" />
-          Review Answers
-        </Link>
-        
         <button 
-          onClick={onStartNewSession}
-          className="bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center"
+          onClick={handleReviewClick}
+          disabled={reviewLoading}
+          className={`bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center ${
+            reviewLoading ? 'opacity-75 cursor-not-allowed' : ''
+          }`}
         >
-          <RotateCcw size={18} className="mr-2" />
-          New Practice Session
+          {reviewLoading ? (
+            <Loader2 size={18} className="mr-2 animate-spin" />
+          ) : (
+            <BookOpen size={18} className="mr-2" />
+          )}
+          {reviewLoading ? 'Loading...' : 'Review Answers'}
         </button>
         
-        <Link 
-          href="/dashboard"
-          className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200 flex items-center"
+        <button 
+          onClick={handleNewSessionClick}
+          disabled={newSessionLoading}
+          className={`bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center ${
+            newSessionLoading ? 'opacity-75 cursor-not-allowed' : ''
+          }`}
         >
-          <BarChart size={18} className="mr-2" />
-          Go to Dashboard
-        </Link>
+          {newSessionLoading ? (
+            <Loader2 size={18} className="mr-2 animate-spin" />
+          ) : (
+            <RotateCcw size={18} className="mr-2" />
+          )}
+          {newSessionLoading ? 'Starting...' : 'New Practice Session'}
+        </button>
+        
+        <button 
+          onClick={handleDashboardClick}
+          disabled={dashboardLoading}
+          className={`bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200 flex items-center ${
+            dashboardLoading ? 'opacity-75 cursor-not-allowed' : ''
+          }`}
+        >
+          {dashboardLoading ? (
+            <Loader2 size={18} className="mr-2 animate-spin" />
+          ) : (
+            <BarChart size={18} className="mr-2" />
+          )}
+          {dashboardLoading ? 'Loading...' : 'Go to Dashboard'}
+        </button>
       </div>
     </div>
   );

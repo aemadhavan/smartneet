@@ -32,6 +32,17 @@ interface QuestionContentProps {
  * Component that renders the appropriate question component based on question type
  */
 export default function QuestionContent({ attempt }: QuestionContentProps) {
+  // Debug logging for N/A question type issue
+  if ((attempt.questionType as string) === 'N/A' || !attempt.questionType) {
+    console.log('[DEBUG] Question with N/A or missing type:', {
+      questionId: attempt.questionId,
+      questionType: attempt.questionType,
+      questionText: attempt.questionText?.substring(0, 100),
+      hasDetails: !!attempt.details,
+      userAnswer: attempt.userAnswer,
+      sessionData: attempt
+    });
+  }
   switch (attempt.questionType) {
     case 'MultipleChoice':
       return (

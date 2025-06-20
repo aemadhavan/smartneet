@@ -30,23 +30,24 @@ export interface MatchingDetails {
   };
 }
 
-export interface AssertionReasonDetails {
-  statements: Array<{
-    is_correct: boolean;
-    statement_text: string;
-    statement_label: string;
-  }>;
+export interface SequenceOrderingDetails {
   options: Array<{
     is_correct: boolean;
     option_text: string;
     option_number: string;
   }>;
+  sequence_items?: Array<{
+    item_number: string;
+    item_text: string;
+  }>;
+  intro_text?: string;
 }
 
-export interface SequenceOrderingDetails {
-  sequence_items: Array<{
-    item_text: string;
-    item_number: number;
+export interface AssertionReasonDetails {
+  statements: Array<{
+    is_correct: boolean;
+    statement_text: string;
+    statement_label: string;
   }>;
   options: Array<{
     is_correct: boolean;
@@ -271,6 +272,94 @@ export function evaluateOptionBasedAnswer(
   return false; // Fallback if normalizedAnswer type is not handled
 }
 
+/**
+ * Evaluate answer for Matching question type
+ * Matching questions use standard options (A, B, C, D) where one option represents the correct matching
+ */
+function evaluateMatchingAnswer(
+  details: MatchingDetails,
+  normalizedAnswer: string | string[] | null
+): boolean {
+  try {
+    // For matching questions, the user selects one of the multiple choice options (A, B, C, D)
+    // that represents the correct matching pattern
+    if (!normalizedAnswer || typeof normalizedAnswer !== 'string') {
+      return false;
+    }
+
+    // Check if options exist
+    if (!details.options || !Array.isArray(details.options)) {
+      console.warn('Matching question missing options array');
+      return false;
+    }
+
+    // Find the correct option (just like multiple choice)
+    const correctOption = details.options.find(opt => opt.is_correct);
+    if (!correctOption) {
+      console.warn('Matching question has no correct option marked');
+      return false;
+    }
+
+    // Compare user's selected option with the correct option
+    const isCorrect = correctOption.option_number.toString() === normalizedAnswer;
+    
+    console.log(`[DEBUG] Matching evaluation:`, {
+      userAnswer: normalizedAnswer,
+      correctOption: correctOption.option_number.toString(),
+      isCorrect
+    });
+
+    return isCorrect;
+  } catch (error) {
+    console.error('Error evaluating Matching answer:', error);
+    return false;
+  }
+}
+
+/**
+ * Evaluate answer for SequenceOrdering question type
+ * SequenceOrdering questions use standard options (A, B, C, D) where one option represents the correct sequence
+ */
+function evaluateSequenceOrderingAnswer(
+  details: SequenceOrderingDetails,
+  normalizedAnswer: string | string[] | null
+): boolean {
+  try {
+    // For sequence ordering questions, the user selects one of the multiple choice options (A, B, C, D)
+    // that represents the correct sequence order
+    if (!normalizedAnswer || typeof normalizedAnswer !== 'string') {
+      return false;
+    }
+
+    // Check if options exist
+    if (!details.options || !Array.isArray(details.options)) {
+      console.warn('SequenceOrdering question missing options array');
+      return false;
+    }
+
+    // Find the correct option (just like multiple choice)
+    const correctOption = details.options.find(opt => opt.is_correct);
+    if (!correctOption) {
+      console.warn('SequenceOrdering question has no correct option marked');
+      return false;
+    }
+
+    // Compare user's selected option with the correct option
+    const isCorrect = correctOption.option_number.toString() === normalizedAnswer;
+    
+    console.log(`[DEBUG] SequenceOrdering evaluation:`, {
+      userAnswer: normalizedAnswer,
+      correctOption: correctOption.option_number.toString(),
+      correctSequence: correctOption.option_text,
+      isCorrect
+    });
+
+    return isCorrect;
+  } catch (error) {
+    console.error('Error evaluating SequenceOrdering answer:', error);
+    return false;
+  }
+}
 
 export function evaluateAnswer(
   questionType: string,
@@ -305,12 +394,13 @@ export function evaluateAnswer(
          // evaluateOptionBasedAnswer handles array for MultipleCorrectStatements
         return evaluateOptionBasedAnswer(questionType, details, normalizedAnswer);
       
-      // Add cases for other types like Matching, SequenceOrdering, FillInTheBlanks
-      // For example:
-      // case 'Matching':
-      //   // return evaluateMatchingAnswer(details as MatchingDetails, normalizedAnswer);
-      //   console.warn(`Evaluation for ${questionType} not fully implemented yet.`);
-      //   return false; // Placeholder
+      case 'Matching':
+        return evaluateMatchingAnswer(details as MatchingDetails, normalizedAnswer);
+      
+      case 'SequenceOrdering':
+        return evaluateSequenceOrderingAnswer(details as SequenceOrderingDetails, normalizedAnswer);
+      
+      // Add cases for other types like FillInTheBlanks
       default:
         console.warn(`Unknown or unsupported question type for evaluation: ${questionType}`);
         return false;
@@ -344,12 +434,19 @@ export function getCorrectAnswerForQuestionType(
           return (details.options as ParsedOptionDetails[]).filter(opt => opt.is_correct).map(opt => opt.option_number.toString());
         }
         break;
-      // TODO: Implement for Matching, SequenceOrdering, FillInTheBlanks
-      // case 'Matching':
-      //   if ('matching_details' in details && details.matching_details) {
-      //     // Logic to return correct matches
-      //   }
-      //   break;
+      case 'Matching':
+        if ('options' in details && Array.isArray(details.options)) {
+          const correctOption = (details.options as ParsedOptionDetails[]).find(opt => opt.is_correct);
+          return correctOption ? correctOption.option_number.toString() : null;
+        }
+        break;
+      case 'SequenceOrdering':
+        if ('options' in details && Array.isArray(details.options)) {
+          const correctOption = (details.options as ParsedOptionDetails[]).find(opt => opt.is_correct);
+          return correctOption ? correctOption.option_number.toString() : null;
+        }
+        break;
+      // TODO: Implement for FillInTheBlanks
       default:
         console.warn(`Correct answer retrieval for ${questionType} not fully implemented.`);
         return null;
