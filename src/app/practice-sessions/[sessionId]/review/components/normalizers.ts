@@ -294,9 +294,9 @@ export function normalizeUserAnswer(questionType: QuestionType, rawAnswer: unkno
         } else if (typedAnswer.selectedOption) {
           // Handle case where it's stored as selectedOption instead of selectedStatements
           selectedStatements = [String(typedAnswer.selectedOption)];
-        } else if ((typedAnswer as any).option) {
+        } else if ('option' in typedAnswer && typedAnswer.option !== undefined) {
           // Handle case where it's stored as 'option' field
-          selectedStatements = [String((typedAnswer as any).option)];
+          selectedStatements = [String(typedAnswer.option)];
         }
       } else if (typeof answer === 'string' || typeof answer === 'number') {
         selectedStatements = [String(answer)];
