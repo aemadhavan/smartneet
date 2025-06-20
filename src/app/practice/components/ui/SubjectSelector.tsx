@@ -1,5 +1,5 @@
 // File: src/app/practice/components/ui/SubjectSelector.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Subject } from '@/app/practice/types';
 
 interface SubjectSelectorProps {
@@ -64,10 +64,62 @@ const subjectIcons: Record<string, {
 
 export function SubjectSelector({ subjects, onSelect, isPremium = false, loading, error }: SubjectSelectorProps) {
   const [hoveredSubject, setHoveredSubject] = useState<number | null>(null);
+  const [loadingSubjects, setLoadingSubjects] = useState<Set<number>>(new Set());
 
   const getIconConfig = (subjectCode: string) => {
     return subjectIcons[subjectCode] || subjectIcons.default;
   };
+
+  const handleSubjectClick = async (subject: Subject) => {
+    // Prevent multiple clicks by checking if subject is already loading
+    if (loadingSubjects.has(subject.subject_id)) {
+      return;
+    }
+
+    // Add subject to loading set
+    setLoadingSubjects(prev => new Set(prev).add(subject.subject_id));
+
+    try {
+      // If it's botany and user is not premium, navigate to URL with limit=free parameter
+      if (subject.subject_code === 'BOT' && !isPremium) {
+        window.location.href = `/practice?subject=botany&limit=free`;
+        return; // Don't remove from loading set since we're navigating away
+      } else {
+        // For other subjects or premium users, use the normal selection
+        onSelect(subject);
+        
+        // Set a timeout to remove loading state in case the navigation is slow
+        setTimeout(() => {
+          setLoadingSubjects(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(subject.subject_id);
+            return newSet;
+          });
+        }, 10000); // 10 second timeout
+      }
+    } catch (error) {
+      console.error('Error selecting subject:', error);
+      // Remove from loading set on error
+      setLoadingSubjects(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(subject.subject_id);
+        return newSet;
+      });
+    }
+  };
+
+  // Clear loading states when component unmounts or when subjects change
+  useEffect(() => {
+    return () => {
+      // Clear all loading states on unmount
+      setLoadingSubjects(new Set());
+    };
+  }, []);
+
+  // Reset loading states if subjects change
+  useEffect(() => {
+    setLoadingSubjects(new Set());
+  }, [subjects]);
 
   // Show loading state
   if (loading) {
@@ -110,19 +162,20 @@ export function SubjectSelector({ subjects, onSelect, isPremium = false, loading
         {subjects.map((subject) => {
           const iconConfig = getIconConfig(subject.subject_code);
           const isHovered = hoveredSubject === subject.subject_id;
+          const isLoading = loadingSubjects.has(subject.subject_id);
           
           return (
             <div
               key={subject.subject_id}
               className={`bg-gradient-to-br ${iconConfig.gradient} rounded-xl border border-gray-100 
                 overflow-hidden transition-all duration-300 relative ${
-                isHovered 
+                isHovered && !isLoading
                   ? 'shadow-lg transform translate-y-[-4px]' 
                   : 'hover:shadow-md'
-              }`}
-              onMouseEnter={() => setHoveredSubject(subject.subject_id)}
+              } ${isLoading ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer'}`}
+              onMouseEnter={() => !isLoading && setHoveredSubject(subject.subject_id)}
               onMouseLeave={() => setHoveredSubject(null)}
-              onClick={() => onSelect(subject)}
+              onClick={() => !isLoading && handleSubjectClick(subject)}
             >
               <div className="p-6 pb-16"> {/* Added padding at bottom to make room for button */}
                 <div className="flex items-center mb-4">
@@ -174,27 +227,37 @@ export function SubjectSelector({ subjects, onSelect, isPremium = false, loading
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      // If it's botany and user is not premium, navigate to URL with limit=free parameter
-                      if (subject.subject_code === 'BOT' && !isPremium) {
-                        window.location.href = `/practice?subject=botany&limit=free`;
-                      } else {
-                        // For other subjects or premium users, use the normal selection
-                        onSelect(subject);
-                      }
+                      handleSubjectClick(subject);
                     }}
+                    disabled={isLoading}
                     className={`px-4 py-2 ${
                       // Enhanced contrast for Chemistry and Zoology buttons
                       subject.subject_code === 'CHEM' ? 'bg-purple-700' : 
                       subject.subject_code === 'ZOO' ? 'bg-yellow-700' :
                       iconConfig.color.replace('text', 'bg')
-                    } rounded-lg text-white font-medium text-sm flex items-center transition-colors 
-                    hover:bg-opacity-90 shadow-sm`}
+                    } rounded-lg text-white font-medium text-sm flex items-center transition-all duration-200
+                    ${isLoading 
+                      ? 'bg-opacity-75 cursor-not-allowed' 
+                      : 'hover:bg-opacity-90 hover:shadow-md hover:scale-105'
+                    } shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
-                    Start Practice
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" 
-                      viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                    {isLoading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="animate-pulse">Starting...</span>
+                      </>
+                    ) : (
+                      <>
+                        Start Practice
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" 
+                          viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -171,19 +171,14 @@ export async function POST(
         )
       );
 
-    // Create a map for easier access
-    const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = 
-      sessionQuestions.reduce((map, q) => {
+    // Create a map for easier access with optimized parsing
+    const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = {};
+    
+    // Batch parse question details for better performance
+    for (const q of sessionQuestions) {
+      try {
         const parsedDetails = parseQuestionDetails(q.details);
-        if (!parsedDetails) {
-          logger.warn('Failed to parse question details', {
-            userId,
-            context: 'practice-sessions/[sessionId]/submit.POST',
-            data: { questionId: q.question_id }
-          });
-          return map;
-        }
-        map[q.question_id.toString()] = {
+        questionDetailsMap[q.question_id.toString()] = {
           session_question_id: q.session_question_id,
           details: parsedDetails,
           marks: q.marks,
@@ -191,8 +186,17 @@ export async function POST(
           question_type: q.question_type,
           topic_id: q.topic_id
         };
-        return map;
-      }, {} as Record<string, QuestionDetailsWithSessionInfo>);
+      } catch (error) {
+        logger.warn('Failed to parse question details', {
+          userId,
+          context: 'practice-sessions/[sessionId]/submit.POST',
+          data: { questionId: q.question_id },
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Skip this question if parsing fails
+        continue;
+      }
+    }
 
     // Check existing attempts to avoid duplicates
     const existingAttempts = await db
@@ -219,29 +223,25 @@ export async function POST(
     }> = {};
     const topicIdsWithNewAttempts = new Set<number>();
     
-    // Collect all new attempts to insert in a batch
+    // Collect all new attempts to insert in a batch - optimized loop
     const attemptsToInsert: QuestionAttemptRecord[] = [];
-    for (const questionId of Object.keys(answers)) {
+    const answerEntries = Object.entries(answers);
+    
+    for (const [questionId, userAnswer] of answerEntries) {
       // Skip if this question already has an attempt
       if (existingAttemptIds.has(questionId)) {
         continue;
       }
       
-      const userAnswer = answers[questionId];
       const questionDetails = questionDetailsMap[questionId];
-
       if (!questionDetails) {
         continue; // Skip this question if it doesn't belong to the session
       }
 
-      // For debugging and logging
-      const correctAnswer = getCorrectAnswerForQuestionType(
-        questionDetails.question_type, 
-        questionDetails.details
-      );
-      
-      // Evaluate if the answer is correct
+      // Evaluate answer - optimized error handling
       let isCorrect = false;
+      let correctAnswer: unknown = null;
+      
       try {
         isCorrect = evaluateAnswer(
           questionDetails.question_type,
@@ -249,13 +249,20 @@ export async function POST(
           userAnswer
         );
         
-        // Store evaluation details for debugging
-        evaluationLog[questionId] = {
-          questionType: questionDetails.question_type,
-          userAnswer,
-          correctAnswer,
-          isCorrect
-        };
+        // Only get correct answer for debugging in development
+        if (process.env.NODE_ENV === 'development') {
+          correctAnswer = getCorrectAnswerForQuestionType(
+            questionDetails.question_type, 
+            questionDetails.details
+          );
+          
+          evaluationLog[questionId] = {
+            questionType: questionDetails.question_type,
+            userAnswer,
+            correctAnswer,
+            isCorrect
+          };
+        }
         
       } catch (error) {
         logger.error('Error evaluating answer', {
@@ -282,9 +289,10 @@ export async function POST(
       }
 
       // Prepare the question attempt record for batch insert
+      const questionIdNum = parseInt(questionId);
       attemptsToInsert.push({
         user_id: userId,
-        question_id: parseInt(questionId),
+        question_id: questionIdNum,
         session_id: sessionIdNum,
         session_question_id: questionDetails.session_question_id,
         attempt_number: 1, // First attempt
@@ -297,7 +305,7 @@ export async function POST(
       });
 
       results.push({
-        question_id: parseInt(questionId),
+        question_id: questionIdNum,
         is_correct: isCorrect,
         marks_awarded: marksAwarded,
       });
@@ -317,25 +325,28 @@ export async function POST(
       data: { sessionId, evaluationLog }
     });
 
-    // After the transaction, update session statistics
-    const { updateSessionStats, updateTopicMastery } = await import('@/lib/utilities/sessionUtils');
+    // After the transaction, update session statistics and topic mastery in parallel
+    const { updateSessionStats, updateTopicMasteryBatch } = await import('@/lib/utilities/sessionUtils');
     
-    // Update session stats
-    await updateSessionStats(sessionIdNum, userId);
-    
-    // Update topic mastery for each attempted topic
-    for (const topicId of topicIdsWithNewAttempts) {
+    // Prepare topic mastery updates data
+    const topicMasteryUpdates = Array.from(topicIdsWithNewAttempts).map(topicId => {
       const attemptResult = results.find(r => {
         const qId = r.question_id.toString();
         return questionDetailsMap[qId]?.topic_id === topicId;
       });
-      if (attemptResult) {
-        // Use only the first attempt for this topic
-        await updateTopicMastery(userId, topicId, attemptResult.is_correct);
-      }
-    }
+      return {
+        topicId,
+        isCorrect: attemptResult?.is_correct || false
+      };
+    }).filter(update => update.isCorrect !== undefined);
 
-    // Get the updated session stats
+    // Run session stats update and topic mastery updates in parallel
+    await Promise.all([
+      updateSessionStats(sessionIdNum, userId),
+      topicMasteryUpdates.length > 0 ? updateTopicMasteryBatch(userId, topicMasteryUpdates) : Promise.resolve()
+    ]);
+
+    // Get the updated session stats and mark as completed in one operation
     const [updatedSession] = await db
       .select({
         questions_attempted: practice_sessions.questions_attempted,

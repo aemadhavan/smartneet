@@ -1,5 +1,18 @@
 // src/lib/utils/answerEvaluation.ts
 
+// Question details cache to avoid repeated JSON parsing
+const questionDetailsCache = new Map<string, QuestionDetails>();
+const CACHE_MAX_SIZE = 1000; // Limit cache size to prevent memory issues
+
+// Cache management functions
+export function clearQuestionDetailsCache(): void {
+  questionDetailsCache.clear();
+}
+
+export function getQuestionDetailsCacheSize(): number {
+  return questionDetailsCache.size;
+}
+
 // TypeScript Interfaces for Question Details
 // These are based on the structure observed in the `questions.details` column
 // and how they are processed in the `submit` route.
@@ -139,10 +152,17 @@ export function isQuestionDetails(details: unknown): details is QuestionDetails 
 
   const typedDetails = details as Partial<QuestionDetails>;
 
-  // For option-based questions, 'options' array is a common pattern.
-  // Other types like FillInTheBlanks might not have 'options'.
+  // Fast checks for distinct question types first (most efficient)
+  if ('matching_details' in typedDetails) return true; // MatchingDetails
+  if ('sequence_items' in typedDetails) return true; // SequenceOrderingDetails  
+  if ('statements' in typedDetails) return true; // AssertionReasonDetails or MultipleCorrectStatementsDetails
+  if ('correct_answers' in typedDetails) return true; // FillInTheBlanksDetails
+
+  // Check options-based questions (most common case)
   if ('options' in typedDetails && Array.isArray(typedDetails.options)) {
-    return typedDetails.options.every((opt: unknown) => {
+    // For performance, only validate first few options instead of all
+    const optionsToCheck = typedDetails.options.slice(0, Math.min(3, typedDetails.options.length));
+    return optionsToCheck.every((opt: unknown) => {
       if (typeof opt !== 'object' || opt === null) return false;
       const typedOpt = opt as RawOptionBeforeNormalization;
       return (
@@ -152,40 +172,43 @@ export function isQuestionDetails(details: unknown): details is QuestionDetails 
       );
     });
   }
-  // Add checks for other question types if they have distinct structures
-  if ('matching_details' in typedDetails) return true; // MatchingDetails
-  if ('sequence_items' in typedDetails) return true; // SequenceOrderingDetails
-  if ('statements' in typedDetails) return true; // AssertionReasonDetails or MultipleCorrectStatementsDetails
-  if ('correct_answers' in typedDetails) return true; // FillInTheBlanksDetails
-  
-  // Fallback for types that only have options (like DiagramBased or a simple MultipleChoice)
-  // This condition might need refinement if more non-option-based types are added.
-  return 'options' in typedDetails && Array.isArray(typedDetails.options);
+
+  return false;
 }
 
 
 export function parseQuestionDetails(details: unknown): QuestionDetails {
-  if (isQuestionDetails(details)) {
-    // Normalize options to ensure consistent structure if options exist
-    if ('options' in details && Array.isArray(details.options)) {
-      return {
-        ...details,
-        options: details.options.map((opt: RawOptionBeforeNormalization) => ({ // Explicitly type opt
-          option_number: String(opt.option_number), // Ensure string
-          option_text: String(opt.option_text || ''), // Ensure string, default to empty
-          is_correct: Boolean(opt.is_correct) // Ensure boolean
-        }))
-      } as QuestionDetails; // Cast to QuestionDetails after transformation
-    }
-    return details; // Return as is if no options or already conforming
+  // Generate cache key for string details
+  const cacheKey = typeof details === 'string' ? details : null;
+  
+  // Check cache first for string details (most common case)
+  if (cacheKey && questionDetailsCache.has(cacheKey)) {
+    return questionDetailsCache.get(cacheKey)!;
   }
 
-  if (typeof details === 'string') {
+  let result: QuestionDetails;
+
+  if (isQuestionDetails(details)) {
+    // Fast path: already parsed object
+    if ('options' in details && Array.isArray(details.options)) {
+      result = {
+        ...details,
+        options: details.options.map((opt: RawOptionBeforeNormalization) => ({
+          option_number: String(opt.option_number),
+          option_text: String(opt.option_text || ''),
+          is_correct: Boolean(opt.is_correct)
+        }))
+      } as QuestionDetails;
+    } else {
+      result = details;
+    }
+  } else if (typeof details === 'string') {
+    // Parse JSON string and cache result
     try {
       const parsedDetails = JSON.parse(details);
       if (isQuestionDetails(parsedDetails)) {
         if ('options' in parsedDetails && Array.isArray(parsedDetails.options)) {
-          return {
+          result = {
             ...parsedDetails,
             options: parsedDetails.options.map((opt: RawOptionBeforeNormalization) => ({
               option_number: String(opt.option_number),
@@ -193,51 +216,94 @@ export function parseQuestionDetails(details: unknown): QuestionDetails {
               is_correct: Boolean(opt.is_correct)
             }))
           } as QuestionDetails;
+        } else {
+          result = parsedDetails;
         }
-        return parsedDetails;
+      } else {
+        throw new Error('Parsed details do not match expected structure after JSON parse.');
       }
-      throw new Error('Parsed details do not match expected structure after JSON parse.');
     } catch (e) {
       const error = e instanceof Error ? e : new Error('Unknown error during JSON parsing');
       console.error('Failed to parse question details string:', error.message);
       throw new Error(`Invalid JSON format in question details: ${error.message}`);
     }
+  } else {
+    console.error('Invalid question details format:', details);
+    throw new Error('Invalid question details format. Expected an object or a valid JSON string.');
   }
 
-  console.error('Invalid question details format:', details);
-  throw new Error('Invalid question details format. Expected an object or a valid JSON string.');
+  // Cache the result if it came from a string
+  if (cacheKey) {
+    // Implement LRU-like behavior: if cache is full, remove oldest entry
+    if (questionDetailsCache.size >= CACHE_MAX_SIZE) {
+      const firstKey = questionDetailsCache.keys().next().value;
+      if (firstKey !== undefined) {
+        questionDetailsCache.delete(firstKey);
+      }
+    }
+    questionDetailsCache.set(cacheKey, result);
+  }
+
+  return result;
 }
 
 
 export function normalizeUserAnswer(userAnswer: unknown): string | string[] | null {
-  if (userAnswer === null || userAnswer === undefined) {
+  // Fast null/undefined check
+  if (userAnswer == null) {
     return null;
   }
-  if (typeof userAnswer === 'number') {
-    return userAnswer.toString();
+
+  // Fast type checks - most common cases first
+  const answerType = typeof userAnswer;
+  
+  if (answerType === 'string') {
+    return userAnswer as string;
   }
-  if (typeof userAnswer === 'string') {
-    return userAnswer;
+  
+  if (answerType === 'number') {
+    return (userAnswer as number).toString();
   }
-  // For MultipleCorrectStatements, the answer might be an array of strings (option numbers)
-  if (Array.isArray(userAnswer) && userAnswer.every(item => typeof item === 'string' || typeof item === 'number')) {
-    return userAnswer.map(item => item.toString());
+  
+  // Array check for MultipleCorrectStatements
+  if (Array.isArray(userAnswer)) {
+    // Optimized array validation - check type of first element and assume rest are same type
+    if (userAnswer.length === 0) return [];
+    
+    const firstType = typeof userAnswer[0];
+    if (firstType === 'string' || firstType === 'number') {
+      // Quick check: if first element is valid type, assume rest are too for performance
+      return userAnswer.map(item => String(item));
+    }
+    return null;
   }
-  if (typeof userAnswer === 'object' && userAnswer !== null) {
+  
+  // Object check - only if it's an object and not an array
+  if (answerType === 'object') {
     const answerObj = userAnswer as Record<string, unknown>;
-    const optionKeys = ['option', 'selectedOption', 'selectedMatches'];
-    for (const key of optionKeys) {
-      const optionValue = answerObj[key];
-      if (typeof optionValue === 'string' || typeof optionValue === 'number') {
-        return optionValue.toString();
+    
+    // Check most common keys first
+    const optionValue = answerObj.option || answerObj.selectedOption || answerObj.selectedMatches;
+    
+    if (optionValue != null) {
+      const optionType = typeof optionValue;
+      if (optionType === 'string' || optionType === 'number') {
+        return String(optionValue);
       }
-      // Handle array for selectedMatches or similar scenarios
-      if (Array.isArray(optionValue) && optionValue.every(item => typeof item === 'string' || typeof item === 'number')) {
-        return optionValue.map(item => item.toString());
+      
+      // Handle array values
+      if (Array.isArray(optionValue) && optionValue.length > 0) {
+        const firstItemType = typeof optionValue[0];
+        if (firstItemType === 'string' || firstItemType === 'number') {
+          return optionValue.map(item => String(item));
+        }
       }
     }
   }
-  console.warn('Could not normalize user answer:', userAnswer);
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('Could not normalize user answer:', userAnswer);
+  }
   return null;
 }
 
@@ -249,7 +315,9 @@ export function evaluateOptionBasedAnswer(
 ): boolean {
   // Ensure the details have options
   if (!('options' in details) || !Array.isArray(details.options)) {
-    console.warn(`No options found for question type: ${questionType}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(`No options found for question type: ${questionType}`);
+    }
     return false;
   }
   
@@ -303,11 +371,13 @@ function evaluateMatchingAnswer(
     // Compare user's selected option with the correct option
     const isCorrect = correctOption.option_number.toString() === normalizedAnswer;
     
-    console.log(`[DEBUG] Matching evaluation:`, {
-      userAnswer: normalizedAnswer,
-      correctOption: correctOption.option_number.toString(),
-      isCorrect
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEBUG] Matching evaluation:`, {
+        userAnswer: normalizedAnswer,
+        correctOption: correctOption.option_number.toString(),
+        isCorrect
+      });
+    }
 
     return isCorrect;
   } catch (error) {
@@ -347,12 +417,14 @@ function evaluateSequenceOrderingAnswer(
     // Compare user's selected option with the correct option
     const isCorrect = correctOption.option_number.toString() === normalizedAnswer;
     
-    console.log(`[DEBUG] SequenceOrdering evaluation:`, {
-      userAnswer: normalizedAnswer,
-      correctOption: correctOption.option_number.toString(),
-      correctSequence: correctOption.option_text,
-      isCorrect
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEBUG] SequenceOrdering evaluation:`, {
+        userAnswer: normalizedAnswer,
+        correctOption: correctOption.option_number.toString(),
+        correctSequence: correctOption.option_text,
+        isCorrect
+      });
+    }
 
     return isCorrect;
   } catch (error) {
@@ -369,7 +441,9 @@ export function evaluateAnswer(
   try {
     const normalizedAnswer = normalizeUserAnswer(userAnswer);
     if (normalizedAnswer === null) {
-      console.warn('Could not normalize user answer for evaluation:', userAnswer);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Could not normalize user answer for evaluation:', userAnswer);
+      }
       return false;
     }
 

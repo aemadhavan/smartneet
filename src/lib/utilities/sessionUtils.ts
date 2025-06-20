@@ -1,8 +1,12 @@
 // src/lib/utilities/sessionUtils.ts
 import { db } from '@/db';
 import { practice_sessions, session_questions, question_attempts, questions, topic_mastery, topics } from '@/db/schema';
-import { and, eq, countDistinct, sum } from 'drizzle-orm';
+import { and, eq, sum, inArray } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
+
+// Simple in-memory cache for session validation to avoid repeated DB checks
+const sessionValidationCache = new Map<string, { timestamp: number, isValid: boolean, totalQuestions: number }>();
+const SESSION_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Updates session statistics based on question attempts
@@ -20,101 +24,158 @@ export async function updateSessionStats(
   score: number,
   max_score: number
 }> {
-  // Use a transaction to ensure atomicity
-  return await db.transaction(async (tx) => {
-    // First, verify the session exists and belongs to the user
-    const [session] = await tx
-      .select({
-        session_id: practice_sessions.session_id,
-        total_questions: practice_sessions.total_questions
-      })
-      .from(practice_sessions)
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionId),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
-    
-    if (!session) {
+  // Check cache for session validation first
+  const cacheKey = `${sessionId}:${userId}`;
+  const now = Date.now();
+  const cachedSession = sessionValidationCache.get(cacheKey);
+  
+  // Use cached session info if valid and recent
+  let sessionInfo: { total_questions: number } | null = null;
+  if (cachedSession && (now - cachedSession.timestamp) < SESSION_CACHE_TTL) {
+    if (!cachedSession.isValid) {
       throw new Error('Session not found or does not belong to the user');
     }
+    sessionInfo = { total_questions: cachedSession.totalQuestions };
+  }
 
-    // Calculate the total number of questions that have been attempted
-    // This gets all unique questions that have attempts
-    const [uniqueAttemptsResult] = await tx
-      .select({
-        distinctCount: countDistinct(question_attempts.question_id) // Use countDistinct
-      })
-      .from(question_attempts)
-      .where(
-        and(
-          eq(question_attempts.session_id, sessionId),
-          eq(question_attempts.user_id, userId)
-        )
-      );
+  // Use a transaction to ensure atomicity
+  return await db.transaction(async (tx) => {
+    let max_score = 0;
+    let attemptStats: Array<{
+      question_id: number;
+      is_correct: boolean;
+      marks_awarded: number | null;
+      attempt_timestamp: Date;
+    }> = [];
 
-    // Get the number of correct questions (count distinct question_ids where is_correct=true)
-    const [correctResult] = await tx
-      .select({
-        distinctCorrect: countDistinct(question_attempts.question_id) // Use countDistinct
-      })
-      .from(question_attempts)
-      .where(
-        and(
-          eq(question_attempts.session_id, sessionId),
-          eq(question_attempts.user_id, userId),
-          eq(question_attempts.is_correct, true)
-        )
-      );
+    if (!sessionInfo) {
+      // Query session info and max score if not cached
+      const [sessionAndMaxScoreQuery, attemptStatsQuery] = await Promise.all([
+        tx
+          .select({
+            session_id: practice_sessions.session_id,
+            total_questions: practice_sessions.total_questions,
+            totalMarks: sum(questions.marks)
+          })
+          .from(practice_sessions)
+          .innerJoin(session_questions, eq(practice_sessions.session_id, session_questions.session_id))
+          .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
+          .where(
+            and(
+              eq(practice_sessions.session_id, sessionId),
+              eq(practice_sessions.user_id, userId)
+            )
+          )
+          .groupBy(practice_sessions.session_id, practice_sessions.total_questions),
 
-    // Calculate total score from marks_awarded in attempts
-    const scoreResults = await tx
-      .select({
-        question_id: question_attempts.question_id,
-        marks_awarded: question_attempts.marks_awarded
-      })
-      .from(question_attempts)
-      .where(
-        and(
-          eq(question_attempts.session_id, sessionId),
-          eq(question_attempts.user_id, userId)
-        )
-      )
-      .orderBy(question_attempts.attempt_timestamp);
-    
-    // Use a Map to track the latest attempt for each question
-    const latestAttemptMap = new Map();
-    for (const result of scoreResults) {
-      latestAttemptMap.set(result.question_id, result.marks_awarded);
+        tx
+          .select({
+            question_id: question_attempts.question_id,
+            is_correct: question_attempts.is_correct,
+            marks_awarded: question_attempts.marks_awarded,
+            attempt_timestamp: question_attempts.attempt_timestamp
+          })
+          .from(question_attempts)
+          .where(
+            and(
+              eq(question_attempts.session_id, sessionId),
+              eq(question_attempts.user_id, userId)
+            )
+          )
+          .orderBy(question_attempts.question_id, question_attempts.attempt_timestamp)
+      ]);
+
+      const [sessionAndMaxScore] = sessionAndMaxScoreQuery;
+      attemptStats = attemptStatsQuery;
+
+      if (!sessionAndMaxScore) {
+        // Cache the negative result
+        sessionValidationCache.set(cacheKey, { timestamp: now, isValid: false, totalQuestions: 0 });
+        throw new Error('Session not found or does not belong to the user');
+      }
+      
+      // Cache the positive result
+      sessionValidationCache.set(cacheKey, { 
+        timestamp: now, 
+        isValid: true, 
+        totalQuestions: sessionAndMaxScore.total_questions || 0 
+      });
+      
+      sessionInfo = { total_questions: sessionAndMaxScore.total_questions || 0 };
+      max_score = sessionAndMaxScore.totalMarks ? parseInt(String(sessionAndMaxScore.totalMarks), 10) : 0;
+    } else {
+      // For cached sessions, execute queries in parallel
+      const [attemptStatsQuery, maxScoreQuery] = await Promise.all([
+        tx
+          .select({
+            question_id: question_attempts.question_id,
+            is_correct: question_attempts.is_correct,
+            marks_awarded: question_attempts.marks_awarded,
+            attempt_timestamp: question_attempts.attempt_timestamp
+          })
+          .from(question_attempts)
+          .where(
+            and(
+              eq(question_attempts.session_id, sessionId),
+              eq(question_attempts.user_id, userId)
+            )
+          )
+          .orderBy(question_attempts.question_id, question_attempts.attempt_timestamp),
+
+        tx
+          .select({ totalMarks: sum(questions.marks) })
+          .from(session_questions)
+          .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
+          .where(eq(session_questions.session_id, sessionId))
+      ]);
+
+      attemptStats = attemptStatsQuery;
+      const [maxScoreResult] = maxScoreQuery;
+      max_score = maxScoreResult?.totalMarks ? parseInt(String(maxScoreResult.totalMarks), 10) : 0;
     }
-    
-    // Sum up the marks from the latest attempt for each question
-    const score = Array.from(latestAttemptMap.values()).reduce(
-      (sum, marks) => sum + Number(marks || 0), // Explicitly convert marks to number
-      0
-    );
 
-    // Calculate max possible score from the session questions
-    const [maxScoreResult] = await tx
-      .select({
-        totalMarks: sum(questions.marks) // Use sum directly
-      })
-      .from(session_questions)
-      .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
-      .where(eq(session_questions.session_id, sessionId));
+    // Optimized single-pass processing of attempt statistics
+    const questionStats = new Map<number, {
+      isCorrect: boolean,
+      marksAwarded: number,
+      latestTimestamp: Date
+    }>();
 
-    // Calculate final values with validation
-    const questions_attempted = Math.min(
-      uniqueAttemptsResult?.distinctCount || 0,
-      session.total_questions || 0 // Provide default value if null/undefined
-    );
-    
-    const questions_correct = correctResult?.distinctCorrect || 0;
-    
-    // Ensure max_score is treated as a number. Parse the string result from sum().
-    const max_score_str = maxScoreResult?.totalMarks; // Type: string | null | undefined
-    const max_score = max_score_str ? parseInt(max_score_str, 10) : 0; 
+    // Single pass to get latest attempt for each question
+    let questions_attempted = 0;
+    let questions_correct = 0;
+    let score = 0;
+
+    for (const attempt of attemptStats) {
+      const questionId = attempt.question_id;
+      const currentStat = questionStats.get(questionId);
+      
+      if (!currentStat || attempt.attempt_timestamp > currentStat.latestTimestamp) {
+        const newStat = {
+          isCorrect: attempt.is_correct,
+          marksAwarded: Number(attempt.marks_awarded ?? 0),
+          latestTimestamp: attempt.attempt_timestamp
+        };
+        
+        // If this is a replacement, subtract old stats
+        if (currentStat) {
+          if (currentStat.isCorrect) questions_correct--;
+          score -= currentStat.marksAwarded;
+        } else {
+          // New question attempt
+          questions_attempted++;
+        }
+        
+        // Add new stats
+        if (newStat.isCorrect) questions_correct++;
+        score += newStat.marksAwarded;
+        
+        questionStats.set(questionId, newStat);
+      }
+    }
+
+    // Ensure questions_attempted doesn't exceed total_questions
+    questions_attempted = Math.min(questions_attempted, sessionInfo.total_questions);
 
     // Update the session with accurate statistics
     await tx
@@ -165,7 +226,7 @@ export async function recordQuestionAttempt(
 ) {
   return await db.transaction(async (tx) => {
     // Create the question attempt record
-    const [newAttempt] = await tx
+    const insertPromise = tx
       .insert(question_attempts)
       .values({
         user_id: userId,
@@ -184,15 +245,19 @@ export async function recordQuestionAttempt(
       })
       .returning();
 
-    // Update the time spent on the question if provided
-    if (timeTakenSeconds) {
-      await tx
-        .update(session_questions)
-        .set({ time_spent_seconds: timeTakenSeconds })
-        .where(eq(session_questions.session_question_id, sessionQuestionId));
-    }
+    // Update the time spent on the question if provided (parallel execution)
+    const updatePromise = timeTakenSeconds 
+      ? tx
+          .update(session_questions)
+          .set({ time_spent_seconds: timeTakenSeconds })
+          .where(eq(session_questions.session_question_id, sessionQuestionId))
+      : Promise.resolve();
 
-    // Update session statistics immediately
+    // Execute both operations in parallel
+    const [attemptResult] = await Promise.all([insertPromise, updatePromise]);
+    const [newAttempt] = attemptResult;
+
+    // Update session statistics immediately (optimized version)
     const sessionStats = await updateSessionStats(sessionId, userId);
 
     return { attempt: newAttempt, sessionStats };
@@ -337,4 +402,167 @@ export async function updateTopicMastery(
   }
 
   return result;
+}
+
+/**
+ * Updates topic mastery levels for multiple topics in a batch operation
+ * This is more efficient than calling updateTopicMastery individually for each topic
+ * 
+ * @param userId User ID
+ * @param topicUpdates Array of topic updates with topicId and isCorrect
+ * @returns Array of updated mastery information
+ */
+export async function updateTopicMasteryBatch(
+  userId: string,
+  topicUpdates: Array<{ topicId: number, isCorrect: boolean }>
+): Promise<Array<{
+  topicId: number,
+  mastery_level: string,
+  questions_attempted: number,
+  questions_correct: number,
+  accuracy_percentage: number
+}>> {
+  if (topicUpdates.length === 0) {
+    return [];
+  }
+
+  const results = await db.transaction(async (tx) => {
+    const topicIds = topicUpdates.map(update => update.topicId);
+    
+    // Get current mastery levels for all topics in one query
+    const existingMasteries = await tx
+      .select()
+      .from(topic_mastery)
+      .where(
+        and(
+          eq(topic_mastery.user_id, userId),
+          topicIds.length === 1 
+            ? eq(topic_mastery.topic_id, topicIds[0])
+            : inArray(topic_mastery.topic_id, topicIds)
+        )
+      );
+
+    // Create a map for quick lookup
+    const masteryMap = new Map(
+      existingMasteries.map(m => [m.topic_id, m])
+    );
+
+    const updateResults = [];
+    const insertsToMake = [];
+    const updatesToMake = [];
+
+    for (const update of topicUpdates) {
+      const { topicId, isCorrect } = update;
+      const existingMastery = masteryMap.get(topicId);
+
+      if (existingMastery) {
+        // Update existing mastery record
+        const questionsAttempted = existingMastery.questions_attempted + 1;
+        const questionsCorrect = isCorrect ? existingMastery.questions_correct + 1 : existingMastery.questions_correct;
+        const accuracyPercentage = Math.round((questionsCorrect / questionsAttempted) * 100);
+        
+        let masteryLevel: 'notStarted' | 'beginner' | 'intermediate' | 'advanced' | 'mastered' = existingMastery.mastery_level as 'notStarted' | 'beginner' | 'intermediate' | 'advanced' | 'mastered';
+        if (questionsAttempted >= 20) {
+          if (accuracyPercentage >= 90) masteryLevel = 'mastered';
+          else if (accuracyPercentage >= 75) masteryLevel = 'advanced';
+          else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
+          else masteryLevel = 'beginner';
+        } else if (questionsAttempted >= 10) {
+          if (accuracyPercentage >= 80) masteryLevel = 'advanced';
+          else if (accuracyPercentage >= 60) masteryLevel = 'intermediate';
+          else masteryLevel = 'beginner';
+        } else if (questionsAttempted >= 5) {
+          if (accuracyPercentage >= 70) masteryLevel = 'intermediate';
+          else masteryLevel = 'beginner';
+        } else {
+          masteryLevel = 'beginner';
+        }
+
+        updatesToMake.push({
+          topicId,
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
+          accuracy_percentage: accuracyPercentage,
+          mastery_level: masteryLevel
+        });
+
+        updateResults.push({
+          topicId,
+          mastery_level: masteryLevel,
+          questions_attempted: questionsAttempted,
+          questions_correct: questionsCorrect,
+          accuracy_percentage: accuracyPercentage
+        });
+      } else {
+        // Create new mastery record
+        const initialAccuracy = isCorrect ? 100 : 0;
+        const initialMasteryLevel = 'beginner' as const;
+
+        insertsToMake.push({
+          user_id: userId,
+          topic_id: topicId,
+          mastery_level: initialMasteryLevel,
+          questions_attempted: 1,
+          questions_correct: isCorrect ? 1 : 0,
+          accuracy_percentage: initialAccuracy,
+          last_practiced: new Date(),
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+
+        updateResults.push({
+          topicId,
+          mastery_level: initialMasteryLevel,
+          questions_attempted: 1,
+          questions_correct: isCorrect ? 1 : 0,
+          accuracy_percentage: initialAccuracy
+        });
+      }
+    }
+
+    // Perform batch inserts
+    if (insertsToMake.length > 0) {
+      await tx.insert(topic_mastery).values(insertsToMake);
+    }
+
+    // Perform batch updates
+    for (const updateData of updatesToMake) {
+      await tx
+        .update(topic_mastery)
+        .set({
+          questions_attempted: updateData.questions_attempted,
+          questions_correct: updateData.questions_correct,
+          accuracy_percentage: updateData.accuracy_percentage,
+          mastery_level: updateData.mastery_level,
+          last_practiced: new Date(),
+          updated_at: new Date()
+        })
+        .where(
+          and(
+            eq(topic_mastery.user_id, userId),
+            eq(topic_mastery.topic_id, updateData.topicId)
+          )
+        );
+    }
+
+    return updateResults;
+  });
+
+  // Optimized batch cache invalidation after transaction
+  try {
+    // Only invalidate cache if we actually made updates
+    if (results.length > 0) {
+      const masteryCachePattern = `user:${userId}:topic-mastery:*`;
+      await cache.deletePattern(masteryCachePattern);
+      
+      // Only log in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`Batch topic mastery caches invalidated for user ${userId}, topics: ${topicUpdates.map(u => u.topicId).join(', ')}`);
+      }
+    }
+  } catch (cacheError) {
+    console.error('Error during batch topic mastery cache invalidation:', cacheError);
+  }
+
+  return results;
 }

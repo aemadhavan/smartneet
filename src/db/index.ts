@@ -26,9 +26,10 @@ function getPool() {
       ssl: {
         rejectUnauthorized: false // This might be needed for Xata connections
       },
-      max: 10, // Limit maximum connections
-      idleTimeoutMillis: 30000, // Close idle connections after 30 seconds
-      connectionTimeoutMillis: 5000, // Timeout after 5 seconds when trying to connect
+      max: 20, // Increased maximum connections for better concurrent handling
+      min: 2, // Maintain minimum connections for faster response
+      idleTimeoutMillis: 60000, // Keep connections longer to reduce reconnection overhead
+      connectionTimeoutMillis: 10000, // Increased timeout for slower networks
       allowExitOnIdle: true // Allow the process to exit if pool is idle
     });
 
