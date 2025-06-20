@@ -32,7 +32,7 @@ export default function SessionRow({ session }) {
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm">
         <Link 
-          href={`/sessions/${session.session_id}`}
+          href={`/practice-sessions/${session.session_id}/review`}
           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
         >
           Review
