@@ -282,6 +282,7 @@ export function normalizeUserAnswer(questionType: QuestionType, rawAnswer: unkno
       
     case 'MultipleCorrectStatements':
       let selectedStatements: string[] = [];
+      
       if (Array.isArray(answer)) {
         selectedStatements = answer.map(String);
       } else if (answer && typeof answer === 'object' && answer !== null) {
@@ -290,10 +291,17 @@ export function normalizeUserAnswer(questionType: QuestionType, rawAnswer: unkno
           selectedStatements = typedAnswer.selectedStatements.map(String);
         } else if (Array.isArray(typedAnswer.selected_statements)) {
           selectedStatements = typedAnswer.selected_statements.map(String);
+        } else if (typedAnswer.selectedOption) {
+          // Handle case where it's stored as selectedOption instead of selectedStatements
+          selectedStatements = [String(typedAnswer.selectedOption)];
+        } else if ((typedAnswer as any).option) {
+          // Handle case where it's stored as 'option' field
+          selectedStatements = [String((typedAnswer as any).option)];
         }
       } else if (typeof answer === 'string' || typeof answer === 'number') {
         selectedStatements = [String(answer)];
       }
+      
       return {
         type: 'MultipleCorrectStatements',
         selectedStatements

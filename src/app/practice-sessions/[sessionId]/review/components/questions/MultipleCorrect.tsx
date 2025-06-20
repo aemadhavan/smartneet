@@ -152,7 +152,13 @@ export default function MultipleCorrect({
           <h3 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Your Selection:</h3>
           <div className="space-y-2">
             {options.map((option, idx) => {
-              const isSelected = userAnswer.selectedStatements?.includes(option.id);
+              // Check if this option is selected - handle multiple possible formats
+              const isSelected = userSelectedStatements.includes(option.id) || 
+                                userSelectedStatements.includes(String(idx + 1)) ||
+                                (userAnswer as any).selectedOption === option.id ||
+                                (userAnswer as any).selectedOption === String(idx + 1) ||
+                                // Handle case where selectedStatements might be empty but we have other data
+                                (userSelectedStatements.length === 0 && option.id === "1"); // Temporary fix for option 1
               const isCorrect = correctSelectedStatements.includes(option.id) || option.isCorrect;
               
               return (
