@@ -63,6 +63,14 @@ export default function PracticeClientPage() {
   const [, setRetryCount] = useState(0);
   const [sessionInitialized, setSessionInitialized] = useState(false);
   
+  // Performance monitoring
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    pageLoadStart: Date.now(),
+    subjectsLoadTime: 0,
+    limitsCheckTime: 0,
+    sessionCreateTime: 0
+  });
+  
   // Get subscription limit status 
   const { 
     limitStatus, 
@@ -198,7 +206,18 @@ export default function PracticeClientPage() {
           setShowLimitNotification(true);
         } else {
           console.log('Creating new session for subject:', selectedSubject, 'at', new Date().toISOString());
+          const sessionStartTime = Date.now();
           const newSession = await createSession(selectedSubject);
+          const sessionEndTime = Date.now();
+          
+          // Log performance metrics
+          console.log('Performance Metrics:', {
+            sessionCreation: sessionEndTime - sessionStartTime,
+            totalPageLoad: sessionEndTime - performanceMetrics.pageLoadStart,
+            subjectsLoad: performanceMetrics.subjectsLoadTime,
+            limitsCheck: performanceMetrics.limitsCheckTime
+          });
+          
           if (!cancelled && newSession) {
             setSessionInitialized(true);
             setLimitsRefreshKey(prev => prev + 1);

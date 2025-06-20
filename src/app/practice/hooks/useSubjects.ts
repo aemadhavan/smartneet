@@ -9,7 +9,7 @@ const fetcher = async (url: string) => {
   try {
     const response = await fetch(url, {
       // Add timeout to prevent hanging requests
-      signal: AbortSignal.timeout(30000) // 30 second timeout
+      signal: AbortSignal.timeout(15000) // Reduced to 15 second timeout for faster failover
     });
     
     if (!response.ok) {
