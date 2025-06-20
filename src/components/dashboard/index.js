@@ -17,3 +17,5 @@ export { default as QuestionTypesPieChart } from './QuestionTypesPieChart';
 export { default as RecentSessionsTable } from './RecentSessionsTable';
 
 export { default as AIRecommendationsPanel } from './AIRecommendationsPanel';
+export { default as LazyChart } from './LazyChart';
+export { default as DashboardCharts } from './DashboardCharts';

@@ -1,8 +1,18 @@
 // File: src/components/dashboard/AIRecommendationsPanel.jsx
+import dynamic from 'next/dynamic';
 import { TrendingUp } from 'lucide-react';
-import FocusAreasPanel from './FocusAreasPanel';
-import StrongAreasPanel from './StrongAreasPanel';
-import LearningInsightsPanel from './LearningInsightsPanel';
+
+const FocusAreasPanel = dynamic(() => import('./FocusAreasPanel'), {
+  loading: () => <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+});
+
+const StrongAreasPanel = dynamic(() => import('./StrongAreasPanel'), {
+  loading: () => <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+});
+
+const LearningInsightsPanel = dynamic(() => import('./LearningInsightsPanel'), {
+  loading: () => <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+});
 
 export default function AIRecommendationsPanel({ focusAreas, strongAreas, stats }) {
   return (
