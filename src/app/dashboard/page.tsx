@@ -4,20 +4,43 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { 
   DashboardHeader,
   LoadingSpinner,
   StatsOverview,
   TopicMasteryPanel,
   QuickActionsPanel,
-  PerformanceChart,
-  SubjectPerformanceChart,
-  QuestionTypesPieChart,
   RecentSessionsTable,
-  AIRecommendationsPanel  
+  LazyChart
 } from '@/components/dashboard';
 import { fetchDashboardData } from '@/lib/dashboard/data-fetching';
 import { DashboardData } from '@/types/dashboard';
+
+// Dynamically import dashboard sections to reduce initial bundle size  
+const DashboardCharts = dynamic(() => import('@/components/dashboard/DashboardCharts'), {
+  loading: () => (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 h-80 animate-pulse">
+        <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 h-80 animate-pulse">
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 h-80 animate-pulse">
+          <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
+
+const AIRecommendationsPanel = dynamic(() => import('@/components/dashboard/AIRecommendationsPanel'), {
+  loading: () => <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 h-40 animate-pulse"><div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div></div>,
+  ssr: false
+});
 
 export default function DashboardPage() {
   const { isSignedIn, isLoaded } = useUser();
@@ -95,12 +118,13 @@ export default function DashboardPage() {
         
         {/* Charts Column */}
         <div className="md:col-span-2">
-          <PerformanceChart data={dashboardData.performanceOverTime} />
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <SubjectPerformanceChart data={dashboardData.subjectPerformance} />
-            <QuestionTypesPieChart data={dashboardData.questionTypeData} />
-          </div>
+          <LazyChart>
+            <DashboardCharts 
+              performanceOverTime={dashboardData.performanceOverTime}
+              subjectPerformance={dashboardData.subjectPerformance}
+              questionTypeData={dashboardData.questionTypeData}
+            />
+          </LazyChart>
         </div>
       </div>
       
