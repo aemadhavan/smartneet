@@ -150,7 +150,7 @@ export interface QuestionAttempt {
   details: NormalizedQuestionDetails;
   explanation: string | null;
   userAnswer: NormalizedAnswer;
-  isCorrect: boolean;
+  isCorrect: boolean | null;
   correctAnswer: NormalizedAnswer;
   marksAwarded: number;
   maxMarks: number;
