@@ -32,6 +32,39 @@ const nextConfig: NextConfig = {
         maxAge: 172800000, // 2 days
         version: '1.0.0'
       };
+      
+      // Add chunk loading error handling
+      config.output = {
+        ...config.output,
+        chunkLoadingGlobal: 'webpackChunksmartner',
+        chunkLoadTimeout: 120000, // 2 minutes
+      };
+      
+      // Optimize chunk splitting
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            default: {
+              minChunks: 2,
+              priority: -20,
+              reuseExistingChunk: true,
+            },
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              priority: -10,
+              reuseExistingChunk: true,
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              priority: -30,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      };
     }
     return config;
   },
