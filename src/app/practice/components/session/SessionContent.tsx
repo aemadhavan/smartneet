@@ -34,6 +34,8 @@ interface SessionContentProps {
   handleNextQuestion: () => void;
   handleCompleteSession: () => void;
   isCompleting?: boolean;
+  elapsedTime?: string;
+  isTimerRunning?: boolean;
 }
 
 const SessionContent = memo(function SessionContent({
@@ -51,7 +53,9 @@ const SessionContent = memo(function SessionContent({
   handleOptionSelect,
   handleNextQuestion,
   handleCompleteSession,
-  isCompleting
+  isCompleting,
+  elapsedTime,
+  isTimerRunning
 }: SessionContentProps) {
   const currentQuestion = session.questions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === session.questions.length - 1;
@@ -63,6 +67,8 @@ const SessionContent = memo(function SessionContent({
         title={title}
         currentQuestionIndex={currentQuestionIndex}
         totalQuestions={session.questions.length}
+        elapsedTime={elapsedTime}
+        isTimerRunning={isTimerRunning}
       >
         {/* Subscription limit info component */}
         {limitStatus && <SubscriptionLimitDisplay refreshKey={limitsRefreshKey} />}

@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Subject, SessionResponse } from '../types';
 import { v4 as uuidv4 } from 'uuid';
+import { useTimer, useQuestionTimer } from './useTimer';
 
 interface SubscriptionError {
   message: string;
@@ -14,6 +15,8 @@ interface PracticeSessionCache {
   userAnswers: Record<number, string>;
   timestamp: number;
   currentIndex: number;
+  sessionStartTime?: number;
+  questionTimes?: Record<number, number>;
 }
 
 // Default number of questions per session
@@ -51,6 +54,17 @@ export function usePracticeSession(
   // Add a ref to track if a session is being created
   const creatingSessionRef = useRef(false);
   const [creatingSession, setCreatingSession] = useState(false);
+
+  // Timer hooks for tracking time
+  const sessionTimer = useTimer();
+  const questionTimer = useQuestionTimer();
+
+  // Auto-start timer when session exists and is not completed
+  useEffect(() => {
+    if (session && !sessionCompleted && !sessionTimer.isRunning) {
+      sessionTimer.start();
+    }
+  }, [session, sessionCompleted, sessionTimer]);
 
   // Helper to get/set session data from/to localStorage cache
   // Wrap sessionCache in useMemo to prevent it from being recreated on each render
@@ -123,6 +137,24 @@ export function usePracticeSession(
             setSession(cachedSession.session);
             setUserAnswers(cachedSession.userAnswers);
             setCurrentQuestionIndex(cachedSession.currentIndex);
+            
+            // Restore timer state if available
+            if (cachedSession.sessionStartTime) {
+              // Continue timer from where it left off
+              sessionTimer.reset();
+              // Start timer and adjust elapsed time
+              sessionTimer.start();
+            } else {
+              sessionTimer.reset();
+              sessionTimer.start();
+            }
+            
+            // Start question timer for current question if not already started
+            const currentQuestion = cachedSession.session.questions[cachedSession.currentIndex];
+            if (currentQuestion && !questionTimer.questionTimes[currentQuestion.question_id]) {
+              questionTimer.startQuestionTimer(currentQuestion.question_id);
+            }
+            
             console.log('Restored session from cache');
             setLoading(false);
             return cachedSession.session;
@@ -240,7 +272,8 @@ export function usePracticeSession(
               session: data,
               userAnswers: {},
               timestamp: Date.now(),
-              currentIndex: 0
+              currentIndex: 0,
+              sessionStartTime: Date.now()
             });
           }
           
@@ -249,6 +282,15 @@ export function usePracticeSession(
           setSessionCompleted(false);
           setUserAnswers({});
           setCurrentQuestionIndex(0);
+          
+          // Start session timer
+          sessionTimer.reset();
+          sessionTimer.start();
+          
+          // Start timer for first question
+          if (data.questions && data.questions.length > 0) {
+            questionTimer.startQuestionTimer(data.questions[0].question_id);
+          }
           
           return data;
         } catch (err) {
@@ -267,6 +309,13 @@ export function usePracticeSession(
                 setSession(cachedSession.session);
                 setUserAnswers(cachedSession.userAnswers);
                 setCurrentQuestionIndex(cachedSession.currentIndex);
+                
+                // Restore timer state
+                if (cachedSession.sessionStartTime) {
+                  sessionTimer.reset();
+                  sessionTimer.start();
+                }
+                
                 setError('Using cached session due to network issues. Your progress will be saved locally.');
                 return cachedSession.session;
               }
@@ -298,7 +347,7 @@ export function usePracticeSession(
       creatingSessionRef.current = false;
       setCreatingSession(false);
     }
-  }, [topicId, subtopicId, onSessionError, sessionCache, sessionCompleted, idempotencyKey]);
+  }, [topicId, subtopicId, onSessionError, sessionCache, sessionCompleted, idempotencyKey, sessionTimer, questionTimer]);
 
   // Update cache when session state changes
   useEffect(() => {
@@ -307,10 +356,12 @@ export function usePracticeSession(
         session,
         userAnswers,
         timestamp: Date.now(),
-        currentIndex: currentQuestionIndex
+        currentIndex: currentQuestionIndex,
+        sessionStartTime: Date.now() - (sessionTimer.elapsedSeconds * 1000),
+        questionTimes: questionTimer.questionTimes
       });
     }
-  }, [session, userAnswers, currentQuestionIndex, sessionCompleted, sessionCache]);
+  }, [session, userAnswers, currentQuestionIndex, sessionCompleted, sessionCache, sessionTimer.elapsedSeconds, questionTimer.questionTimes]);
 
   // Handle option selection
   const handleOptionSelect = useCallback((questionId: number, optionNumber: string) => {
@@ -328,13 +379,15 @@ export function usePracticeSession(
           session,
           userAnswers: updated,
           timestamp: Date.now(),
-          currentIndex: currentQuestionIndex
+          currentIndex: currentQuestionIndex,
+          sessionStartTime: Date.now() - (sessionTimer.elapsedSeconds * 1000),
+          questionTimes: questionTimer.questionTimes
         });
       }
       
       return updated;
     });
-  }, [session, currentQuestionIndex, sessionCache]);
+  }, [session, currentQuestionIndex, sessionCache, sessionTimer.elapsedSeconds, questionTimer.questionTimes]);
 
   // Handle completion of session
   const handleCompleteSession = useCallback(async () => {
@@ -347,6 +400,15 @@ export function usePracticeSession(
       ) {
         return;
       }
+
+      // Stop current question timer if running
+      const currentQuestion = session.questions[currentQuestionIndex];
+      if (currentQuestion) {
+        questionTimer.stopQuestionTimer(currentQuestion.question_id);
+      }
+
+      // Stop session timer
+      const totalSessionTime = sessionTimer.stop();
   
       // Simplified answer payload format
       const answersPayload: Record<number, string> = {};
@@ -356,35 +418,56 @@ export function usePracticeSession(
           answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? userAnswers[questionId] : String(userAnswers[questionId]);
         }
       });
+
+      // Include timing data in the submission
+      const submissionPayload = {
+        answers: answersPayload,
+        timingData: {
+          totalSeconds: totalSessionTime,
+          questionTimes: questionTimer.questionTimes,
+          averageTimePerQuestion: questionTimer.getAverageTime()
+        }
+      };
       
       const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ answers: answersPayload }),
+        body: JSON.stringify(submissionPayload),
       });
   
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit answers.');
-      }
-  
       const responseData = await response.json();
-      console.log('Submission successful:', responseData);
       
-      // Mark session as completed in state
-      setSessionCompleted(true);
-      
-      // Clear the session cache since it's completed
-      if (sessionCacheKey.current) {
-        sessionCache.clearCache(sessionCacheKey.current);
+      // Check if response was successful (either standard success or already completed)
+      if (response.ok || responseData.success) {
+        console.log('Submission successful:', responseData);
+        setSessionCompleted(true);
+        if (sessionCacheKey.current) {
+          sessionCache.clearCache(sessionCacheKey.current);
+        }
+        return;
       }
+      
+      // If we get here, there was an error
+      throw new Error(responseData.error || 'Failed to submit answers.');
     } catch (err) {
       console.error('Error completing session:', err);
-      alert('Failed to submit answers. Please try again.');
+      
+      // More user-friendly error messages
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
+      
+      if (errorMessage.includes('already completed')) {
+        // If it's already completed, just mark as completed locally
+        setSessionCompleted(true);
+        if (sessionCacheKey.current) {
+          sessionCache.clearCache(sessionCacheKey.current);
+        }
+      } else {
+        alert('Failed to submit answers. Please try again.');
+      }
     }
-  }, [session, userAnswers, sessionCache]);
+  }, [session, userAnswers, sessionCache, currentQuestionIndex, questionTimer, sessionTimer]);
 
   // Store the most recent version of handleCompleteSession in the ref
   useEffect(() => {
@@ -394,9 +477,22 @@ export function usePracticeSession(
   // Handle navigation to next question
   const handleNextQuestion = useCallback(() => {
     if (!session) return;
+    
+    // Stop timer for current question
+    const currentQuestion = session.questions[currentQuestionIndex];
+    if (currentQuestion) {
+      questionTimer.stopQuestionTimer(currentQuestion.question_id);
+    }
+    
     if (currentQuestionIndex < session.questions.length - 1) {
       setCurrentQuestionIndex(prevIndex => {
         const newIndex = prevIndex + 1;
+        
+        // Start timer for next question
+        const nextQuestion = session.questions[newIndex];
+        if (nextQuestion) {
+          questionTimer.startQuestionTimer(nextQuestion.question_id);
+        }
         
         // Update the cache with new index
         if (sessionCacheKey.current && session) {
@@ -404,7 +500,9 @@ export function usePracticeSession(
             session,
             userAnswers,
             timestamp: Date.now(),
-            currentIndex: newIndex
+            currentIndex: newIndex,
+            sessionStartTime: Date.now() - (sessionTimer.elapsedSeconds * 1000),
+            questionTimes: questionTimer.questionTimes
           });
         }
         
@@ -413,7 +511,7 @@ export function usePracticeSession(
     } else {
       handleCompleteSession();
     }
-  }, [currentQuestionIndex, session, userAnswers, handleCompleteSession, sessionCache]);
+  }, [currentQuestionIndex, session, userAnswers, handleCompleteSession, sessionCache, questionTimer, sessionTimer.elapsedSeconds]);
 
   // Handle start of a new session
   const handleStartNewSession = useCallback(() => {
@@ -431,6 +529,10 @@ export function usePracticeSession(
     setError(null);
     setIdempotencyKey(uuidv4());
     
+    // Reset timers
+    sessionTimer.reset();
+    questionTimer.reset();
+    
     // Use the callback to reset the subject in the parent component
     if (selectedSubject && onResetSubject) {
       const tempSubject = { ...selectedSubject };
@@ -442,7 +544,7 @@ export function usePracticeSession(
         onResetSubject(tempSubject);
       }, 200);
     }
-  }, [selectedSubject, onResetSubject, sessionCache]); 
+  }, [selectedSubject, onResetSubject, sessionCache, sessionTimer, questionTimer]); 
 
   // Handle retry when there's an error
   const handleRetry = useCallback(() => {
@@ -492,12 +594,31 @@ export function usePracticeSession(
     }
   }, [session, sessionCache]);
 
+  // Enhanced setCurrentQuestionIndex that handles timing
+  const setCurrentQuestionIndexWithTiming = useCallback((newIndex: number | ((prevIndex: number) => number)) => {
+    const currentQuestion = session?.questions[currentQuestionIndex];
+    const actualNewIndex = typeof newIndex === 'function' ? newIndex(currentQuestionIndex) : newIndex;
+    
+    // Stop timer for current question
+    if (currentQuestion && actualNewIndex !== currentQuestionIndex) {
+      questionTimer.stopQuestionTimer(currentQuestion.question_id);
+    }
+    
+    setCurrentQuestionIndex(actualNewIndex);
+    
+    // Start timer for new question
+    const nextQuestion = session?.questions[actualNewIndex];
+    if (nextQuestion && actualNewIndex !== currentQuestionIndex) {
+      questionTimer.startQuestionTimer(nextQuestion.question_id);
+    }
+  }, [session, currentQuestionIndex, questionTimer]);
+
   return {
     session,
     loading,
     error,
     currentQuestionIndex,
-    setCurrentQuestionIndex,
+    setCurrentQuestionIndex: setCurrentQuestionIndexWithTiming,
     userAnswers,
     setUserAnswers,
     sessionCompleted,
@@ -510,5 +631,22 @@ export function usePracticeSession(
     forceCompleteSession,
     createSession, // Expose the createSession function so it can be called manually
     creatingSession,
+    // Timer states and functions
+    sessionTimer: {
+      isRunning: sessionTimer.isRunning,
+      elapsedSeconds: sessionTimer.elapsedSeconds,
+      formattedTime: sessionTimer.formattedTime,
+      start: sessionTimer.start,
+      pause: sessionTimer.pause,
+      reset: sessionTimer.reset,
+      stop: sessionTimer.stop
+    },
+    questionTimer: {
+      questionTimes: questionTimer.questionTimes,
+      getQuestionTime: questionTimer.getQuestionTime,
+      getTotalTime: questionTimer.getTotalTime,
+      getAverageTime: questionTimer.getAverageTime,
+      reset: questionTimer.reset
+    }
   };
 }
