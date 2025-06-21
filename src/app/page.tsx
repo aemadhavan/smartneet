@@ -94,13 +94,6 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
-      {/* Preload critical assets */}
-      <link 
-        rel="preload" 
-        href="/dashboard.webp" 
-        as="image" 
-        type="image/webp" 
-      />
       
       <div className="min-h-screen bg-white dark:from-gray-900 dark:to-gray-800 font-poppins relative overflow-x-hidden">
         {/* Hero section - Critical path */}
