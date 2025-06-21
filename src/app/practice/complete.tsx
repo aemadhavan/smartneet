@@ -81,14 +81,18 @@ export default function SessionCompletePage({
   };
 
   const handleNewSessionClick = () => {
+    console.log('New Session button clicked');
     setNewSessionLoading(true);
     // Use window.location.href for a full page navigation to clear all state
     window.location.href = '/practice';
   };
 
   const handleDashboardClick = () => {
+    console.log('Dashboard button clicked');
     setDashboardLoading(true);
-    router.push('/dashboard');
+    
+    // Use window.location.href for more reliable navigation, similar to new session
+    window.location.href = '/dashboard';
   };
 
   if (loading) {
@@ -110,7 +114,7 @@ export default function SessionCompletePage({
         <p className="text-gray-600 dark:text-gray-300 mb-8">{error}</p>
         <div className="flex space-x-4">
           <button 
-            onClick={() => router.push('/dashboard')}
+            onClick={() => window.location.href = '/dashboard'}
             className="bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200"
           >
             Go to Dashboard
@@ -286,11 +290,12 @@ export default function SessionCompletePage({
         </div>
       </div>
       
-      <div className="flex flex-wrap justify-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
         <button 
           onClick={handleReviewClick}
           disabled={reviewLoading}
-          className={`bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center ${
+          data-testid="review-button"
+          className={`bg-indigo-600 dark:bg-indigo-700 hover:bg-indigo-700 dark:hover:bg-indigo-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center justify-center min-w-[180px] ${
             reviewLoading ? 'opacity-75 cursor-not-allowed' : ''
           }`}
         >
@@ -305,7 +310,8 @@ export default function SessionCompletePage({
         <button 
           onClick={handleNewSessionClick}
           disabled={newSessionLoading}
-          className={`bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center ${
+          data-testid="new-session-button"
+          className={`bg-emerald-600 dark:bg-emerald-700 hover:bg-emerald-700 dark:hover:bg-emerald-600 text-white px-6 py-3 rounded-md transition duration-200 flex items-center justify-center min-w-[180px] ${
             newSessionLoading ? 'opacity-75 cursor-not-allowed' : ''
           }`}
         >
@@ -320,7 +326,8 @@ export default function SessionCompletePage({
         <button 
           onClick={handleDashboardClick}
           disabled={dashboardLoading}
-          className={`bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-6 py-3 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition duration-200 flex items-center ${
+          data-testid="dashboard-button"
+          className={`bg-blue-600 dark:bg-blue-700 text-white px-6 py-3 rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition duration-200 flex items-center justify-center min-w-[180px] ${
             dashboardLoading ? 'opacity-75 cursor-not-allowed' : ''
           }`}
         >

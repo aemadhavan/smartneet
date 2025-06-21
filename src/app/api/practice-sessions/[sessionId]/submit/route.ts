@@ -34,6 +34,7 @@ interface QuestionAttemptRecord {
   user_answer: unknown;
   is_correct: boolean;
   marks_awarded: number;
+  time_taken_seconds?: number | null;
   attempt_timestamp: Date;
   created_at: Date;
   updated_at: Date;
@@ -44,7 +45,12 @@ const submitAnswersSchema = z.object({
   answers: z.record(z.string(), z.union([
     z.string(),
     z.record(z.string(), z.string())
-  ]))
+  ])),
+  timingData: z.object({
+    totalSeconds: z.number().optional(),
+    questionTimes: z.record(z.string(), z.number()).optional(),
+    averageTimePerQuestion: z.number().optional()
+  }).optional()
 });
 
 /**
@@ -103,15 +109,36 @@ export async function POST(
     }
 
     if (session.is_completed) {
-      logger.warn('Attempted to submit answers to already completed session', {
+      logger.info('Session already completed, returning existing data', {
         userId,
         context: 'practice-sessions/[sessionId]/submit.POST',
         data: { sessionId }
       });
-      return NextResponse.json(
-        { error: 'Session already completed' },
-        { status: 400 }
-      );
+      
+      // Get the existing session stats for completed session
+      const [completedSession] = await db
+        .select({
+          questions_attempted: practice_sessions.questions_attempted,
+          questions_correct: practice_sessions.questions_correct,
+          score: practice_sessions.score,
+          max_score: practice_sessions.max_score,
+          is_completed: practice_sessions.is_completed
+        })
+        .from(practice_sessions)
+        .where(eq(practice_sessions.session_id, sessionIdNum));
+
+      return NextResponse.json({
+        success: true,
+        message: 'Session already completed',
+        sessionStats: completedSession || {
+          questions_attempted: 0,
+          questions_correct: 0,
+          score: 0,
+          max_score: 0,
+          is_completed: true
+        },
+        results: []
+      });
     }
 
     // Parse and validate the request body
@@ -142,7 +169,7 @@ export async function POST(
       );
     }
     
-    const { answers = {} } = body;
+    const { answers = {}, timingData } = body;
 
     if (Object.keys(answers).length === 0) {
       return NextResponse.json(
@@ -290,6 +317,8 @@ export async function POST(
 
       // Prepare the question attempt record for batch insert
       const questionIdNum = parseInt(questionId);
+      const timeSpent = (timingData?.questionTimes?.[questionId] as number) || null;
+      
       attemptsToInsert.push({
         user_id: userId,
         question_id: questionIdNum,
@@ -299,6 +328,7 @@ export async function POST(
         user_answer: JSON.stringify({ option: userAnswer }),
         is_correct: isCorrect,
         marks_awarded: marksAwarded,
+        time_taken_seconds: timeSpent,
         attempt_timestamp: new Date(),
         created_at: new Date(),
         updated_at: new Date(),
@@ -315,6 +345,30 @@ export async function POST(
     if (attemptsToInsert.length > 0) {
       await db.transaction(async (tx) => {
         await tx.insert(question_attempts).values(attemptsToInsert);
+        
+        // Update session_questions with timing data if available
+        if (timingData?.questionTimes) {
+          for (const [questionId, timeSpent] of Object.entries(timingData.questionTimes)) {
+            const questionDetails = questionDetailsMap[questionId];
+            const timeSpentSeconds = typeof timeSpent === 'number' ? timeSpent : 0;
+            
+            if (questionDetails && timeSpentSeconds > 0) {
+              await tx
+                .update(session_questions)
+                .set({
+                  time_spent_seconds: timeSpentSeconds,
+                  updated_at: new Date()
+                })
+                .where(
+                  and(
+                    eq(session_questions.session_question_id, questionDetails.session_question_id),
+                    eq(session_questions.session_id, sessionIdNum),
+                    eq(session_questions.user_id, userId)
+                  )
+                );
+            }
+          }
+        }
       });
     }
 
@@ -360,13 +414,25 @@ export async function POST(
 
     // Mark the session as completed if all questions have been answered
     if (!updatedSession.is_completed) {
+      const sessionUpdateData: {
+        is_completed: boolean;
+        end_time: Date;
+        updated_at: Date;
+        duration_minutes?: number;
+      } = {
+        is_completed: true,
+        end_time: new Date(),
+        updated_at: new Date()
+      };
+
+      // Add duration if timing data is available
+      if (timingData?.totalSeconds) {
+        sessionUpdateData.duration_minutes = Math.ceil(timingData.totalSeconds / 60);
+      }
+
       await db
         .update(practice_sessions)
-        .set({
-          is_completed: true,
-          end_time: new Date(),
-          updated_at: new Date()
-        })
+        .set(sessionUpdateData)
         .where(eq(practice_sessions.session_id, sessionIdNum));
     }
 

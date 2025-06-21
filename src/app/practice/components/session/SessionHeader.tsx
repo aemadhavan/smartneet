@@ -6,13 +6,17 @@ interface SessionHeaderProps {
   currentQuestionIndex: number;
   totalQuestions: number;
   children?: React.ReactNode;
+  elapsedTime?: string;
+  isTimerRunning?: boolean;
 }
 
 const SessionHeader = memo(function SessionHeader({ 
   title,
   currentQuestionIndex,
   totalQuestions,
-  children
+  children,
+  elapsedTime,
+  isTimerRunning
 }: SessionHeaderProps) {
   return (
     <>
@@ -21,6 +25,11 @@ const SessionHeader = memo(function SessionHeader({
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           {children}
+          
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+            <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+            <span className="font-mono">{elapsedTime || '0:00'}</span>
+          </div>
           
           <div className="text-sm text-gray-500 dark:text-gray-300">
             Question {currentQuestionIndex + 1} of {totalQuestions}

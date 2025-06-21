@@ -121,6 +121,8 @@ export default function PracticeClientPage() {
     handleCompleteSession: rawHandleCompleteSession,
     createSession,
     handleRetry: sessionRetry,
+    sessionTimer,
+    questionTimer: _questionTimer, // eslint-disable-line @typescript-eslint/no-unused-vars
   } = usePracticeSession(
     // Don't automatically create session until we check limits
     null, 
@@ -139,6 +141,7 @@ export default function PracticeClientPage() {
       setIsCompleting(false);
     }
   }, [rawHandleCompleteSession]);
+
 
   // Check if the topic is premium (not one of the first two topics)
   useEffect(() => {
@@ -395,6 +398,8 @@ export default function PracticeClientPage() {
               handleNextQuestion={handleNextQuestion}
               handleCompleteSession={handleCompleteSession}
               isCompleting={isCompleting}
+              elapsedTime={sessionTimer.formattedTime}
+              isTimerRunning={sessionTimer.isRunning}
             />
           </div>
         ) : (

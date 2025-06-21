@@ -3,6 +3,11 @@ import { AnswerResult, QuestionDetails } from '@/lib/utils/answerEvaluation';
 
 export interface SubmitAnswersBody {
   answers: Record<string, string | { [key: string]: string }>; // questionId -> answer (string or object)
+  timingData?: {
+    totalSeconds?: number;
+    questionTimes?: Record<string, number>;
+    averageTimePerQuestion?: number;
+  };
 }
 
 export interface QuestionDetailsWithSessionInfo {
