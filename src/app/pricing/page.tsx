@@ -19,14 +19,62 @@ type SubscriptionPlan = {
 };
 
 async function getPlans() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-  console.log('BASE URL:', baseUrl);
-  const res = await fetch(`${baseUrl}/api/subscription-plans`, {
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error('Failed to fetch subscription plans');
-  const data = await res.json();
-  return data.plans;
+  try {
+    // Import the database logic directly to avoid HTTP requests during SSR
+    const { db } = await import('@/db');
+    const drizzleOrm = await import('drizzle-orm');
+    const { subscription_plans } = await import('@/db/schema');
+    
+    console.log('Fetching subscription plans from database...');
+    
+    // Fetch directly from database
+    const plans = await db
+      .select()
+      .from(subscription_plans)
+      .where(drizzleOrm.eq(subscription_plans.is_active, true))
+      .orderBy(drizzleOrm.asc(subscription_plans.price_inr));
+    
+    console.log(`Found ${plans.length} active subscription plans`);
+    
+    // Process the features field to ensure it's a proper array
+    const processedPlans: SubscriptionPlan[] = plans.map(plan => {
+      let processedFeatures: string[] = [];
+      
+      // If features is a string (JSON string), parse it into an array
+      if (typeof plan.features === 'string') {
+        try {
+          const parsed = JSON.parse(plan.features);
+          processedFeatures = Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+          console.log(`Failed to parse features for plan ${plan.plan_id}:`, e);
+          // If it's not valid JSON, split by comma
+          processedFeatures = plan.features.split(',').map(f => f.trim());
+        }
+      } else if (Array.isArray(plan.features)) {
+        processedFeatures = plan.features;
+      }
+      
+      return {
+        plan_id: plan.plan_id,
+        plan_name: plan.plan_name,
+        plan_code: plan.plan_code,
+        description: plan.description || '',
+        price_inr: plan.price_inr,
+        price_id_stripe: plan.price_id_stripe,
+        features: processedFeatures,
+        test_limit_daily: plan.test_limit_daily,
+        duration_days: plan.duration_days,
+        is_active: plan.is_active ?? true
+      };
+    });
+    
+    console.log('Processed plans:', processedPlans.map(p => ({ id: p.plan_id, name: p.plan_name })));
+    
+    return processedPlans;
+  } catch (error) {
+    console.error('Error fetching subscription plans:', error);
+    throw new Error('Failed to fetch subscription plans');
+  }
 }
 
 export default async function PricingPage() {
