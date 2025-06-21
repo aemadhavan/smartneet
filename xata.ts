@@ -1799,7 +1799,7 @@ const DatabaseClient = buildClient();
 
 const defaultOptions = {
   databaseURL:
-    "https://Madhavan-s-workspace-79j6ki.us-east-1.xata.sh/db/smartneet:main"
+    "https://Madhavan-s-workspace-79j6ki.us-east-1.xata.sh/db/smartneet:smarterschool"
 };
 
 export class XataClient extends DatabaseClient<DatabaseSchema> {

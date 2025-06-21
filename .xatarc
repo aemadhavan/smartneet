@@ -1,6 +1,6 @@
 {
-  "databaseURL": "https://Madhavan-s-workspace-79j6ki.us-east-1.xata.sh/db/smartneet:main",
-  "branch": "main",
+  "databaseURL": "https://Madhavan-s-workspace-79j6ki.us-east-1.xata.sh/db/smartneet:smarterschool",
+  "branch": "smarterschool",
   "codegen": {
     "output": "xata.ts"
   }
