@@ -22,16 +22,22 @@ export async function GET() {
       return NextResponse.json({ data: cachedData, source: 'cache' });
     }
 
-    // Get distribution of question types from user's attempts
-    const questionTypeDistribution = await db
-      .select({
-        question_type: questions.question_type,
-        count: count()
-      })
-      .from(question_attempts)
-      .innerJoin(questions, eq(question_attempts.question_id, questions.question_id))
-      .where(eq(question_attempts.user_id, userId))
-      .groupBy(questions.question_type);
+    // Get distribution of question types from user's attempts (limit to prevent memory issues)
+    const questionTypeDistribution = await Promise.race([
+      db
+        .select({
+          question_type: questions.question_type,
+          count: count()
+        })
+        .from(question_attempts)
+        .innerJoin(questions, eq(question_attempts.question_id, questions.question_id))
+        .where(eq(question_attempts.user_id, userId))
+        .groupBy(questions.question_type)
+        .limit(50), // Prevent memory exhaustion
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
+      )
+    ]) as Array<{ question_type: string; count: number }>;
 
     // Format the response for the pie chart
     let dataToReturn;

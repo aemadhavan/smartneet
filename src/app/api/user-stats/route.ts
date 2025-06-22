@@ -26,23 +26,35 @@ export async function GET() {
     const yesterdayDate = new Date(today);
     yesterdayDate.setDate(today.getDate() - 1);
 
-    // Get total sessions count
-    const sessionsResult = await db
-      .select({ count: count() })
-      .from(practice_sessions)
-      .where(eq(practice_sessions.user_id, userId));
+    // Get total sessions count (with timeout protection)
+    const sessionsResult = await Promise.race([
+      db
+        .select({ count: count() })
+        .from(practice_sessions)
+        .where(eq(practice_sessions.user_id, userId))
+        .limit(1000), // Prevent memory issues
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
+      )
+    ]);
     
     const totalSessions = sessionsResult[0]?.count || 0;
 
-    // Get total questions data
-    const questionsResult = await db
-      .select({
-        attempted: sum(practice_sessions.questions_attempted),
-        correct: sum(practice_sessions.questions_correct),
-        duration: sum(practice_sessions.duration_minutes)
-      })
-      .from(practice_sessions)
-      .where(eq(practice_sessions.user_id, userId));
+    // Get total questions data (with timeout protection)
+    const questionsResult = await Promise.race([
+      db
+        .select({
+          attempted: sum(practice_sessions.questions_attempted),
+          correct: sum(practice_sessions.questions_correct),
+          duration: sum(practice_sessions.duration_minutes)
+        })
+        .from(practice_sessions)
+        .where(eq(practice_sessions.user_id, userId))
+        .limit(1000), // Prevent memory issues
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
+      )
+    ]);
     
     // Convert to numbers to ensure type safety
     const totalQuestionsAttempted = Number(questionsResult[0]?.attempted || 0);
@@ -54,31 +66,43 @@ export async function GET() {
       ? (totalCorrectAnswers / totalQuestionsAttempted) * 100 
       : 0;
 
-    // Count mastered topics
-    const masteredResult = await db
-      .select({ count: count() })
-      .from(topic_mastery)
-      .where(
-        and(
-          eq(topic_mastery.user_id, userId),
-          eq(topic_mastery.mastery_level, 'mastered')
+    // Count mastered topics (with timeout protection)
+    const masteredResult = await Promise.race([
+      db
+        .select({ count: count() })
+        .from(topic_mastery)
+        .where(
+          and(
+            eq(topic_mastery.user_id, userId),
+            eq(topic_mastery.mastery_level, 'mastered')
+          )
         )
-      );
+        .limit(500), // Prevent memory issues
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
+      )
+    ]);
     
     const masteredTopics = masteredResult[0]?.count || 0;
 
     // Calculate streak (simplified version)
     // In a real app, you'd need a more sophisticated algorithm that checks
     // consecutive days with activity in the database
-    const yesterdayActivity = await db
-      .select({ count: count() })
-      .from(practice_sessions)
-      .where(
-        and(
-          eq(practice_sessions.user_id, userId),
-          gte(practice_sessions.start_time, yesterdayDate)
+    const yesterdayActivity = await Promise.race([
+      db
+        .select({ count: count() })
+        .from(practice_sessions)
+        .where(
+          and(
+            eq(practice_sessions.user_id, userId),
+            gte(practice_sessions.start_time, yesterdayDate)
+          )
         )
-      );
+        .limit(100), // Prevent memory issues
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 8000)
+      )
+    ]);
     
     // This is a placeholder - in a real app you'd need to actually calculate
     // consecutive days streak from the database

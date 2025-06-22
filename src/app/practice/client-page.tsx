@@ -24,18 +24,6 @@ import {
 import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
 import { Subject } from './types';
 
-// Define Topic interface locally since it's not exported from './types'
-interface Topic {
-  topic_id: number;
-  subject_id: number;
-  topic_name: string;
-  parent_topic_id?: number | null;
-  description?: string | null;
-  is_active?: boolean;
-  created_at?: string;
-  updated_at?: string;
-}
-
 // Define SubscriptionError interface to match the one expected by usePracticeSession
 interface SubscriptionError {
   message: string;
@@ -143,33 +131,26 @@ export default function PracticeClientPage() {
   }, [rawHandleCompleteSession]);
 
 
-  // Check if the topic is premium (not one of the first two topics)
+  // Check if the topic requires premium access
   useEffect(() => {
     const checkTopicAccess = async () => {
-      if (topicId && !isPremium && subjectParam === 'botany') {
+      if (topicId && !isPremium) {
         setIsCheckingAccess(true);
         try {
-          // Get the subject ID for botany
-          const botanySubjectId = 3; // Biology subject ID
+          const accessResponse = await fetch(`/api/topics/${topicId}/access?isPremium=${isPremium}&limitParam=${limitParam || ''}`);
           
-          // Fetch all topics for this subject to determine if this is a free topic
-          const topicsResponse = await fetch(`/api/topics?subjectId=${botanySubjectId}&isRootLevel=true&isActive=true`);
-          
-          if (!topicsResponse.ok) {
+          if (!accessResponse.ok) {
             throw new Error('Failed to check topic access');
           }
           
-          const topicsData = await topicsResponse.json();
+          const accessData = await accessResponse.json();
           
-          if (!topicsData.success) {
-            throw new Error(topicsData.error || 'Failed to check topic access');
+          if (!accessData.success) {
+            throw new Error(accessData.error || 'Failed to check topic access');
           }
           
-          // Find the index of the current topic
-          const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id === topicId);
-          
-          // If it's not one of the first two topics and the user is not premium, deny access
-          if (topicIndex > 1 && !isPremium && limitParam !== 'free') {
+          // Set access denied based on API response
+          if (!accessData.data.hasAccess) {
             setAccessDenied(true);
           }
         } catch (error) {
@@ -181,25 +162,22 @@ export default function PracticeClientPage() {
     };
     
     checkTopicAccess();
-  }, [topicId, isPremium, subjectParam, limitParam]);
+  }, [topicId, isPremium, limitParam]);
 
-  // More robust session initialization with retries and better error handling
+  // More robust session initialization with declarative approach
   useEffect(() => {
     let cancelled = false;
+    
     const initSession = async () => {
       // Prevent automatic session creation after completion, when access is denied, or already initialized
       if (sessionInitialized || !selectedSubject || accessDenied || sessionCompleted) {
         setIsInitializing(false);
         return;
       }
-      // Wait for limit status to be available (max 3 seconds)
-      let waitTime = 0;
-      const maxWaitTime = 3000; // 3 seconds
-      const checkInterval = 100; // 100ms
       
-      while (!limitStatus && waitTime < maxWaitTime) {
-        await new Promise(resolve => setTimeout(resolve, checkInterval));
-        waitTime += checkInterval;
+      // Only proceed when limits are loaded and access check is complete
+      if (limitsLoading || isCheckingAccess) {
+        return;
       }
       
       try {
@@ -240,7 +218,7 @@ export default function PracticeClientPage() {
     
     initSession();
     return () => { cancelled = true; };
-  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, sessionCompleted]);
+  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, sessionCompleted, limitsLoading, isCheckingAccess]);
 
   // Combined loading state
   const loading = isInitializing || subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
@@ -367,44 +345,33 @@ export default function PracticeClientPage() {
   if (session && session.questions && session.questions.length > 0) {
     return (
       <div className="container mx-auto py-8 px-4">
-        {!selectedSubject ? (
-          <SubjectSelector
-            subjects={subjects}
-            loading={subjectsLoading}
-            error={subjectsError}
-            onSelect={setSelectedSubject}
+        <div className="space-y-6">
+          <QuestionNavigator
+            questions={session.questions}
+            currentIndex={currentQuestionIndex}
+            userAnswers={userAnswers}
+            onQuestionSelect={setCurrentQuestionIndex}
           />
-        ) : session ? (
-          <div className="space-y-6">
-            <QuestionNavigator
-              questions={session.questions}
-              currentIndex={currentQuestionIndex}
-              userAnswers={userAnswers}
-              onQuestionSelect={setCurrentQuestionIndex}
-            />
-            <SessionContent
-              session={session}
-              title={getSessionTitle()}
-              currentQuestionIndex={currentQuestionIndex}
-              userAnswers={userAnswers}
-              isPremium={isPremium}
-              limitParam={limitParam}
-              limitStatus={limitStatus}
-              limitsRefreshKey={limitsRefreshKey}
-              showLimitNotification={showLimitNotification}
-              limitMessage={limitMessage}
-              setCurrentQuestionIndex={setCurrentQuestionIndex}
-              handleOptionSelect={handleOptionSelect}
-              handleNextQuestion={handleNextQuestion}
-              handleCompleteSession={handleCompleteSession}
-              isCompleting={isCompleting}
-              elapsedTime={sessionTimer.formattedTime}
-              isTimerRunning={sessionTimer.isRunning}
-            />
-          </div>
-        ) : (
-          <LoadingSpinner />
-        )}
+          <SessionContent
+            session={session}
+            title={getSessionTitle()}
+            currentQuestionIndex={currentQuestionIndex}
+            userAnswers={userAnswers}
+            isPremium={isPremium}
+            limitParam={limitParam}
+            limitStatus={limitStatus}
+            limitsRefreshKey={limitsRefreshKey}
+            showLimitNotification={showLimitNotification}
+            limitMessage={limitMessage}
+            setCurrentQuestionIndex={setCurrentQuestionIndex}
+            handleOptionSelect={handleOptionSelect}
+            handleNextQuestion={handleNextQuestion}
+            handleCompleteSession={handleCompleteSession}
+            isCompleting={isCompleting}
+            elapsedTime={sessionTimer.formattedTime}
+            isTimerRunning={sessionTimer.isRunning}
+          />
+        </div>
       </div>
     );
   }

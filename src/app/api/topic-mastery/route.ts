@@ -54,10 +54,16 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(topics.subject_id, subjectId));
     }
     
-    // Execute query with all conditions and ordering
-    const masteryDataFromDb = await baseQuery // Renamed to avoid confusion
-      .where(and(...conditions))
-      .orderBy(desc(topic_mastery.last_practiced));
+    // Execute query with all conditions and ordering (with timeout protection)
+    const masteryDataFromDb = await Promise.race([
+      baseQuery // Renamed to avoid confusion
+        .where(and(...conditions))
+        .orderBy(desc(topic_mastery.last_practiced))
+        .limit(100), // Prevent memory exhaustion
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Query timeout')), 10000)
+      )
+    ]);
     
     // Cache the result
     await cache.set(cacheKey, masteryDataFromDb, 3600); // 3600 seconds = 1 hour
