@@ -30,6 +30,14 @@ export default function ZoologyPage() {
   // Determine if the user has premium access
   // Default to showing only first two topics free (safest approach)
   const isPremium = apiIsPremium;
+  
+  // Debug logging
+  console.log('Zoology Page - Premium Status:', { 
+    isPremium, 
+    apiIsPremium, 
+    subscriptionLoading,
+    type: typeof isPremium 
+  });
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
