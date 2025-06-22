@@ -1,16 +1,12 @@
 // src/lib/services/QuestionPoolService.ts
 import { db } from '@/db';
-import { 
-  questions, 
-  topics, 
-  subtopics, 
-  user_subscriptions,
-  subscription_plans
-} from '@/db/schema';
+import { topics } from '@/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 import { logger } from '@/lib/logger';
 import { CACHE_TTLS } from '@/lib/middleware/rateLimitMiddleware';
+import { SUBJECT_IDS } from '@/lib/constants/subscription';
+import { improvedSubscriptionService } from './ImprovedSubscriptionService';
 
 // Define question interfaces
 export interface QuestionWithDetails {
@@ -61,46 +57,9 @@ export class QuestionPoolService {
     }
   }
   
-  /**
-   * Check if user has a premium subscription
-   * @param userId User ID
-   */
-  async isUserPremium(userId: string): Promise<boolean> {
-    try {
-      const userSubscription = await db
-        .select({
-          plan_code: subscription_plans.plan_code
-        })
-        .from(user_subscriptions)
-        .innerJoin(
-          subscription_plans,
-          eq(user_subscriptions.plan_id, subscription_plans.plan_id)
-        )
-        .where(eq(user_subscriptions.user_id, userId))
-        .limit(1)
-        .then(rows => rows[0])
-        .catch(error => {
-          logger.error('Error fetching user subscription', {
-            context: 'QuestionPoolService.isUserPremium',
-            userId,
-            error: error instanceof Error ? error : String(error)
-          });
-          return null;
-        });
-      
-      return Boolean(userSubscription && userSubscription.plan_code !== 'free');
-    } catch (error) {
-      logger.error('Error checking user premium status', {
-        context: 'QuestionPoolService.isUserPremium',
-        userId,
-        error: error instanceof Error ? error : String(error)
-      });
-      return false;
-    }
-  }
   
   /**
-   * Fetch all potential questions matching the given filters
+   * Fetch all potential questions matching the given filters using relational query syntax
    */
   async fetchPotentialQuestions(
     subjectId: number, 
@@ -108,51 +67,45 @@ export class QuestionPoolService {
     subtopicId?: number
   ): Promise<QuestionWithDetails[]> {
     try {
-      // Base query: include questions from the specified subject
-      const baseQuery = db.select({
-        question_id: questions.question_id,
-        question_text: questions.question_text,
-        question_type: questions.question_type,
-        details: questions.details,
-        explanation: questions.explanation,
-        difficulty_level: questions.difficulty_level,
-        marks: questions.marks ?? 0,
-        negative_marks: questions.negative_marks ?? 0,
-        topic_id: topics.topic_id,
-        topic_name: topics.topic_name,
-        subtopic_id: subtopics.subtopic_id,
-        subtopic_name: subtopics.subtopic_name,
-        source_type: questions.source_type,
-      })
-      .from(questions)
-      .innerJoin(topics, eq(questions.topic_id, topics.topic_id))
-      .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id));
+      const queryResults = await db.query.questions.findMany({
+        where: (questions, { and, eq }) => and(
+          eq(questions.subject_id, subjectId),
+          eq(questions.source_type, 'AI_Generated'),
+          eq(questions.is_active, true),
+          ...(topicId ? [eq(questions.topic_id, topicId)] : []),
+          ...(subtopicId ? [eq(questions.subtopic_id, subtopicId)] : [])
+        ),
+        with: {
+          topic: {
+            columns: {
+              topic_id: true,
+              topic_name: true
+            }
+          },
+          subtopic: {
+            columns: {
+              subtopic_id: true,
+              subtopic_name: true
+            }
+          }
+        }
+      });
       
-      // Build conditions array
-      const conditions = [
-        eq(questions.subject_id, subjectId),
-        eq(questions.source_type, 'AI_Generated'),
-        eq(questions.is_active, true)
-      ];
-      
-      // Add topic filter if specified
-      if (topicId) {
-        conditions.push(eq(questions.topic_id, topicId));
-      }
-      
-      // Add subtopic filter if specified
-      if (subtopicId) {
-        conditions.push(eq(questions.subtopic_id, subtopicId));
-      }
-      
-      // Apply all conditions with 'and'
-      const queryResults = await baseQuery.where(and(...conditions));
-      
-      // Ensure marks and negative_marks are always numbers
+      // Transform results to match QuestionWithDetails interface
       return queryResults.map(q => ({
-        ...q,
+        question_id: q.question_id,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        details: q.details,
+        explanation: q.explanation,
+        difficulty_level: q.difficulty_level,
         marks: q.marks ?? 0,
-        negative_marks: q.negative_marks ?? 0
+        negative_marks: q.negative_marks ?? 0,
+        topic_id: q.topic?.topic_id ?? 0,
+        topic_name: q.topic?.topic_name ?? '',
+        subtopic_id: q.subtopic?.subtopic_id ?? null,
+        subtopic_name: q.subtopic?.subtopic_name ?? null,
+        source_type: q.source_type
       }));
     } catch (error) {
       logger.error('Error fetching potential questions', {
@@ -198,10 +151,10 @@ export class QuestionPoolService {
   ): Promise<QuestionWithDetails[]> {
     try {
       // Check if this is a Botany subject (Biology)
-      const isBotanySubject = subjectId === 3; // Biology subject ID
+      const isBotanySubject = subjectId === SUBJECT_IDS.BIOLOGY;
       
       // Check if user has premium subscription
-      const isPremiumUser = await this.isUserPremium(userId);
+      const isPremiumUser = await improvedSubscriptionService.isUserPremium(userId);
       const isFreemiumUser = !isPremiumUser;
       
       // Cache key for the potential questions pool
@@ -260,7 +213,7 @@ export class QuestionPoolService {
         data: { userId, subjectId, topicId, subtopicId, questionCount },
         error: error instanceof Error ? error : String(error)
       });
-      return [];
+      throw new Error(`Failed to get questions: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }

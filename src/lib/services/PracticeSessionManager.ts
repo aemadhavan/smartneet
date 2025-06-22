@@ -13,6 +13,7 @@ import {
 import { eq, and, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '@/db/schema';
+import { SUBJECT_IDS, SUBSCRIPTION_LIMITS } from '@/lib/constants/subscription';
 
 interface SessionCreationRequest {
   userId: string;
@@ -67,9 +68,22 @@ export class PracticeSessionManager {
       // Step 3: Validate user access and limits
       await this.validateUserAccess(request);
 
-      // Step 4: Create session in transaction with proper error handling
+      // Step 4: Get questions first to prevent ghost sessions
+      const questions = await questionPoolService.getPersonalizedQuestions(
+        request.userId,
+        request.subjectId,
+        request.topicId,
+        request.subtopicId,
+        request.questionCount || 10
+      );
+
+      if (questions.length === 0) {
+        throw new Error('No questions available for the selected criteria');
+      }
+
+      // Step 5: Create session in transaction with validated questions
       const result = await db.transaction(async (tx) => {
-        // Create the session record
+        // Create the session record with correct counts from the start
         const [newSession] = await tx.insert(practice_sessions).values({
           user_id: request.userId,
           subject_id: request.subjectId,
@@ -77,26 +91,13 @@ export class PracticeSessionManager {
           subtopic_id: request.subtopicId,
           session_type: request.sessionType || 'Practice',
           start_time: new Date(),
-          total_questions: request.questionCount || 10,
+          total_questions: questions.length,
           questions_attempted: 0,
           questions_correct: 0,
           is_completed: false,
           score: 0,
-          max_score: 0
+          max_score: questions.reduce((sum, q) => sum + (q.marks || 4), 0)
         }).returning();
-
-        // Get personalized questions
-        const questions = await questionPoolService.getPersonalizedQuestions(
-          request.userId,
-          request.subjectId,
-          request.topicId,
-          request.subtopicId,
-          request.questionCount || 10
-        );
-
-        if (questions.length === 0) {
-          throw new Error('No questions available for the selected criteria');
-        }
 
         // Insert session questions in batch
         const sessionQuestions = questions.map((question, index) => ({
@@ -110,14 +111,6 @@ export class PracticeSessionManager {
         }));
 
         await tx.insert(session_questions).values(sessionQuestions);
-
-        // Update session with actual question count
-        await tx.update(practice_sessions)
-          .set({ 
-            total_questions: questions.length,
-            max_score: questions.reduce((sum, q) => sum + (q.marks || 4), 0)
-          })
-          .where(eq(practice_sessions.session_id, newSession.session_id));
 
         // Atomically increment test usage
         await this.incrementTestUsageAtomic(tx, request.userId);
@@ -207,7 +200,7 @@ export class PracticeSessionManager {
     }
 
     // Check topic access for freemium users
-    if (request.topicId && request.subjectId === 3) { // Biology subject
+    if (request.topicId && request.subjectId === SUBJECT_IDS.BIOLOGY) {
       const hasAccess = await this.validateTopicAccess(request.userId, request.topicId, request.subjectId);
       if (!hasAccess) {
         throw new Error('This topic is available only to premium users');
@@ -223,8 +216,8 @@ export class PracticeSessionManager {
     if (isPremium) return true;
 
     // For Biology subject, check if topic is in first 2 topics
-    if (subjectId === 3) {
-      const freemiumTopics = await questionPoolService.getFreemiumTopics(subjectId, 2);
+    if (subjectId === SUBJECT_IDS.BIOLOGY) {
+      const freemiumTopics = await questionPoolService.getFreemiumTopics(subjectId, SUBSCRIPTION_LIMITS.FREEMIUM_TOPICS_LIMIT);
       const allowedTopicIds = new Set(freemiumTopics.map(t => t.topic_id));
       return allowedTopicIds.has(topicId);
     }
