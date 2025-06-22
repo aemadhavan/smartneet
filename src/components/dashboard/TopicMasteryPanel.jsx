@@ -17,8 +17,11 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name');
   
+  // Ensure topicMastery is always an array
+  const safeTopicMastery = Array.isArray(topicMastery) ? topicMastery : [];
+  
   // Filter topics based on mastery level and search query
-  const filteredTopics = topicMastery.filter(topic => {
+  const filteredTopics = safeTopicMastery.filter(topic => {
     const matchesFilter = filter === 'all' || topic.mastery_level === filter;
     const matchesSearch = topic.topic_name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -40,12 +43,12 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
   
   // Calculate statistics
   const topicStats = {
-    total: topicMastery.length,
-    mastered: topicMastery.filter(t => t.mastery_level === 'mastered').length,
-    advanced: topicMastery.filter(t => t.mastery_level === 'advanced').length,
-    intermediate: topicMastery.filter(t => t.mastery_level === 'intermediate').length,
-    beginner: topicMastery.filter(t => t.mastery_level === 'beginner').length,
-    notStarted: topicMastery.filter(t => t.mastery_level === 'notStarted').length,
+    total: safeTopicMastery.length,
+    mastered: safeTopicMastery.filter(t => t.mastery_level === 'mastered').length,
+    advanced: safeTopicMastery.filter(t => t.mastery_level === 'advanced').length,
+    intermediate: safeTopicMastery.filter(t => t.mastery_level === 'intermediate').length,
+    beginner: safeTopicMastery.filter(t => t.mastery_level === 'beginner').length,
+    notStarted: safeTopicMastery.filter(t => t.mastery_level === 'notStarted').length,
   };
   
   const displayLimit = 5;
@@ -131,7 +134,7 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
       <div className="space-y-3">
         {sortedTopics.length === 0 ? (
           <p className="dark:text-white text-gray-500 text-center py-4">
-            {topicMastery.length === 0 
+            {safeTopicMastery.length === 0 
               ? "No topic mastery data available yet." 
               : "No topics match your search criteria."}
           </p>

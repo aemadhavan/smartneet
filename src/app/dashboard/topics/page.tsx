@@ -128,7 +128,17 @@ export default function TopicsPage() {
         throw new Error('Failed to fetch topic mastery');
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Handle API response format - look for data array
+      if (Array.isArray(responseData)) {
+        return responseData;
+      } else if (responseData && responseData.data && Array.isArray(responseData.data)) {
+        return responseData.data;
+      } else {
+        console.error('Expected array but got:', typeof responseData);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching topic mastery:', error);
       return [];
@@ -143,7 +153,17 @@ export default function TopicsPage() {
         throw new Error('Failed to fetch subjects');
       }
       
-      return await response.json();
+      const responseData = await response.json();
+      
+      // Handle API response format
+      if (Array.isArray(responseData)) {
+        return responseData;
+      } else if (responseData && responseData.data && Array.isArray(responseData.data)) {
+        return responseData.data;
+      } else {
+        console.error('Expected array for subjects but got:', typeof responseData);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching subjects:', error);
       return [];
@@ -152,20 +172,23 @@ export default function TopicsPage() {
 
   // Calculate summary statistics
   const calculateStats = (topics: TopicMastery[]) => {
-    const masteredCount = topics.filter(t => t.mastery_level === 'mastered').length;
-    const inProgressCount = topics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length;
-    const notStartedCount = topics.filter(t => t.mastery_level === 'notStarted').length;
+    // Ensure topics is always an array
+    const safeTopics = Array.isArray(topics) ? topics : [];
+    
+    const masteredCount = safeTopics.filter(t => t.mastery_level === 'mastered').length;
+    const inProgressCount = safeTopics.filter(t => ['beginner', 'intermediate', 'advanced'].includes(t.mastery_level)).length;
+    const notStartedCount = safeTopics.filter(t => t.mastery_level === 'notStarted').length;
     
     // Calculate average accuracy
-    const totalAccuracy = topics.reduce((sum, topic) => {
+    const totalAccuracy = safeTopics.reduce((sum, topic) => {
       return sum + (topic.accuracy_percentage || 0);
     }, 0);
-    const avgAccuracy = topics.length ? totalAccuracy / topics.length : 0;
+    const avgAccuracy = safeTopics.length ? totalAccuracy / safeTopics.length : 0;
     
     // Determine strongest and weakest subjects
     const subjectPerformance = new Map<string, { total: number, count: number }>();
     
-    topics.forEach(topic => {
+    safeTopics.forEach(topic => {
       const subjectName = topic.subject_name;
       if (!subjectName) return;
       
@@ -198,7 +221,7 @@ export default function TopicsPage() {
     });
     
     setStats({
-      totalTopics: topics.length,
+      totalTopics: safeTopics.length,
       masteredTopics: masteredCount,
       inProgressTopics: inProgressCount,
       notStartedTopics: notStartedCount,
@@ -210,7 +233,10 @@ export default function TopicsPage() {
   
   // Get filtered and sorted topics
   const getFilteredTopics = (): TopicMastery[] => {
-    return topicMastery
+    // Ensure topicMastery is always an array
+    const safeTopicMastery = Array.isArray(topicMastery) ? topicMastery : [];
+    
+    return safeTopicMastery
       .filter(topic => {
         // Apply subject filter
         if (selectedSubject !== null && topic.subject_id !== selectedSubject) {
@@ -247,9 +273,12 @@ export default function TopicsPage() {
   
   // Get data for subject performance chart
   const getSubjectPerformanceData = (): PerformanceData[] => {
+    // Ensure topicMastery is always an array
+    const safeTopicMastery = Array.isArray(topicMastery) ? topicMastery : [];
+    
     const subjectPerformance = new Map<string, { total: number, count: number }>();
     
-    topicMastery.forEach(topic => {
+    safeTopicMastery.forEach(topic => {
       const subjectName = topic.subject_name;
       if (!subjectName) return;
       
@@ -417,7 +446,7 @@ export default function TopicsPage() {
         <div className="flex flex-wrap items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-800">Topic Mastery</h2>
           <div className="text-sm text-gray-500">
-            Showing {filteredTopics.length} of {topicMastery.length} topics
+            Showing {filteredTopics.length} of {Array.isArray(topicMastery) ? topicMastery.length : 0} topics
           </div>
         </div>
         

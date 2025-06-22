@@ -427,7 +427,18 @@ export async function updateTopicMasteryBatch(
   }
 
   const results = await db.transaction(async (tx) => {
-    const topicIds = topicUpdates.map(update => update.topicId);
+    // Group updates by topic ID and aggregate correct/incorrect counts
+    const topicAggregates = new Map<number, { questionsAttempted: number, questionsCorrect: number }>();
+    
+    for (const update of topicUpdates) {
+      const existing = topicAggregates.get(update.topicId) || { questionsAttempted: 0, questionsCorrect: 0 };
+      topicAggregates.set(update.topicId, {
+        questionsAttempted: existing.questionsAttempted + 1,
+        questionsCorrect: existing.questionsCorrect + (update.isCorrect ? 1 : 0)
+      });
+    }
+    
+    const topicIds = Array.from(topicAggregates.keys());
     
     // Get current mastery levels for all topics in one query
     const existingMasteries = await tx
@@ -451,14 +462,13 @@ export async function updateTopicMasteryBatch(
     const insertsToMake = [];
     const updatesToMake = [];
 
-    for (const update of topicUpdates) {
-      const { topicId, isCorrect } = update;
+    for (const [topicId, aggregates] of topicAggregates) {
       const existingMastery = masteryMap.get(topicId);
 
       if (existingMastery) {
         // Update existing mastery record
-        const questionsAttempted = existingMastery.questions_attempted + 1;
-        const questionsCorrect = isCorrect ? existingMastery.questions_correct + 1 : existingMastery.questions_correct;
+        const questionsAttempted = existingMastery.questions_attempted + aggregates.questionsAttempted;
+        const questionsCorrect = existingMastery.questions_correct + aggregates.questionsCorrect;
         const accuracyPercentage = Math.round((questionsCorrect / questionsAttempted) * 100);
         
         let masteryLevel: 'notStarted' | 'beginner' | 'intermediate' | 'advanced' | 'mastered' = existingMastery.mastery_level as 'notStarted' | 'beginner' | 'intermediate' | 'advanced' | 'mastered';
@@ -495,15 +505,17 @@ export async function updateTopicMasteryBatch(
         });
       } else {
         // Create new mastery record
-        const initialAccuracy = isCorrect ? 100 : 0;
+        const initialAccuracy = aggregates.questionsAttempted > 0 
+          ? Math.round((aggregates.questionsCorrect / aggregates.questionsAttempted) * 100) 
+          : 0;
         const initialMasteryLevel = 'beginner' as const;
 
         insertsToMake.push({
           user_id: userId,
           topic_id: topicId,
           mastery_level: initialMasteryLevel,
-          questions_attempted: 1,
-          questions_correct: isCorrect ? 1 : 0,
+          questions_attempted: aggregates.questionsAttempted,
+          questions_correct: aggregates.questionsCorrect,
           accuracy_percentage: initialAccuracy,
           last_practiced: new Date(),
           created_at: new Date(),
@@ -513,8 +525,8 @@ export async function updateTopicMasteryBatch(
         updateResults.push({
           topicId,
           mastery_level: initialMasteryLevel,
-          questions_attempted: 1,
-          questions_correct: isCorrect ? 1 : 0,
+          questions_attempted: aggregates.questionsAttempted,
+          questions_correct: aggregates.questionsCorrect,
           accuracy_percentage: initialAccuracy
         });
       }
