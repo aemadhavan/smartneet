@@ -310,38 +310,118 @@ export function usePracticeSessionSWR(
     });
   }, [session, currentQuestionIndex, sessionCache]);
 
-  // Handle completion of session
-  const handleCompleteSession = useCallback(async () => {
+  // Handle completion of session with enhanced error handling and retry
+  const handleCompleteSession = useCallback(async (maxRetries: number = 3) => {
     if (!session) return;
     
-    try {
-      const answeredCount = Object.keys(userAnswers).length;
-      
-      // Confirm if not all questions are answered
-      if (
-        answeredCount < session.questions.length &&
-        !confirm('You have not answered all questions. Are you sure you want to finish the session?')
-      ) {
-        return;
-      }
-
-      // Submit answers
-      await submitAnswers();
-      
-      logger.info('Session completed successfully', { 
-        context: 'usePracticeSessionSWR',
-        data: {
-          sessionId: session.sessionId
+    const attemptSubmission = async (attempt: number = 1): Promise<boolean> => {
+      try {
+        const answeredCount = Object.keys(userAnswers).length;
+        
+        // Confirm if not all questions are answered
+        if (
+          answeredCount < session.questions.length &&
+          !confirm('You have not answered all questions. Are you sure you want to finish the session?')
+        ) {
+          return false;
         }
-      });
-    } catch (err) {
-      logger.error('Error completing session', {
-        error: err instanceof Error ? err.message : String(err),
-        context: 'usePracticeSessionSWR'
-      });
-      alert('Failed to submit answers. Please try again.');
-    }
-  }, [session, userAnswers, submitAnswers]);
+
+        // Submit answers using SWR mutation
+        await submitAnswers();
+        
+        logger.info('Session completed successfully', { 
+          context: 'usePracticeSessionSWR',
+          data: {
+            sessionId: session.sessionId
+          }
+        });
+        
+        return true;
+      } catch (err) {
+        logger.error(`Error completing session (attempt ${attempt}/${maxRetries})`, {
+          error: err instanceof Error ? err.message : String(err),
+          context: 'usePracticeSessionSWR'
+        });
+        
+        // Check if this is a network error
+        const isNetworkError = err instanceof Error && 
+          (err.name === 'AbortError' || 
+           err.name === 'TypeError' ||
+           err.message.includes('Failed to fetch') ||
+           err.message.includes('Network') ||
+           err.message.includes('fetch') ||
+           err.message.includes('FetchError'));
+        
+        if (isNetworkError && attempt < maxRetries) {
+          // Show retry dialog for network errors
+          const shouldRetry = confirm(
+            `Network connection failed. This might be due to a poor internet connection.\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
+          );
+          
+          if (shouldRetry) {
+            // Wait before retrying with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt - 1), 5000)));
+            return attemptSubmission(attempt + 1);
+          }
+        }
+        
+        // If it's not a network error or we've exhausted retries, show error
+        const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
+        
+        if (isNetworkError) {
+          // For network errors, offer to save locally
+          const shouldSaveLocally = confirm(
+            `Unable to submit your answers due to network issues. Your progress has been saved locally and will be submitted when you have a stable connection.\n\nWould you like to continue and mark this session as completed?`
+          );
+          
+          if (shouldSaveLocally) {
+            try {
+              // Prepare submission data for local storage
+              const answersPayload: Record<number, string> = {};
+              session.questions.forEach((question) => {
+                const questionId = question.question_id;
+                if (userAnswers[questionId]) {
+                  answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? 
+                    userAnswers[questionId] : String(userAnswers[questionId]);
+                }
+              });
+              
+              const submissionData = {
+                sessionId: session.sessionId,
+                answers: answersPayload,
+                timestamp: Date.now(),
+                status: 'pending'
+              };
+              
+              localStorage.setItem(`pending_submission_${session.sessionId}`, JSON.stringify(submissionData));
+              
+              // Mark as completed locally
+              setSessionCompleted(true);
+              if (sessionCacheKey.current) {
+                sessionCache.clearCache(sessionCacheKey.current);
+              }
+              
+              alert('Session completed locally. Your answers will be submitted automatically when you have a stable internet connection.');
+              return true;
+            } catch (storageError) {
+              logger.error('Failed to save submission locally', {
+                error: storageError instanceof Error ? storageError.message : String(storageError),
+                context: 'usePracticeSessionSWR'
+              });
+              alert('Failed to save submission locally. Please try again when you have a stable internet connection.');
+              return false;
+            }
+          }
+        } else {
+          alert(`Failed to submit answers: ${errorMessage}\n\nPlease try again or contact support if the problem persists.`);
+        }
+        
+        return false;
+      }
+    };
+    
+    return attemptSubmission();
+  }, [session, userAnswers, submitAnswers, sessionCache, setSessionCompleted]);
 
   // Handle navigation to next question
   const handleNextQuestion = useCallback(() => {

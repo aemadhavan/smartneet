@@ -404,89 +404,165 @@ export function usePracticeSession(
     });
   }, [session, currentQuestionIndex, sessionCache, sessionTimer.elapsedSeconds, questionTimer.questionTimes]);
 
-  // Handle completion of session
-  const handleCompleteSession = useCallback(async () => {
+  // Handle completion of session with enhanced error handling and retry
+  const handleCompleteSession = useCallback(async (maxRetries: number = 3) => {
     if (!session) return;
-    try {
-      const answeredCount = Object.keys(userAnswers).length;
-      if (
-        answeredCount < session.questions.length &&
-        !confirm('You have not answered all questions. Are you sure you want to finish the session?')
-      ) {
-        return;
-      }
-
-      // Stop current question timer if running
-      const currentQuestion = session.questions[currentQuestionIndex];
-      if (currentQuestion) {
-        questionTimer.stopQuestionTimer(currentQuestion.question_id);
-      }
-
-      // Stop session timer
-      const totalSessionTime = sessionTimer.stop();
-  
-      // Simplified answer payload format
-      const answersPayload: Record<number, string> = {};
-      session.questions.forEach((question) => {
-        const questionId = question.question_id;
-        if (userAnswers[questionId]) {
-          answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? userAnswers[questionId] : String(userAnswers[questionId]);
-        }
-      });
-
-      // Include timing data in the submission
-      const submissionPayload = {
-        answers: answersPayload,
-        timingData: {
-          totalSeconds: totalSessionTime,
-          questionTimes: questionTimer.questionTimes,
-          averageTimePerQuestion: questionTimer.getAverageTime()
-        }
-      };
-      
-      const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(submissionPayload),
-      });
-  
-      const responseData = await response.json();
-      
-      // Check if response was successful (either standard success or already completed)
-      if (response.ok || responseData.success) {
-        console.log('Submission successful:', responseData);
-        setSessionCompleted(true);
-        if (sessionCacheKey.current) {
-          sessionCache.clearCache(sessionCacheKey.current);
-        }
-        return;
-      }
-      
-      // If we get here, there was an error
-      throw new Error(responseData.error || 'Failed to submit answers.');
-    } catch (err) {
-      console.error('Error completing session:', err);
-      
-      // More user-friendly error messages
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
-      
-      if (errorMessage.includes('already completed')) {
-        // If it's already completed, just mark as completed locally
-        setSessionCompleted(true);
-        if (sessionCacheKey.current) {
-          sessionCache.clearCache(sessionCacheKey.current);
-        }
-      } else {
-        alert('Failed to submit answers. Please try again.');
-      }
+    
+    // Prepare submission data once at the beginning
+    const answeredCount = Object.keys(userAnswers).length;
+    if (
+      answeredCount < session.questions.length &&
+      !confirm('You have not answered all questions. Are you sure you want to finish the session?')
+    ) {
+      return;
     }
+
+    // Stop current question timer if running
+    const currentQuestion = session.questions[currentQuestionIndex];
+    if (currentQuestion) {
+      questionTimer.stopQuestionTimer(currentQuestion.question_id);
+    }
+
+    // Stop session timer
+    const totalSessionTime = sessionTimer.stop();
+
+    // Simplified answer payload format
+    const answersPayload: Record<number, string> = {};
+    session.questions.forEach((question) => {
+      const questionId = question.question_id;
+      if (userAnswers[questionId]) {
+        answersPayload[questionId] = typeof userAnswers[questionId] === 'object' ? userAnswers[questionId] : String(userAnswers[questionId]);
+      }
+    });
+
+    // Include timing data in the submission
+    const submissionPayload = {
+      answers: answersPayload,
+      timingData: {
+        totalSeconds: totalSessionTime,
+        questionTimes: questionTimer.questionTimes,
+        averageTimePerQuestion: questionTimer.getAverageTime()
+      }
+    };
+    
+    const attemptSubmission = async (attempt: number = 1): Promise<boolean> => {
+      try {
+        // Set timeout for network request
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+        
+        const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(submissionPayload),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+    
+        const responseData = await response.json();
+        
+        // Check if response was successful (either standard success or already completed)
+        if (response.ok || responseData.success) {
+          console.log('Submission successful:', responseData);
+          setSessionCompleted(true);
+          if (sessionCacheKey.current) {
+            sessionCache.clearCache(sessionCacheKey.current);
+          }
+          return true;
+        }
+        
+        // If we get here, there was an error
+        throw new Error(responseData.error || 'Failed to submit answers.');
+      } catch (err) {
+        console.error(`Error completing session (attempt ${attempt}/${maxRetries}):`, err);
+        
+        // Check if this is a network error
+        const isNetworkError = err instanceof Error && 
+          (err.name === 'AbortError' || 
+           err.name === 'TypeError' ||
+           err.message.includes('Failed to fetch') ||
+           err.message.includes('Network') ||
+           err.message.includes('fetch'));
+        
+        // Check if this is already completed
+        const isAlreadyCompleted = err instanceof Error && 
+          err.message.includes('already completed');
+        
+        if (isAlreadyCompleted) {
+          // If it's already completed, just mark as completed locally
+          setSessionCompleted(true);
+          if (sessionCacheKey.current) {
+            sessionCache.clearCache(sessionCacheKey.current);
+          }
+          return true;
+        }
+        
+        if (isNetworkError && attempt < maxRetries) {
+          // Show retry dialog for network errors
+          const shouldRetry = confirm(
+            `Network connection failed. This might be due to a poor internet connection.\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
+          );
+          
+          if (shouldRetry) {
+            // Wait before retrying with exponential backoff
+            await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt - 1), 5000)));
+            return attemptSubmission(attempt + 1);
+          }
+        }
+        
+        // If it's not a network error or we've exhausted retries, show error
+        const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
+        
+        if (isNetworkError) {
+          const shouldSaveLocally = confirm(
+            `Unable to submit your answers due to network issues. Your progress has been saved locally and will be submitted when you have a stable connection.\n\nWould you like to continue and mark this session as completed?`
+          );
+          
+          if (shouldSaveLocally) {
+            // Save submission data locally for later retry
+            try {
+              const submissionData = {
+                sessionId: session.sessionId,
+                answers: submissionPayload.answers,
+                timingData: submissionPayload.timingData,
+                timestamp: Date.now(),
+                status: 'pending'
+              };
+              localStorage.setItem(`pending_submission_${session.sessionId}`, JSON.stringify(submissionData));
+              
+              // Mark as completed locally
+              setSessionCompleted(true);
+              if (sessionCacheKey.current) {
+                sessionCache.clearCache(sessionCacheKey.current);
+              }
+              
+              alert('Session completed locally. Your answers will be submitted automatically when you have a stable internet connection.');
+              return true;
+            } catch (storageError) {
+              console.error('Failed to save submission locally:', storageError);
+              alert('Failed to save submission locally. Please try again when you have a stable internet connection.');
+              return false;
+            }
+          }
+        } else {
+          alert(`Failed to submit answers: ${errorMessage}\n\nPlease try again or contact support if the problem persists.`);
+        }
+        
+        return false;
+      }
+    };
+    
+    return attemptSubmission();
   }, [session, userAnswers, sessionCache, currentQuestionIndex, questionTimer, sessionTimer]);
 
   // Store the most recent version of handleCompleteSession in the ref
   useEffect(() => {
-    handleCompleteSessionRef.current = handleCompleteSession;
+    handleCompleteSessionRef.current = async () => {
+      await handleCompleteSession();
+    };
   }, [handleCompleteSession]);
 
   // Handle navigation to next question
