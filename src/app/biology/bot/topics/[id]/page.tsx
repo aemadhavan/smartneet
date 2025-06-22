@@ -40,7 +40,7 @@ export default function TopicDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSubtopicId, setActiveSubtopicId] = useState<number | null>(null);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const { isPremium: apiIsPremium } = useSubscriptionLimits();
+  const { isPremium: apiIsPremium, loading: subscriptionLoading } = useSubscriptionLimits();
   
   // Check if user has premium access - use the explicit isPremium flag from the hook
   const isPremium = apiIsPremium;
@@ -73,8 +73,9 @@ export default function TopicDetailPage() {
         setIsFreeTopic(foundIndex === 0 || foundIndex === 1);
         
         // If premium content and user doesn't have access, redirect to pricing
-        if (foundIndex > 1 && !isPremium) {
-          console.log("Redirecting to pricing - topic index:", foundIndex, "isPremium:", isPremium);
+        // Only redirect if subscription is loaded and user is not premium
+        if (foundIndex > 1 && !subscriptionLoading && !isPremium) {
+          console.log("Redirecting to pricing - topic index:", foundIndex, "isPremium:", isPremium, "subscriptionLoading:", subscriptionLoading);
           router.push(`/pricing?from=biology-topic-${topicId}`);
           return;
         }
@@ -108,12 +109,12 @@ export default function TopicDetailPage() {
     };
     
     fetchTopics();
-  }, [topicId, isPremium, router]);
+  }, [topicId, isPremium, subscriptionLoading, router]);
 
   // Find the active subtopic
   const activeSubtopic = subtopics.find(s => s.subtopic_id === activeSubtopicId);
 
-  if (isLoading) {
+  if (isLoading || subscriptionLoading) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>

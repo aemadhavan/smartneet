@@ -25,11 +25,19 @@ export default function ZoologyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isPremium: apiIsPremium } = useSubscriptionLimits();
+  const { isPremium: apiIsPremium, loading: subscriptionLoading } = useSubscriptionLimits();
   
   // Determine if the user has premium access
   // Default to showing only first two topics free (safest approach)
   const isPremium = apiIsPremium;
+  
+  // Debug logging
+  console.log('Zoology Page - Premium Status:', { 
+    isPremium, 
+    apiIsPremium, 
+    subscriptionLoading,
+    type: typeof isPremium 
+  });
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
@@ -80,11 +88,20 @@ export default function ZoologyPage() {
     fetchTopicsAndSubtopics();
   }, []);
 
-  if (isLoading) {
+  // Function to determine if user can access the topic
+  const canAccessTopic = (index: number) => {
+    const hasAccess = Boolean(isPremium) || index < 2; // First two topics accessible for free users
+    console.log(`Zoology Topic ${index}: isPremium=${isPremium}, hasAccess=${hasAccess}`);
+    return hasAccess;
+  };
+
+  if (isLoading || subscriptionLoading) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">Loading zoology topics...</p>
+        <p className="text-gray-600">
+          {subscriptionLoading ? "Loading subscription status..." : "Loading zoology topics..."}
+        </p>
       </div>
     );
   }
@@ -147,13 +164,15 @@ export default function ZoologyPage() {
         </div>
       </div>
 
-      {/* Free access notice - manually force display regardless of subscription state */}
-      <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <p className="text-blue-700">
-          <span className="font-semibold">Free plan:</span> You have access to the first two topics. 
-          <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> for full access to all topics.
-        </p>
-      </div>
+      {/* Free access notice - only show for non-premium users */}
+      {!isPremium && (
+        <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <p className="text-blue-700">
+            <span className="font-semibold">Free plan:</span> You have access to the first two topics. 
+            <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> for full access to all topics.
+          </p>
+        </div>
+      )}
 
       {topics.length === 0 ? (
         <div className="bg-gray-50 p-8 rounded-lg text-center">
@@ -162,8 +181,8 @@ export default function ZoologyPage() {
       ) : (
         <div className="grid md:grid-cols-2 gap-6">
           {topics.map((topic, index) => {
-            // Force correct handling of premium status for each topic
-            const isTopicAccessible = index < 2;
+            // Use the canAccessTopic function to determine accessibility
+            const isTopicAccessible = canAccessTopic(index);
             
             return (
               <div key={topic.topic_id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 relative">
@@ -193,7 +212,7 @@ export default function ZoologyPage() {
                   </div>
                 </div>
                 
-                {/* Force premium indicators for topics after the first two, regardless of subscription state */}
+                {/* Premium indicators for premium topics */}
                 {!isTopicAccessible && (
                   <>
                     <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-medium shadow-sm">
