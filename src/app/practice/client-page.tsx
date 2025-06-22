@@ -62,7 +62,6 @@ export default function PracticeClientPage() {
   // Get subscription limit status 
   const { 
     limitStatus, 
-    subscription, 
     isPremium,
     loading: limitsLoading, 
     error: limitsError, 
