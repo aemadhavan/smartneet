@@ -114,12 +114,6 @@ export default function ZoologyPage() {
 
   return (
     <div className="container mx-auto py-8 px-4">
-      {/* Debug information - you can remove this in production */}
-      {/*<div className="mb-4 p-2 bg-gray-100 text-xs">
-        <p>Debug: isPremium={String(isPremium)}, isSignedIn={String(isSignedIn)}, subscriptionLoaded={String(subscriptionLoaded)}</p>
-        <p>Subscription plan: {subscription?.planCode || 'Not loaded'}</p>
-      </div>*/}
-      
       <header className="mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">Zoology</h1>
         <p className="text-gray-600 max-w-3xl">
