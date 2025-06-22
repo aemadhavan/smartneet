@@ -50,6 +50,7 @@ export default function TopicDetailPage() {
 
   useEffect(() => {
     const checkAccessAndFetchData = async () => {
+      let isRedirecting = false; // Declare isRedirecting here
       try {
         // Don't proceed until subscription status is resolved.
         // The main loading indicator will be shown since `subscriptionLoading` is true.
@@ -75,6 +76,7 @@ export default function TopicDetailPage() {
         
         // 2. If it's a premium topic and the user is not premium, redirect.
         if (isPremiumTopic && !isPremium) {
+          isRedirecting = true; // Set the flag
           router.push(`/pricing?from=biology-topic-${topicId}`);
           return;
         }
@@ -93,8 +95,10 @@ export default function TopicDetailPage() {
       } catch (err) {
         console.error('Error fetching topic data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
+      } finally { // Ensure isLoading is set to false only if no redirect occurred
+        if (!isRedirecting) {
+          setIsLoading(false);
+        }
       }
     };
     

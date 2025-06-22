@@ -46,6 +46,7 @@ export default function TopicDetailPage() {
 
   useEffect(() => {
     const checkAccessAndFetchData = async () => {
+      let isRedirecting = false; // Declare isRedirecting here
       try {
         // Don't proceed until subscription status is resolved.
         if (subscriptionLoading) {
@@ -69,6 +70,7 @@ export default function TopicDetailPage() {
         
         // 2. If it's a premium topic and the user is not premium, redirect.
         if (isPremiumTopic && !isPremium) {
+          isRedirecting = true;
           router.push(`/pricing?from=zoology-topic-${topicId}`);
           return;
         }
@@ -88,7 +90,9 @@ export default function TopicDetailPage() {
         console.error('Error fetching topic data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
-        setIsLoading(false);
+        if (!isRedirecting) {
+          setIsLoading(false);
+        }
       }
     };
     
