@@ -1,0 +1,13 @@
+// /Users/maceka/Projects/smartneet/vitest.config.ts
+import { defineConfig } from 'vitest/config';
+import tsconfigPaths from 'vite-tsconfig-paths';
+
+export default defineConfig({
+  plugins: [tsconfigPaths()],
+  test: {
+    globals: true,
+    environment: 'jsdom', // Mock browser environment
+    mockReset: true, // Automatically reset mocks between tests
+    setupFiles: ['./src/tests/setup.ts'], // Load env variables before tests run
+  },
+});

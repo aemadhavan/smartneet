@@ -9,6 +9,7 @@ import { cache } from '@/lib/cache';
 import { logger } from '@/lib/logger';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type * as schema from '@/db/schema';
+import { SUBSCRIPTION_LIMITS, PLAN_CODES } from '@/lib/constants/subscription';
 
 interface TestLimitStatus {
   canTake: boolean;
@@ -224,7 +225,7 @@ export class ImprovedSubscriptionService {
     const freePlans = await tx
       .select()
       .from(subscription_plans)
-      .where(eq(subscription_plans.plan_code, 'free'))
+      .where(eq(subscription_plans.plan_code, PLAN_CODES.FREE))
       .limit(1);
 
     if (freePlans.length === 0) {
@@ -315,7 +316,7 @@ export class ImprovedSubscriptionService {
         plan_name: 'Free Plan',
         plan_code: 'free',
         description: 'Default free plan',
-        test_limit_daily: 3,
+        test_limit_daily: SUBSCRIPTION_LIMITS.FREE_PLAN_DAILY_TESTS,
         price_inr: 0,
         price_id_stripe: '',
         product_id_stripe: '',
@@ -336,7 +337,7 @@ export class ImprovedSubscriptionService {
   private calculateLimitStatus(subscription: typeof user_subscriptions.$inferSelect, plan: typeof subscription_plans.$inferSelect): TestLimitStatus {
     const isUnlimited = plan.test_limit_daily === null;
     const usedToday = subscription.tests_used_today || 0;
-    const limitPerDay = plan.test_limit_daily || 3;
+    const limitPerDay = plan.test_limit_daily || SUBSCRIPTION_LIMITS.FREE_PLAN_DAILY_TESTS;
 
     if (isUnlimited) {
       return {
@@ -420,7 +421,7 @@ export class ImprovedSubscriptionService {
         plan_name: 'Free Plan',
         plan_code: 'free',
         description: 'Default free plan',
-        test_limit_daily: 3,
+        test_limit_daily: SUBSCRIPTION_LIMITS.FREE_PLAN_DAILY_TESTS,
         price_inr: 0,
         price_id_stripe: '',
         product_id_stripe: '',
@@ -434,7 +435,7 @@ export class ImprovedSubscriptionService {
         canTake: true,
         isUnlimited: false,
         usedToday: 0,
-        limitPerDay: 3,
+        limitPerDay: SUBSCRIPTION_LIMITS.FREE_PLAN_DAILY_TESTS,
         remainingToday: 3
       }
     };
@@ -470,6 +471,23 @@ export class ImprovedSubscriptionService {
       logger.warn('Failed to release subscription lock', {
         data: { lockKey }
       });
+    }
+  }
+
+  /**
+   * Check if user has a premium subscription
+   */
+  async isUserPremium(userId: string): Promise<boolean> {
+    try {
+      const data = await this.getSubscriptionData(userId);
+      return Boolean(data.plan.plan_code !== PLAN_CODES.FREE);
+    } catch (error) {
+      logger.error('Error checking user premium status', {
+        context: 'ImprovedSubscriptionService.isUserPremium',
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
     }
   }
 

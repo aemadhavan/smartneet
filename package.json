@@ -22,7 +22,9 @@
     "update-stripe-version": "ts-node scripts/update-stripe-version.ts",
     "diagnose:practice": "node scripts/run-practice-diagnostics.js diagnose",
     "fix:practice-issues": "node scripts/run-practice-diagnostics.js fix",
-    "fix:practice-issues:execute": "node scripts/run-practice-diagnostics.js fix-execute"
+    "fix:practice-issues:execute": "node scripts/run-practice-diagnostics.js fix-execute",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.20.2",
@@ -87,12 +89,15 @@
     "@types/react-dom": "^19.1.5",
     "@types/stripe": "^8.0.416",
     "@types/styled-components": "^5.1.34",
+    "@vitejs/plugin-react": "^4.5.2",
+    "@vitest/ui": "^3.2.4",
     "dotenv": "^16.5.0",
     "drizzle-kit": "^0.31.1",
     "drizzle-orm": "^0.41.0",
     "esbuild": "^0.25.4",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
+    "jsdom": "^26.1.0",
     "node-fetch": "^3.3.2",
     "pg": "^8.14.1",
     "stripe": "^18.0.0",
@@ -101,7 +106,9 @@
     "tsx": "^4.19.3",
     "tw-animate-css": "^1.2.8",
     "typescript": "^5.8.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   },
   "overrides": {
     "react": "19.1.0",

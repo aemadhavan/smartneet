@@ -7,13 +7,14 @@ import {
   question_attempts,
   questions,
 } from '@/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
 import { 
   evaluateAnswer, 
   parseQuestionDetails, 
   getCorrectAnswerForQuestionType,
-  AnswerResult
+  AnswerResult,
+  QuestionDetails
 } from '@/lib/utils/answerEvaluation';
 import { logger } from '@/lib/logger';
 import { cacheService } from '@/lib/services/CacheService';
@@ -21,7 +22,6 @@ import { RATE_LIMITS, applyRateLimit } from '@/lib/middleware/rateLimitMiddlewar
 import { z } from 'zod';
 import { 
   SubmitAnswersBody, 
-  QuestionDetailsWithSessionInfo,
   SubmitAnswersResponse
 } from '@/types/answer-submission';
 
@@ -40,6 +40,17 @@ interface QuestionAttemptRecord {
   updated_at: Date;
 }
 
+interface OptimizedQuestionData {
+  session_question_id: number;
+  question_id: number;
+  details: QuestionDetails;
+  marks: number | null;
+  negative_marks: number | null;
+  question_type: string;
+  topic_id: number | null;
+  hasExistingAttempt: boolean;
+}
+
 // Validation schema for answer submission
 const submitAnswersSchema = z.object({
   answers: z.record(z.string(), z.union([
@@ -54,7 +65,7 @@ const submitAnswersSchema = z.object({
 });
 
 /**
- * Submit answers for a practice session
+ * Submit answers for a practice session - OPTIMIZED VERSION
  */
 export async function POST(
   request: NextRequest,
@@ -177,42 +188,77 @@ export async function POST(
         { status: 400 }
       );
     }
-    
-    // Get all session questions with their details
-    const sessionQuestions = await db
-      .select({
-        session_question_id: session_questions.session_question_id,
-        question_id: session_questions.question_id,
-        details: questions.details,
-        marks: questions.marks,
-        negative_marks: questions.negative_marks,
-        question_type: questions.question_type,
-        topic_id: questions.topic_id
-      })
-      .from(session_questions)
-      .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
-      .where(
-        and(
-          eq(session_questions.session_id, sessionIdNum),
-          eq(session_questions.user_id, userId)
-        )
-      );
 
-    // Create a map for easier access with optimized parsing
-    const questionDetailsMap: Record<string, QuestionDetailsWithSessionInfo> = {};
+    // OPTIMIZATION 1: Single query to get all data needed for processing
+    // Get session questions, question details, and existing attempts in one optimized query
+    const questionIds = Object.keys(answers).map(id => parseInt(id)).filter(id => !isNaN(id));
     
-    // Batch parse question details for better performance
+    if (questionIds.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid question IDs provided' },
+        { status: 400 }
+      );
+    }
+
+    // OPTIMIZATION 2: Use parallel queries instead of sequential ones
+    const [sessionQuestions, existingAttempts] = await Promise.all([
+      // Get session questions with question details in one query
+      db
+        .select({
+          session_question_id: session_questions.session_question_id,
+          question_id: session_questions.question_id,
+          details: questions.details,
+          marks: questions.marks,
+          negative_marks: questions.negative_marks,
+          question_type: questions.question_type,
+          topic_id: questions.topic_id
+        })
+        .from(session_questions)
+        .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
+        .where(
+          and(
+            eq(session_questions.session_id, sessionIdNum),
+            eq(session_questions.user_id, userId),
+            inArray(session_questions.question_id, questionIds)
+          )
+        ),
+      
+      // Get existing attempts for these specific questions only
+      db
+        .select({ 
+          question_id: question_attempts.question_id 
+        })
+        .from(question_attempts)
+        .where(
+          and(
+            eq(question_attempts.session_id, sessionIdNum),
+            eq(question_attempts.user_id, userId),
+            inArray(question_attempts.question_id, questionIds)
+          )
+        )
+    ]);
+
+    // OPTIMIZATION 3: Use Maps for O(1) lookups instead of O(N) find operations
+    const existingAttemptIds = new Set(
+      existingAttempts.map(a => a.question_id.toString())
+    );
+
+    // Create optimized question data map with all needed information
+    const questionDataMap = new Map<string, OptimizedQuestionData>();
+    
     for (const q of sessionQuestions) {
       try {
         const parsedDetails = parseQuestionDetails(q.details);
-        questionDetailsMap[q.question_id.toString()] = {
+        questionDataMap.set(q.question_id.toString(), {
           session_question_id: q.session_question_id,
+          question_id: q.question_id,
           details: parsedDetails,
           marks: q.marks,
           negative_marks: q.negative_marks,
           question_type: q.question_type,
-          topic_id: q.topic_id
-        };
+          topic_id: q.topic_id,
+          hasExistingAttempt: existingAttemptIds.has(q.question_id.toString())
+        });
       } catch (error) {
         logger.warn('Failed to parse question details', {
           userId,
@@ -225,22 +271,7 @@ export async function POST(
       }
     }
 
-    // Check existing attempts to avoid duplicates
-    const existingAttempts = await db
-      .select({ question_id: question_attempts.question_id })
-      .from(question_attempts)
-      .where(
-        and(
-          eq(question_attempts.session_id, sessionIdNum),
-          eq(question_attempts.user_id, userId)
-        )
-      );
-    
-    // Create a set of question IDs that already have attempts
-    const existingAttemptIds = new Set(
-      existingAttempts.map(a => a.question_id.toString())
-    );
-    
+    // OPTIMIZATION 4: Process answers efficiently without nested loops
     const results: AnswerResult[] = [];
     const evaluationLog: Record<string, {
       questionType: string;
@@ -249,42 +280,41 @@ export async function POST(
       isCorrect: boolean;
     }> = {};
     const topicIdsWithNewAttempts = new Set<number>();
-    
-    // Collect all new attempts to insert in a batch - optimized loop
     const attemptsToInsert: QuestionAttemptRecord[] = [];
-    const answerEntries = Object.entries(answers);
-    
-    for (const [questionId, userAnswer] of answerEntries) {
-      // Skip if this question already has an attempt
-      if (existingAttemptIds.has(questionId)) {
+    const timingUpdates: Array<{
+      sessionQuestionId: number;
+      timeSpent: number;
+    }> = [];
+
+    // Process each answer efficiently
+    for (const [questionId, userAnswer] of Object.entries(answers)) {
+      const questionData = questionDataMap.get(questionId);
+      
+      // Skip if question not found or already has attempt
+      if (!questionData || questionData.hasExistingAttempt) {
         continue;
       }
-      
-      const questionDetails = questionDetailsMap[questionId];
-      if (!questionDetails) {
-        continue; // Skip this question if it doesn't belong to the session
-      }
 
-      // Evaluate answer - optimized error handling
+      // Evaluate answer
       let isCorrect = false;
       let correctAnswer: unknown = null;
       
       try {
         isCorrect = evaluateAnswer(
-          questionDetails.question_type,
-          questionDetails.details,
+          questionData.question_type,
+          questionData.details,
           userAnswer
         );
         
         // Only get correct answer for debugging in development
         if (process.env.NODE_ENV === 'development') {
           correctAnswer = getCorrectAnswerForQuestionType(
-            questionDetails.question_type, 
-            questionDetails.details
+            questionData.question_type, 
+            questionData.details
           );
           
           evaluationLog[questionId] = {
-            questionType: questionDetails.question_type,
+            questionType: questionData.question_type,
             userAnswer,
             correctAnswer,
             isCorrect
@@ -298,7 +328,7 @@ export async function POST(
           data: { 
             sessionId, 
             questionId, 
-            questionType: questionDetails.question_type 
+            questionType: questionData.question_type 
           },
           error: error instanceof Error ? error.message : String(error)
         });
@@ -307,28 +337,36 @@ export async function POST(
 
       // Calculate marks awarded
       const marksAwarded = isCorrect
-        ? questionDetails.marks ?? 0
-        : -(questionDetails.negative_marks ?? 0);
+        ? questionData.marks ?? 0
+        : -(questionData.negative_marks ?? 0);
 
-      // Track topic IDs for mastery updates if topic_id exists
-      if (questionDetails.topic_id) {
-        topicIdsWithNewAttempts.add(questionDetails.topic_id);
+      // Track topic IDs for mastery updates
+      if (questionData.topic_id) {
+        topicIdsWithNewAttempts.add(questionData.topic_id);
+      }
+
+      // Prepare timing update if available
+      const timeSpent = timingData?.questionTimes?.[questionId];
+      if (typeof timeSpent === 'number' && timeSpent > 0) {
+        timingUpdates.push({
+          sessionQuestionId: questionData.session_question_id,
+          timeSpent
+        });
       }
 
       // Prepare the question attempt record for batch insert
       const questionIdNum = parseInt(questionId);
-      const timeSpent = (timingData?.questionTimes?.[questionId] as number) || null;
       
       attemptsToInsert.push({
         user_id: userId,
         question_id: questionIdNum,
         session_id: sessionIdNum,
-        session_question_id: questionDetails.session_question_id,
-        attempt_number: 1, // First attempt
-        user_answer: JSON.stringify({ option: userAnswer }),
+        session_question_id: questionData.session_question_id,
+        attempt_number: 1,
+        user_answer: userAnswer, // Store answer directly, Drizzle handles JSON serialization
         is_correct: isCorrect,
         marks_awarded: marksAwarded,
-        time_taken_seconds: timeSpent,
+        time_taken_seconds: typeof timeSpent === 'number' ? timeSpent : null,
         attempt_timestamp: new Date(),
         created_at: new Date(),
         updated_at: new Date(),
@@ -341,33 +379,32 @@ export async function POST(
       });
     }
 
-    // Perform the batch insert in a transaction
+    // OPTIMIZATION 5: Batch all database operations in a single transaction
     if (attemptsToInsert.length > 0) {
       await db.transaction(async (tx) => {
+        // Insert all attempts at once
         await tx.insert(question_attempts).values(attemptsToInsert);
         
-        // Update session_questions with timing data if available
-        if (timingData?.questionTimes) {
-          for (const [questionId, timeSpent] of Object.entries(timingData.questionTimes)) {
-            const questionDetails = questionDetailsMap[questionId];
-            const timeSpentSeconds = typeof timeSpent === 'number' ? timeSpent : 0;
-            
-            if (questionDetails && timeSpentSeconds > 0) {
-              await tx
+        // Update timing data in batch if available
+        if (timingUpdates.length > 0) {
+          // Use Promise.all for parallel timing updates
+          await Promise.all(
+            timingUpdates.map(({ sessionQuestionId, timeSpent }) =>
+              tx
                 .update(session_questions)
                 .set({
-                  time_spent_seconds: timeSpentSeconds,
+                  time_spent_seconds: timeSpent,
                   updated_at: new Date()
                 })
                 .where(
                   and(
-                    eq(session_questions.session_question_id, questionDetails.session_question_id),
+                    eq(session_questions.session_question_id, sessionQuestionId),
                     eq(session_questions.session_id, sessionIdNum),
                     eq(session_questions.user_id, userId)
                   )
-                );
-            }
-          }
+                )
+            )
+          );
         }
       });
     }
@@ -379,62 +416,59 @@ export async function POST(
       data: { sessionId, evaluationLog }
     });
 
+    // OPTIMIZATION 6: Prepare topic mastery updates correctly - FIXED CRITICAL BUG
+    // The bug was using Array.find() which only gets the first result per topic
+    // We need to pass ALL individual question results to updateTopicMasteryBatch
+    const topicMasteryUpdates: Array<{ topicId: number, isCorrect: boolean }> = [];
+    
+    for (const result of results) {
+      const questionData = questionDataMap.get(result.question_id.toString());
+      if (questionData?.topic_id) {
+        topicMasteryUpdates.push({
+          topicId: questionData.topic_id,
+          isCorrect: result.is_correct
+        });
+      }
+    }
+
     // After the transaction, update session statistics and topic mastery in parallel
     const { updateSessionStats, updateTopicMasteryBatch } = await import('@/lib/utilities/sessionUtils');
     
-    // Prepare topic mastery updates data
-    const topicMasteryUpdates = Array.from(topicIdsWithNewAttempts).map(topicId => {
-      const attemptResult = results.find(r => {
-        const qId = r.question_id.toString();
-        return questionDetailsMap[qId]?.topic_id === topicId;
-      });
-      return {
-        topicId,
-        isCorrect: attemptResult?.is_correct || false
-      };
-    }).filter(update => update.isCorrect !== undefined);
-
     // Run session stats update and topic mastery updates in parallel
     await Promise.all([
       updateSessionStats(sessionIdNum, userId),
       topicMasteryUpdates.length > 0 ? updateTopicMasteryBatch(userId, topicMasteryUpdates) : Promise.resolve()
     ]);
 
-    // Get the updated session stats and mark as completed in one operation
+    // OPTIMIZATION: Mark session as completed and get updated stats in single atomic operation
+    // Note: Session is marked as completed on any answer submission (intended behavior)
+    const sessionUpdateData: {
+      is_completed: boolean;
+      end_time: Date;
+      updated_at: Date;
+      duration_minutes?: number;
+    } = {
+      is_completed: true,
+      end_time: new Date(),
+      updated_at: new Date()
+    };
+
+    // Add duration if timing data is available
+    if (timingData?.totalSeconds) {
+      sessionUpdateData.duration_minutes = Math.ceil(timingData.totalSeconds / 60);
+    }
+
     const [updatedSession] = await db
-      .select({
+      .update(practice_sessions)
+      .set(sessionUpdateData)
+      .where(eq(practice_sessions.session_id, sessionIdNum))
+      .returning({
         questions_attempted: practice_sessions.questions_attempted,
         questions_correct: practice_sessions.questions_correct,
         score: practice_sessions.score,
         max_score: practice_sessions.max_score,
         is_completed: practice_sessions.is_completed
-      })
-      .from(practice_sessions)
-      .where(eq(practice_sessions.session_id, sessionIdNum));
-
-    // Mark the session as completed if all questions have been answered
-    if (!updatedSession.is_completed) {
-      const sessionUpdateData: {
-        is_completed: boolean;
-        end_time: Date;
-        updated_at: Date;
-        duration_minutes?: number;
-      } = {
-        is_completed: true,
-        end_time: new Date(),
-        updated_at: new Date()
-      };
-
-      // Add duration if timing data is available
-      if (timingData?.totalSeconds) {
-        sessionUpdateData.duration_minutes = Math.ceil(timingData.totalSeconds / 60);
-      }
-
-      await db
-        .update(practice_sessions)
-        .set(sessionUpdateData)
-        .where(eq(practice_sessions.session_id, sessionIdNum));
-    }
+      });
 
     // Invalidate session caches
     await cacheService.invalidateUserSessionCaches(userId, sessionIdNum);

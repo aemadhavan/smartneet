@@ -251,6 +251,12 @@ export function usePracticeSession(
               throw new Error(errorMessage);
             }
             
+            // Check if this is a rate limit error (429) - don't retry these
+            if (response.status === 429) {
+              const errorMessage = errorData.error || "Too many requests. Please wait a moment before trying again.";
+              throw new Error(errorMessage);
+            }
+            
             // If it's a server error (5xx), retry with exponential backoff
             if (response.status >= 500) {
               throw new Error('Server error, will retry');
@@ -295,6 +301,15 @@ export function usePracticeSession(
           return data;
         } catch (err) {
           console.error(`Error creating session (attempt ${attempt + 1}/${MAX_RETRIES}):`, err);
+          
+          // Check if this is a rate limit or subscription error - don't retry these
+          const isRateLimitError = err instanceof Error && 
+            (err.message.includes('Too many requests') || err.message.includes('Rate limit') || err.message.includes('reached your daily limit'));
+          
+          if (isRateLimitError) {
+            setError(err.message);
+            return null;
+          }
           
           // Specific handling for network errors
           const isNetworkError = err instanceof Error && 
