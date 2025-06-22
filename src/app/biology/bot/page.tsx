@@ -25,7 +25,7 @@ export default function BotanyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isPremium, loading: subscriptionLoading, subscription } = useSubscriptionLimits();
+  const { isPremium, loading: subscriptionLoading } = useSubscriptionLimits();
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
