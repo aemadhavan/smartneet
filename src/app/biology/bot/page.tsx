@@ -25,21 +25,13 @@ export default function BotanyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isPremium: apiIsPremium, loading: subscriptionLoading } = useSubscriptionLimits();
-  
-  // Use the explicit isPremium flag from the hook
-  const isPremium = apiIsPremium;
-  
-  // Debug logging
-  console.log('Botany Page - Premium Status:', { 
-    isPremium, 
-    apiIsPremium, 
-    subscriptionLoading,
-    type: typeof isPremium 
-  });
+  const { isPremium, loading: subscriptionLoading } = useSubscriptionLimits();
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
+      if (subscriptionLoading) {
+        return;
+      }
       try {
         setIsLoading(true);
         
@@ -85,13 +77,11 @@ export default function BotanyPage() {
     };
     
     fetchTopicsAndSubtopics();
-  }, []);
+  }, [subscriptionLoading]);
 
   // Function to determine if user can access the topic
   const canAccessTopic = (index: number) => {
-    const hasAccess = Boolean(isPremium) || index < 2; // First two topics accessible for free users
-    console.log(`Botany Topic ${index}: isPremium=${isPremium}, type=${typeof isPremium}, hasAccess=${hasAccess}`);
-    return hasAccess;
+    return isPremium || index < 2; // First two topics accessible for free users
   };
 
   if (isLoading || subscriptionLoading) {

@@ -40,74 +40,59 @@ export default function TopicDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeSubtopicId, setActiveSubtopicId] = useState<number | null>(null);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const { isPremium: apiIsPremium, loading: subscriptionLoading } = useSubscriptionLimits();
-  
-  // Check if user has premium access - use the explicit isPremium from the hook
-  const isPremium = apiIsPremium;
+  const { isPremium, loading: subscriptionLoading } = useSubscriptionLimits();
   // Check if this is a free topic (one of the first two)
   const [isFreeTopic, setIsFreeTopic] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchTopics = async () => {
+    const checkAccessAndFetchData = async () => {
       try {
-        // Fetch all topic IDs to determine if this is a free topic
-        const zoologySubjectId = 4; // Zoology subject ID
-        const topicsResponse = await fetch(`/api/topics?subjectId=${zoologySubjectId}&isRootLevel=true&isActive=true`);
-        
-        if (!topicsResponse.ok) {
-          throw new Error('Failed to fetch topics list');
-        }
-        
-        const topicsData = await topicsResponse.json();
-        
-        if (!topicsData.success) {
-          throw new Error(topicsData.error || 'Failed to fetch topics list');
+        // Don't proceed until subscription status is resolved.
+        if (subscriptionLoading) {
+          return;
         }
 
+        setIsLoading(true);
+
+        // 1. Fetch all topics to determine if the current topic is premium
+        const zoologySubjectId = 4; // Zoology subject ID
+        const topicsResponse = await fetch(`/api/topics?subjectId=${zoologySubjectId}&isRootLevel=true&isActive=true`);
+        if (!topicsResponse.ok) throw new Error('Failed to fetch topics list');
+        const topicsData = await topicsResponse.json();
+        if (!topicsData.success) throw new Error(topicsData.error || 'Failed to fetch topics list');
         setAllTopics(topicsData.data);
         
-        // Check if this topic is one of the first two (free topics)
         const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id.toString() === topicId);
         const foundIndex = topicIndex === -1 ? 999 : topicIndex; // Use a high index if not found to require premium
-        setIsFreeTopic(foundIndex === 0 || foundIndex === 1);
+        const isPremiumTopic = foundIndex > 1;
+        setIsFreeTopic(!isPremiumTopic);
         
-        // If premium content and user doesn't have access, redirect to pricing
-        // Only redirect if subscription is loaded and user is not premium
-        if (foundIndex > 1 && !subscriptionLoading && !isPremium) {
-          console.log("Redirecting to pricing - topic index:", foundIndex, "isPremium:", isPremium, "subscriptionLoading:", subscriptionLoading);
+        // 2. If it's a premium topic and the user is not premium, redirect.
+        if (isPremiumTopic && !isPremium) {
           router.push(`/pricing?from=zoology-topic-${topicId}`);
           return;
         }
         
-        // Fetch topic details using the API
+        // 3. User has access, fetch the specific topic details.
         const response = await fetch(`/api/topics/${topicId}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch topic details');
-        }
-        
+        if (!response.ok) throw new Error('Failed to fetch topic details');
         const data = await response.json();
-        
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch topic details');
-        }
-        
+        if (!data.success) throw new Error(data.error || 'Failed to fetch topic details');
         setTopic(data.topic);
         setSubtopics(data.subtopics);
         
-        // Set first subtopic as active if any exist
         if (data.subtopics && data.subtopics.length > 0) {
           setActiveSubtopicId(data.subtopics[0].subtopic_id);
         }
       } catch (err) {
-        console.error('Error fetching topic details:', err);
+        console.error('Error fetching topic data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchTopics();
+    checkAccessAndFetchData();
   }, [topicId, isPremium, subscriptionLoading, router]);
 
   // Find the active subtopic

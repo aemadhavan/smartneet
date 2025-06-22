@@ -25,22 +25,13 @@ export default function ZoologyPage() {
   const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { isPremium: apiIsPremium, loading: subscriptionLoading } = useSubscriptionLimits();
-  
-  // Determine if the user has premium access
-  // Default to showing only first two topics free (safest approach)
-  const isPremium = apiIsPremium;
-  
-  // Debug logging
-  console.log('Zoology Page - Premium Status:', { 
-    isPremium, 
-    apiIsPremium, 
-    subscriptionLoading,
-    type: typeof isPremium 
-  });
+  const { isPremium, loading: subscriptionLoading } = useSubscriptionLimits();
 
   useEffect(() => {
     const fetchTopicsAndSubtopics = async () => {
+      if (subscriptionLoading) {
+        return;
+      }
       try {
         setIsLoading(true);
         
@@ -86,13 +77,11 @@ export default function ZoologyPage() {
     };
     
     fetchTopicsAndSubtopics();
-  }, []);
+  }, [subscriptionLoading]);
 
   // Function to determine if user can access the topic
   const canAccessTopic = (index: number) => {
-    const hasAccess = Boolean(isPremium) || index < 2; // First two topics accessible for free users
-    console.log(`Zoology Topic ${index}: isPremium=${isPremium}, hasAccess=${hasAccess}`);
-    return hasAccess;
+    return isPremium || index < 2; // First two topics accessible for free users
   };
 
   if (isLoading || subscriptionLoading) {
