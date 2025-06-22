@@ -62,14 +62,11 @@ export default function PracticeClientPage() {
   // Get subscription limit status 
   const { 
     limitStatus, 
-    subscription, 
+    isPremium,
     loading: limitsLoading, 
     error: limitsError, 
     refetch: refetchLimits 
   } = useSubscriptionLimits();
-  
-  // Check if user has premium access
-  const isPremium = subscription?.planCode !== 'free';
   
   const [limitsRefreshKey, setLimitsRefreshKey] = useState(0);
   const [isCheckingAccess, setIsCheckingAccess] = useState<boolean>(false);
@@ -134,6 +131,11 @@ export default function PracticeClientPage() {
   // Check if the topic requires premium access
   useEffect(() => {
     const checkTopicAccess = async () => {
+      // Don't check access until subscription data is loaded
+      if (limitsLoading) {
+        return;
+      }
+      
       if (topicId && !isPremium) {
         setIsCheckingAccess(true);
         try {
@@ -162,7 +164,7 @@ export default function PracticeClientPage() {
     };
     
     checkTopicAccess();
-  }, [topicId, isPremium, limitParam]);
+  }, [topicId, isPremium, limitParam, limitsLoading]);
 
   // More robust session initialization with declarative approach
   useEffect(() => {
