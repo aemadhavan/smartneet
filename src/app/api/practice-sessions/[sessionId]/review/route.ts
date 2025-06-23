@@ -36,7 +36,7 @@ const RETRY_DELAY = 1000;
 /**
  * Retry wrapper for database operations that might hit connection limits
  */
-async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastError: Error;
   let attempt = 0;
   
