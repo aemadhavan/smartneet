@@ -22,6 +22,7 @@ import {
 import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 import { logger } from '@/lib/logger'; // Import the logger service
 import QuestionErrorBoundary from './QuestionErrorBoundary';
+import { NetworkStatusIndicator } from '../ui/NetworkStatusIndicator';
 
 interface QuestionDisplayProps {
   question: Question;
@@ -33,6 +34,8 @@ interface QuestionDisplayProps {
   onPreviousQuestion: () => void;
   currentQuestionIndex: number;
   isCompleting?: boolean;
+  submissionError?: string | null;
+  isNetworkError?: boolean;
 }
 
 const QuestionDisplay = memo(function QuestionDisplay({
@@ -44,7 +47,9 @@ const QuestionDisplay = memo(function QuestionDisplay({
   isLastQuestion,
   onPreviousQuestion,
   currentQuestionIndex,
-  isCompleting
+  isCompleting,
+  submissionError,
+  isNetworkError
 }: QuestionDisplayProps) {
   const [showExplanation, setShowExplanation] = useState(false);
   const questionRef = useRef<HTMLDivElement>(null);
@@ -298,13 +303,15 @@ const QuestionDisplay = memo(function QuestionDisplay({
   }, [selectedOption, isLastQuestion]);
 
   return (
-    <div 
-      className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8"
-      ref={questionRef}
-      tabIndex={-1} // Allow focus but not in the tab order
-      role="region"
-      aria-label={`Question ${currentQuestionIndex + 1}`}
-    >
+    <>
+      <NetworkStatusIndicator />
+      <div 
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8"
+        ref={questionRef}
+        tabIndex={-1} // Allow focus but not in the tab order
+        role="region"
+        aria-label={`Question ${currentQuestionIndex + 1}`}
+      >
       {/* Question metadata */}
       <div className="flex flex-wrap justify-between items-start mb-4">
         <div className="flex items-center mb-2 md:mb-0">
@@ -351,6 +358,42 @@ const QuestionDisplay = memo(function QuestionDisplay({
       <div className="mb-6">
         {renderQuestionContent()}
       </div>
+
+      {/* Submission error display */}
+      {submissionError && (
+        <div className={`mb-6 p-4 rounded-md border ${
+          isNetworkError 
+            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700'
+            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700'
+        }`}>
+          <div className="flex items-start space-x-2">
+            {isNetworkError ? (
+              <svg className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <div className={`text-sm ${
+              isNetworkError 
+                ? 'text-amber-700 dark:text-amber-200'
+                : 'text-red-700 dark:text-red-200'
+            }`}>
+              <p className="font-medium">
+                {isNetworkError ? 'Network Connection Issue' : 'Submission Failed'}
+              </p>
+              <p className="mt-1">{submissionError}</p>
+              {isNetworkError && (
+                <p className="mt-2 text-xs">
+                  Your answers are saved locally and will be submitted when connection is restored.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex flex-wrap justify-between mt-8" role="navigation" aria-label="Question navigation">
@@ -432,6 +475,7 @@ const QuestionDisplay = memo(function QuestionDisplay({
         />
       )}
     </div>
+    </>
   );
 });
 
