@@ -8,6 +8,7 @@ import { logger } from '@/lib/logger';
 import { cacheService } from '@/lib/services/CacheService';
 import { applyRateLimit } from '@/lib/middleware/rateLimitMiddleware';
 import { getCorrectAnswer } from '@/app/practice-sessions/[sessionId]/review/components/helpers';
+import { withRetry } from '@/lib/utils/withRetry';
 
 // Mock Drizzle ORM functions
 vi.mock('drizzle-orm', () => ({
@@ -62,13 +63,9 @@ vi.mock('next/server', () => ({
 
 // Mock the `withRetry` function to directly execute the provided function by default.
 // This allows testing the retry logic by overriding this mock in specific tests.
-vi.mock('./route', async (importOriginal) => {
-  const mod = await importOriginal<typeof import('./route')>();
-  return {
-    ...mod,
-    withRetry: vi.fn(async (fn: any) => fn()), // Default: just execute the function once
-  } as typeof import('./route');
-});
+vi.mock('@/lib/utils/withRetry', () => ({
+  withRetry: vi.fn(async (fn: any) => fn()), // Default: just execute the function once
+}));
 
 // Re-import GET after mocking withRetry to ensure the mocked version is used
 import { GET as OriginalGET } from './route';
@@ -118,7 +115,6 @@ describe('GET /api/practice-sessions/[sessionId]/review', () => {
     mockGetCorrectAnswer.mockImplementation((details, type) => ({ type, value: `Correct Answer for ${type}` }) as any);
 
     // Reset `withRetry` mock to its default behavior (execute once) for each test
-    const { withRetry } = await import('./route');
     vi.mocked(withRetry).mockImplementation(async (fn: any) => fn());
   });
 
@@ -468,7 +464,7 @@ describe('GET /api/practice-sessions/[sessionId]/review', () => {
     (concurrencyError as any).code = 'XATA_CONCURRENCY_LIMIT'; // Simulate Xata specific code
 
     // Mock withRetry to throw this error immediately for testing this path
-    vi.mocked((await vi.importActual<typeof import('./route')>('./route')).withRetry).mockImplementation(async (fn: any) => {
+    vi.mocked(withRetry).mockImplementation(async (fn: any) => {
       throw concurrencyError;
     });
 
@@ -515,7 +511,7 @@ describe('GET /api/practice-sessions/[sessionId]/review', () => {
     };
 
     let callCount = 0;
-    const originalWithRetry = (await vi.importActual<typeof import('./route')>('./route')).withRetry;
+    const originalWithRetry = (await vi.importActual<typeof import('@/lib/utils/withRetry')>('@/lib/utils/withRetry')).withRetry;
 
     // Mock the internal DB call that `withRetry` wraps
     mockPracticeSessionsFindFirst.mockImplementation(async () => {
@@ -529,7 +525,7 @@ describe('GET /api/practice-sessions/[sessionId]/review', () => {
     });
 
     // Temporarily use the actual withRetry for this test
-    vi.mocked((await vi.importActual<typeof import('./route')>('./route')).withRetry).mockImplementation(originalWithRetry); // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(withRetry).mockImplementation(originalWithRetry); // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
     const request = createMockRequest(`http://localhost/api/practice-sessions/${mockSessionId}/review`);
     const response = await GET_MOCKED(request, { params: Promise.resolve({ sessionId: mockSessionId }) });
@@ -548,14 +544,14 @@ describe('GET /api/practice-sessions/[sessionId]/review', () => {
     (concurrencyError as any).code = 'XATA_CONCURRENCY_LIMIT';
 
     let callCount = 0;
-    const originalWithRetry = (await vi.importActual<typeof import('./route')>('./route')).withRetry;
+    const originalWithRetry = (await vi.importActual<typeof import('@/lib/utils/withRetry')>('@/lib/utils/withRetry')).withRetry;
 
     mockPracticeSessionsFindFirst.mockImplementation(async () => {
       callCount++;
       throw concurrencyError; // Always fail
     });
 
-    vi.mocked((await vi.importActual<typeof import('./route')>('./route')).withRetry).mockImplementation(originalWithRetry); // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(withRetry).mockImplementation(originalWithRetry); // eslint-disable-next-line @typescript-eslint/no-explicit-any
 
     const request = createMockRequest(`http://localhost/api/practice-sessions/${mockSessionId}/review`);
     const response = await GET_MOCKED(request, { params: Promise.resolve({ sessionId: mockSessionId }) }); // eslint-disable-next-line @typescript-eslint/no-explicit-any
