@@ -1,3 +1,4 @@
+/// <reference types="vitest/globals" />
 import { config } from 'dotenv';
 import path from 'path';
 
