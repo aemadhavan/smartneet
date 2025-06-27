@@ -134,7 +134,16 @@ export async function GET(request: NextRequest) {
     };
     
     // Cache the result for future lookups
-    await cache.set(cacheKey, response, CACHE_TTLS.SESSION_QUESTION_LOOKUP);
+    try {
+      await cache.set(cacheKey, response, CACHE_TTLS.SESSION_QUESTION_LOOKUP);
+    } catch (cacheError) {
+      // Log cache error but don't fail the request
+      logger.warn('Failed to cache session question lookup result', {
+        userId,
+        context: 'session-questions/lookup.GET',
+        error: cacheError instanceof Error ? cacheError.message : String(cacheError)
+      });
+    }
     
     logger.debug('Successfully looked up session question', {
       userId,
