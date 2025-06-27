@@ -1,4 +1,5 @@
 // /Users/maceka/Projects/smartneet/vitest.config.ts
+/// <reference types="vitest" />
 import { defineConfig } from 'vitest/config';
 import tsconfigPaths from 'vite-tsconfig-paths';
 

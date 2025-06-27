@@ -7,9 +7,10 @@
       "esnext"
     ],
     "types": [
-      "node",
+      "node", 
       "react",
-      "react-dom"
+      "react-dom",
+      "vitest"
     ],
     "experimentalDecorators": true,
     "allowJs": true,
@@ -43,7 +44,8 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules"

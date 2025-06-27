@@ -16,7 +16,15 @@ export async function GET() {
     const cacheKey = `user:${userId}:question-type-distribution`;
 
     // Try to get from cache first
-    const cachedData = await cache.get(cacheKey);
+    let cachedData;
+    try {
+      cachedData = await cache.get(cacheKey);
+    } catch (cacheError) {
+      // Log cache error but continue with database query
+      console.error('Error getting cache for question type distribution:', cacheError);
+      cachedData = null;
+    }
+    
     if (cachedData) {
       // Assuming cachedData stores the final array structure
       return NextResponse.json({ data: cachedData, source: 'cache' });
@@ -56,8 +64,9 @@ export async function GET() {
       dataToReturn = questionTypeDistribution.map((item) => {
         // Convert enum values to readable names
         const name = item.question_type
-          .replace(/([A-Z])/g, ' $1') // Add space before capital letters
-          .trim(); // Remove leading/trailing spaces
+          .split('_') // Split on underscores
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()) // Capitalize each word
+          .join(' '); // Join with spaces
         
         return {
           name,
@@ -67,7 +76,12 @@ export async function GET() {
     }
 
     // Cache the result (either formatted data or default data)
-    await cache.set(cacheKey, dataToReturn, 3600); // 3600 seconds = 1 hour
+    try {
+      await cache.set(cacheKey, dataToReturn, 3600); // 3600 seconds = 1 hour
+    } catch (cacheError) {
+      // Log cache error but don't fail the request
+      console.error('Error setting cache for question type distribution:', cacheError);
+    }
 
     return NextResponse.json({ data: dataToReturn, source: source });
   } catch (error) {
