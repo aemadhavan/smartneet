@@ -9,5 +9,8 @@ export default defineConfig({
     environment: 'jsdom', // Mock browser environment
     mockReset: true, // Automatically reset mocks between tests
     setupFiles: ['./src/tests/setup.ts'], // Load env variables before tests run
+    typecheck: {
+      tsconfig: './tsconfig.json'
+    }
   },
 });
