@@ -19,6 +19,11 @@ Disallow: /sign-up
 Allow: /smarter-guides/
 Allow: /about-us
 Allow: /pricing
+Allow: /cookie-policy
+Allow: /privacy-policy
+Allow: /terms-of-service
+
+
 
 # Set crawl delay to prevent server overload
 Crawl-delay: 1
