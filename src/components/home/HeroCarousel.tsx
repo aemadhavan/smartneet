@@ -55,7 +55,7 @@ const HeroCarousel = () => {
     };
   }, [api]);
 
-  // Array of images for the carousel - Optimized dimensions and formats
+  // Array of images for the carousel - Now publicly viewable marketing content
   const images: CarouselImage[] = [
     { src: "/dashboard.webp", alt: "Dashboard visualization showing NEET practice analytics", width: 1200, height: 800 },
     { src: "/practice-analysis.webp", alt: "Detailed practice analysis showing performance metrics", width: 1200, height: 800 },
