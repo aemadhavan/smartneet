@@ -23,4 +23,4 @@ Disallow: /biology/
 Crawl-delay: 1
 
 # Sitemap location
-Sitemap: https://smartneet.com/sitemap.xml
+Sitemap: https://smarterneet.com/sitemap.xml
