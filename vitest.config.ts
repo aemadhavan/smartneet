@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom', // Mock browser environment
     mockReset: true, // Automatically reset mocks between tests
-    setupFiles: ['./src/tests/setup.ts'], // Load env variables before tests run
+    setupFiles: ['./src/tests/setup.ts', './src/tests/vitest-setup.ts'], // Load env variables and Vitest setup before tests run
     typecheck: {
       tsconfig: './tsconfig.json'
     }
