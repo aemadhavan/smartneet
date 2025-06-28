@@ -24,14 +24,6 @@
     <priority>0.8</priority>
   </url>
   
-  <!-- Subject Pages -->
-  <url>
-    <loc>https://smarterneet.com/biology</loc>
-    <lastmod>2025-06-08</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  
   <!-- Smarter Guides Specific Pages -->
   <url>
     <loc>https://smarterneet.com/smarter-guides/botany</loc>
