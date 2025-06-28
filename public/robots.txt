@@ -1,5 +1,4 @@
 User-agent: *
-Allow: /
 
 # Protect API routes from crawling
 Disallow: /api/
@@ -9,23 +8,18 @@ Disallow: /dashboard/
 Disallow: /practice/
 Disallow: /sessions/
 Disallow: /admin/
-Disallow: /biology
 
 # Protect authentication pages from indexing
-Disallow: /sign-in
-Disallow: /sign-up
+Disallow: /sign-in/
+Disallow: /sign-up/
 
-# Allow important public content for SEO
-Allow: /smarter-guides/*
-Allow: /about-us
-Allow: /pricing
-Allow: /cookie-policy
-Allow: /privacy-policy
-Allow: /terms-of-service
-
-
+# This path is disallowed. Please verify if this is a public content section
+# that should be indexed. If it is, this line should be removed.
+Disallow: /biology/
 
 # Set crawl delay to prevent server overload
+# Note: Googlebot does not honor this directive. For Google, you should set
+# the crawl rate in Google Search Console. It is still respected by other crawlers.
 Crawl-delay: 1
 
 # Sitemap location
