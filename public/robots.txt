@@ -16,7 +16,7 @@ Disallow: /sign-in
 Disallow: /sign-up
 
 # Allow important public content for SEO
-Allow: /smarter-guides/
+Allow: /smarter-guides/*
 Allow: /about-us
 Allow: /pricing
 Allow: /cookie-policy
