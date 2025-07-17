@@ -1,8 +1,8 @@
 // Query Chemistry Questions with Drizzle ORM
 // This script demonstrates how to use the existing Drizzle setup to query chemistry questions
 
-import { db } from './src/db/index';
-import { subjects, questions, topics, subtopics } from './src/db/schema';
+import { db } from '../../src/db/index';
+import { subjects, questions, topics, subtopics } from '../../src/db/schema';
 import { eq, and, count } from 'drizzle-orm';
 
 async function queryChemistryQuestions() {

@@ -2,8 +2,8 @@
 // This can be used as a reference for creating your own API endpoints
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from './src/db/index';
-import { subjects, questions, topics, subtopics } from './src/db/schema';
+import { db } from '../../src/db/index';
+import { subjects, questions, topics, subtopics } from '../../src/db/schema';
 import { eq, and, count, sql } from 'drizzle-orm';
 
 // Example function to get chemistry questions
@@ -12,7 +12,7 @@ export async function getChemistryQuestions(params: {
   topic_id?: number;
   subtopic_id?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
-  question_type?: string;
+  question_type?: 'MultipleChoice' | 'Matching' | 'MultipleCorrectStatements' | 'AssertionReason' | 'DiagramBased' | 'SequenceOrdering';
 }) {
   const { limit = 10, topic_id, subtopic_id, difficulty, question_type } = params;
   
@@ -158,7 +158,7 @@ export async function GET(request: NextRequest) {
     const topic_id = searchParams.get('topic_id') ? parseInt(searchParams.get('topic_id')!) : undefined;
     const subtopic_id = searchParams.get('subtopic_id') ? parseInt(searchParams.get('subtopic_id')!) : undefined;
     const difficulty = searchParams.get('difficulty') as 'easy' | 'medium' | 'hard' | undefined;
-    const question_type = searchParams.get('question_type') || undefined;
+    const question_type = searchParams.get('question_type') as 'MultipleChoice' | 'Matching' | 'MultipleCorrectStatements' | 'AssertionReason' | 'DiagramBased' | 'SequenceOrdering' | undefined;
     
     // Get questions
     const questions = await getChemistryQuestions({

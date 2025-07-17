@@ -103,7 +103,7 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
         containerRef.current.innerHTML = content;
       }
     }
-  }, [content]);
+  }, [content, inline]);
 
   // Loading state while KaTeX is being imported
   if (typeof window !== 'undefined' && !katex) {
