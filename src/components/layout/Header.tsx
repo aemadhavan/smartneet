@@ -91,7 +91,11 @@ const Header = () => {
           </NavLink>
           <NavLink href="/biology" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Biology
+          </NavLink>
+          <NavLink href="/chemistry" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Chemistry
           </NavLink>         
+          
           <NavLink href="/smarter-guides" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Smarter Guides (Bodhi AI)
           </NavLink>
@@ -104,7 +108,6 @@ const Header = () => {
             </NavLink>
           </SignedIn>
           <span className="text-gray-400">Physics (Coming soon)</span>
-          <span className="text-gray-400">Chemistry (Coming soon)</span>
           
         </nav>
 
