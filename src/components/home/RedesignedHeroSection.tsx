@@ -64,7 +64,7 @@ export const RedesignedHeroSection = () => {
   const isAuthenticated = !!userId;
   // Simple stats with reduced processing
   const stats = [
-    { number: "500+", label: "Science Questions" },
+    { number: "4200+", label: "Science Questions" },
     { number: "50+", label: "Topics Covered" },
     { number: "100%", label: "NEET Aligned" }
   ];
@@ -130,7 +130,7 @@ export const RedesignedHeroSection = () => {
             {/* Feature list - Simplified rendering */}
             <div className="space-y-4">
               {[
-                { icon: "🧪", text: "500+ AI and Expert-Crafted Science Questions" },
+                { icon: "🧪", text: "4200+ AI and Expert-Crafted Science Questions" },
                 { icon: "📊", text: "Topic-wise Performance Analytics" },
               ].map((feature, idx) => (
                 <div key={idx} className="flex items-center space-x-3">
