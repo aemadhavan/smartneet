@@ -67,9 +67,14 @@ const Footer = () => {
                   Biology
                 </Link>
               </li>
+              <li>
+                <Link href="/chemistry" className="text-gray-400 hover:text-white transition-colors">
+                  Chemistry
+                </Link>
+              </li>
               <li className="text-gray-400">Physics (Coming soon)</li>
-              <li className="text-gray-400">Chemistry (Coming soon)</li>
-              {/* <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Previous Papers</Link></li> */}
+              {/*<li className="text-gray-400">Chemistry (Coming soon)</li>
+               <li><Link href="#" className="text-gray-400 hover:text-white transition-colors">Previous Papers</Link></li> */}
             </ul>
           </div>
           {/* <div>

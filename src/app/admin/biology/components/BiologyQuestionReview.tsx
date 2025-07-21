@@ -4,6 +4,7 @@
 import React from 'react';
 
 import Image from 'next/image';
+import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
@@ -655,7 +656,10 @@ export default function BiologyQuestionReview() {
                   <TabsContent value="explanation" className="pt-4">
                     {question.explanation ? (
                       <div className="prose max-w-none">
-                        {question.explanation}
+                        <LaTeXRenderer 
+                          content={question.explanation}
+                          className="prose dark:prose-invert max-w-none"
+                        />
                       </div>
                     ) : (
                       <div className="italic text-gray-500">No explanation provided</div>

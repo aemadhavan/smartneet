@@ -64,8 +64,8 @@ export const RedesignedHeroSection = () => {
   const isAuthenticated = !!userId;
   // Simple stats with reduced processing
   const stats = [
-    { number: "500+", label: "Biology Questions" },
-    { number: "25+", label: "Topics Covered" },
+    { number: "500+", label: "Science Questions" },
+    { number: "50+", label: "Topics Covered" },
     { number: "100%", label: "NEET Aligned" }
   ];
 
@@ -83,15 +83,15 @@ export const RedesignedHeroSection = () => {
           <div className="lg:w-1/2 z-10">
             <div className="inline-block mb-4 px-3 py-1 bg-white/10 rounded-full border border-white/20 text-sm">
               <span className="mr-2 text-emerald-400">🧬</span>
-              <span className="font-medium">Biology Module is now live!</span>
+              <span className="font-medium">Biology & Chemistry Modules are now live!</span>
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 text-white">
-              Master NEET Biology with <span className="text-emerald-400">SmarterNEET</span>
+              Master NEET Biology & Chemistry with <span className="text-emerald-400">SmarterNEET</span>
             </h1>
             
             <p className="text-lg md:text-xl text-indigo-100 mb-8 max-w-xl">
-              Our comprehensive biology module is now live! Get access to expert-crafted questions, AI-driven insights, and a personalized learning journey focused on NEET biology topics.
+              Our comprehensive biology and chemistry modules are now live! Get access to expert-crafted questions, AI-driven insights, and a personalized learning journey focused on NEET science topics.
             </p>
             
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
@@ -99,20 +99,38 @@ export const RedesignedHeroSection = () => {
                 href={isAuthenticated ? "/practice" : "/sign-up"}
                 className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg transition-all text-center"
               >
-                {isAuthenticated ? "Practice Now" : "Sign up for Biology"}
+                {isAuthenticated ? "Practice Now" : "Start Learning"}
               </Link>
               <Link 
                 href="/biology" 
                 className="px-8 py-4 bg-white/10 border border-white/20 text-white font-medium rounded-xl hover:bg-white/20 transition-all text-center"
               >
-                View Biology Topics
+                View All Topics
+              </Link>
+            </div>
+            
+            {/* Subject Quick Access */}
+            <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 mb-8">
+              <Link 
+                href="/biology"
+                className="flex items-center space-x-2 px-4 py-2 bg-emerald-500/20 border border-emerald-400/30 text-emerald-100 rounded-lg hover:bg-emerald-500/30 transition-all"
+              >
+                <span className="text-emerald-400">🧬</span>
+                <span className="text-sm font-medium">Biology Topics</span>
+              </Link>
+              <Link 
+                href="/chemistry"
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-500/20 border border-blue-400/30 text-blue-100 rounded-lg hover:bg-blue-500/30 transition-all"
+              >
+                <span className="text-blue-400">⚗️</span>
+                <span className="text-sm font-medium">Chemistry Topics</span>
               </Link>
             </div>
             
             {/* Feature list - Simplified rendering */}
             <div className="space-y-4">
               {[
-                { icon: "🧪", text: "500+ AI and Expert-Crafted Biology Questions" },
+                { icon: "🧪", text: "500+ AI and Expert-Crafted Science Questions" },
                 { icon: "📊", text: "Topic-wise Performance Analytics" },
               ].map((feature, idx) => (
                 <div key={idx} className="flex items-center space-x-3">

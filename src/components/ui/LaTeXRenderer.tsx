@@ -29,32 +29,64 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
     try {
       // Function to render LaTeX with mixed content
       const renderMixedContent = (text: string): string => {
-        // Handle inline math: $...$
-        let rendered = text.replace(/\$([^$]+)\$/g, (match, mathContent) => {
+        // Pre-process common chemistry notation patterns that aren't properly wrapped
+        let preprocessed = text;
+        
+        // Handle common superscript/subscript patterns in chemistry
+        // Convert patterns like H₂O, CO₂, etc. to proper LaTeX
+        preprocessed = preprocessed.replace(/([A-Za-z])([₀-₉]+)/g, '$1$_{$2}$');
+        preprocessed = preprocessed.replace(/([A-Za-z])([⁰-⁹]+)/g, '$1$^{$2}$');
+        
+        // Handle common ionic notation like Ca²⁺, Mg²⁺, etc.
+        preprocessed = preprocessed.replace(/([A-Za-z]+)([²³⁴⁵⁶⁷⁸⁹]+)([⁺⁻])/g, '$1$^{$2$3}$');
+        
+        // Handle scientific notation patterns like cm²mol⁻¹
+        preprocessed = preprocessed.replace(/([a-zA-Z]+)([²³⁴⁵⁶⁷⁸⁹]+)([a-zA-Z]+)([⁻¹²³⁴⁵⁶⁷⁸⁹]+)/g, '$1$^{$2}$$3$^{$4}$');
+        
+        // Handle Lambda symbols and other Greek letters
+        preprocessed = preprocessed.replace(/Λ/g, '$\\Lambda$');
+        preprocessed = preprocessed.replace(/λ/g, '$\\lambda$');
+        preprocessed = preprocessed.replace(/Δ/g, '$\\Delta$');
+        preprocessed = preprocessed.replace(/δ/g, '$\\delta$');
+        preprocessed = preprocessed.replace(/π/g, '$\\pi$');
+        preprocessed = preprocessed.replace(/σ/g, '$\\sigma$');
+        preprocessed = preprocessed.replace(/μ/g, '$\\mu$');
+        preprocessed = preprocessed.replace(/α/g, '$\\alpha$');
+        preprocessed = preprocessed.replace(/β/g, '$\\beta$');
+        preprocessed = preprocessed.replace(/γ/g, '$\\gamma$');
+        
+        // Handle block math first: $$...$$
+        // For inline contexts (like option buttons), render as inline even if using $$
+        let rendered = preprocessed.replace(/\$\$([^$]+?)\$\$/g, (match, mathContent) => {
           if (!katex) return match;
           try {
-            return katex.renderToString(mathContent, { 
+            const renderedMath = katex.renderToString(mathContent, { 
               throwOnError: false,
-              displayMode: false,
+              displayMode: inline ? false : true, // Use inline mode for inline contexts
               output: 'html'
             });
+            // Wrap in a span to prevent line breaks
+            return `<span class="latex-math-block">${renderedMath}</span>`;
           } catch (e) {
-            console.warn('LaTeX rendering error for inline math:', mathContent, e);
+            console.warn('LaTeX rendering error for block math:', mathContent, e);
             return match; // Return original if rendering fails
           }
         });
 
-        // Handle block math: $$...$$
-        rendered = rendered.replace(/\$\$([^$]+)\$\$/g, (match, mathContent) => {
+        // Handle inline math: $...$
+        // Use a more robust regex that handles nested braces and complex expressions
+        rendered = rendered.replace(/\$([^$]+?)\$/g, (match, mathContent) => {
           if (!katex) return match;
           try {
-            return katex.renderToString(mathContent, { 
+            const renderedMath = katex.renderToString(mathContent, { 
               throwOnError: false,
-              displayMode: true,
+              displayMode: false,
               output: 'html'
             });
+            // Wrap in a span to prevent line breaks
+            return `<span class="latex-math-inline">${renderedMath}</span>`;
           } catch (e) {
-            console.warn('LaTeX rendering error for block math:', mathContent, e);
+            console.warn('LaTeX rendering error for inline math:', mathContent, e);
             return match; // Return original if rendering fails
           }
         });
@@ -71,7 +103,7 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
         containerRef.current.innerHTML = content;
       }
     }
-  }, [content]);
+  }, [content, inline]);
 
   // Loading state while KaTeX is being imported
   if (typeof window !== 'undefined' && !katex) {

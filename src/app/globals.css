@@ -248,3 +248,43 @@
 .latex-content .katex .base {
   vertical-align: baseline;
 }
+
+/* Prevent line breaks within LaTeX expressions */
+.latex-content .katex {
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* Allow display math to wrap properly while preventing breaks within expressions */
+.latex-content .katex-display {
+  white-space: normal;
+  display: block;
+}
+
+/* Ensure mathematical expressions don't break mid-formula */
+.latex-content .katex .mord,
+.latex-content .katex .mbin,
+.latex-content .katex .mrel,
+.latex-content .katex .mop,
+.latex-content .katex .mpunct {
+  white-space: nowrap;
+}
+
+/* Wrapper classes to prevent line breaks within LaTeX expressions */
+.latex-content .latex-math-inline {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+.latex-content .latex-math-block {
+  display: inline-block;
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
+/* For display math, allow normal wrapping */
+.latex-content .latex-math-block .katex-display {
+  white-space: normal;
+  display: block;
+}

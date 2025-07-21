@@ -40,6 +40,38 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
     return;
   }
 
+  // Check if request is from mobile app
+  const userAgent = req.headers.get('user-agent') || '';
+  const clientId = req.headers.get('x-client-id') || '';
+  const isMobileApp = userAgent.includes('SmarterNEET-Mobile') || 
+                      clientId.startsWith('flutter-') ||
+                      userAgent.includes('Mobile');
+
+  // If API request from mobile app, allow certain endpoints
+  if (isMobileApp && req.nextUrl.pathname.startsWith('/api/')) {
+    const allowedMobileApis = [
+      '/api/subjects',
+      '/api/topics',
+      '/api/subtopics',
+      '/api/questions',
+      '/api/practice-sessions',
+      '/api/question-attempts',
+      '/api/subscription-plans',
+      '/api/question-types',
+      '/api/user-stats',
+      '/api/topic-mastery',
+      '/api/session-questions'
+    ];
+    
+    const isAllowedApi = allowedMobileApis.some(api => 
+      req.nextUrl.pathname.startsWith(api)
+    );
+    
+    if (isAllowedApi) {
+      return; // Allow without auth
+    }
+  }
+
   // If not a public route, require authentication
   if (!publicRoutes(req)) {
     const { userId } = await auth();
