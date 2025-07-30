@@ -33,12 +33,14 @@ export const CACHE_TTLS = {
  * @param userId User ID for rate limiting
  * @param actionKey Key identifying the action (e.g., 'create-session')
  * @param limits Rate limit configuration
+ * @param request Optional NextRequest to log request source
  * @returns NextResponse with rate limit error or null to continue
  */
 export async function applyRateLimit(
   userId: string,
   actionKey: string,
-  limits: { points: number; duration: number }
+  limits: { points: number; duration: number },
+  request?: Request
 ): Promise<NextResponse | null> {
   try {
     const rateLimiter = new RateLimiter(
@@ -48,6 +50,29 @@ export async function applyRateLimit(
     );
     
     const rateLimitResult = await rateLimiter.consume();
+    
+    // Log request source for debugging
+    if (request) {
+      const userAgent = request.headers.get('user-agent') || '';
+      const clientId = request.headers.get('x-client-id') || '';
+      const referer = request.headers.get('referer') || '';
+      const origin = request.headers.get('origin') || '';
+      
+      const isMobileApp = userAgent.includes('SmarterNEET-Mobile') || 
+                          clientId.startsWith('flutter-') ||
+                          userAgent.includes('Mobile');
+      
+      console.log(`Rate limit check for ${actionKey}:${userId}`, {
+        success: rateLimitResult.success,
+        remaining: rateLimitResult.remaining,
+        isMobileApp,
+        userAgent: userAgent.substring(0, 100), // Truncate for logs
+        clientId,
+        referer,
+        origin,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     if (!rateLimitResult.success) {
       return NextResponse.json(

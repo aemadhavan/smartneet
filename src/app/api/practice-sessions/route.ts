@@ -75,7 +75,8 @@ export async function POST(request: NextRequest) {
     const rateLimitResponse = await applyRateLimit(
       userId, 
       'create-session', 
-      RATE_LIMITS.CREATE_SESSION
+      RATE_LIMITS.CREATE_SESSION,
+      request
     );
     
     if (rateLimitResponse) {

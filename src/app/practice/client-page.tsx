@@ -166,6 +166,16 @@ export default function PracticeClientPage() {
     checkTopicAccess();
   }, [topicId, isPremium, limitParam, limitsLoading]);
 
+  // Create stable references to avoid dependency issues in useEffect
+  const createSessionRef = useRef(createSession);
+  const refetchLimitsRef = useRef(refetchLimits);
+  
+  // Update refs when functions change
+  useEffect(() => {
+    createSessionRef.current = createSession;
+    refetchLimitsRef.current = refetchLimits;
+  }, [createSession, refetchLimits]);
+
   // More robust session initialization with declarative approach
   useEffect(() => {
     let cancelled = false;
@@ -190,7 +200,7 @@ export default function PracticeClientPage() {
         } else {
           console.log('Creating new session for subject:', selectedSubject, 'at', new Date().toISOString());
           const sessionStartTime = Date.now();
-          const newSession = await createSession(selectedSubject);
+          const newSession = await createSessionRef.current(selectedSubject);
           const sessionEndTime = Date.now();
           
           // Log performance metrics
@@ -204,7 +214,11 @@ export default function PracticeClientPage() {
           if (!cancelled && newSession) {
             setSessionInitialized(true);
             setLimitsRefreshKey(prev => prev + 1);
-            refetchLimits();
+            try {
+              refetchLimitsRef.current();
+            } catch (refetchError) {
+              console.warn('Failed to refetch limits:', refetchError);
+            }
           }
         }
       } catch (error) {
@@ -220,7 +234,8 @@ export default function PracticeClientPage() {
     
     initSession();
     return () => { cancelled = true; };
-  }, [selectedSubject, limitStatus, accessDenied, createSession, refetchLimits, sessionInitialized, sessionCompleted, limitsLoading, isCheckingAccess]);
+  }, [selectedSubject, limitStatus, accessDenied, sessionInitialized, sessionCompleted, limitsLoading, isCheckingAccess, session]);
+  // Note: createSession and refetchLimits are accessed via refs to avoid dependency issues
 
   // Combined loading state
   const loading = isInitializing || subjectsLoading || sessionLoading || limitsLoading || isCheckingAccess;
