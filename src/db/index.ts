@@ -63,14 +63,22 @@ export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3):
       const dbError = error as DatabaseError;
       
       // Retry for database connection errors
-      if (dbError.code === 'XATA_CONCURRENCY_LIMIT' || 
-          dbError.code === '53300' ||  // Too many connections
-          dbError.code === '08006' ||  // Connection terminated
-          dbError.code === '08001') {  // Unable to establish connection
+      const errorMessage = dbError.message || String(error);
+      const isRetryableError = 
+        dbError.code === 'XATA_CONCURRENCY_LIMIT' || 
+        dbError.code === '53300' ||  // Too many connections
+        dbError.code === '08006' ||  // Connection terminated
+        dbError.code === '08001' ||  // Unable to establish connection
+        errorMessage.includes('unable to connect to the appropriate database') ||
+        errorMessage.includes('connection terminated') ||
+        errorMessage.includes('too many connections') ||
+        errorMessage.includes('connection failed');
+        
+      if (isRetryableError) {
         lastError = dbError;
         // Exponential backoff: 1s, 2s, 4s, ...
         const delay = Math.pow(2, attempt) * 1000;
-        console.warn(`Connection limit exceeded, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+        console.warn(`Database connectivity issue, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries}):`, errorMessage);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         // For other errors, throw immediately

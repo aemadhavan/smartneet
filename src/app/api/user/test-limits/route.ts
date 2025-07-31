@@ -1,7 +1,7 @@
 // src/app/api/user/test-limits/route.ts
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { eq } from 'drizzle-orm';
 import { subscription_plans } from '@/db/schema';
 import { subscriptionService } from '@/lib/services/SubscriptionService';
@@ -98,12 +98,14 @@ export async function GET(request: Request) {
             return DEFAULT_FREE_SUBSCRIPTION;
           }
           
-          // Get subscription plan
-          const plans = await db
-            .select()
-            .from(subscription_plans)
-            .where(eq(subscription_plans.plan_id, updatedSubscription.plan_id))
-            .limit(1);
+          // Get subscription plan - with retry for database connectivity
+          const plans = await withRetry(async () =>
+            db
+              .select()
+              .from(subscription_plans)
+              .where(eq(subscription_plans.plan_id, updatedSubscription.plan_id))
+              .limit(1)
+          );
           
           const plan = plans.length > 0 ? plans[0] : null;
           

@@ -1,8 +1,8 @@
 // app/api/topics/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { topics } from '@/db/schema';
-import { eq, isNull, and } from 'drizzle-orm';
+import { eq, isNull, and, SQL } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 
 // GET /api/topics - Get topics with optional filtering
@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
     }
     
     // Cache miss - proceed with database query
-    // Build conditions array
-    const conditions = [];
+    // Build conditions array with proper typing
+    const conditions: SQL<unknown>[] = [];
     
     if (subjectId) {
       conditions.push(eq(topics.subject_id, subjectId));
@@ -50,13 +50,14 @@ export async function GET(req: NextRequest) {
       conditions.push(eq(topics.is_active, isActive));
     }
     
-    // Execute query with conditions
-    let topicsResult;
-    if (conditions.length > 0) {
-      topicsResult = await db.select().from(topics).where(and(...conditions));
-    } else {
-      topicsResult = await db.select().from(topics);
-    }
+    // Execute query with conditions - with retry for database connectivity
+    const topicsResult = await withRetry(async () => {
+      if (conditions.length > 0) {
+        return await db.select().from(topics).where(and(...conditions));
+      } else {
+        return await db.select().from(topics);
+      }
+    });
     
     // Store result in cache - use different TTLs based on the query type
     // Subject and parent filtering is more stable, so cache longer
@@ -66,7 +67,10 @@ export async function GET(req: NextRequest) {
       cacheTTL = 7200; // 2 hours for hierarchical data that changes less frequently
     }
     
-    await cache.set(cacheKey, topicsResult, cacheTTL);
+    await cache.set(cacheKey, topicsResult, cacheTTL).catch(() => {
+      // If cache set fails, log but don't break the response
+      console.warn('Failed to cache topics data');
+    });
     
     return NextResponse.json({
       success: true,
