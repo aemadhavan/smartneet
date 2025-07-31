@@ -1,6 +1,6 @@
 // src/app/api/practice-sessions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { count } from 'drizzle-orm';
 import { 
   practice_sessions, 
@@ -289,37 +289,43 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      // Get user's practice sessions
-      const sessions = await db.select({
-        session_id: practice_sessions.session_id,
-        session_type: practice_sessions.session_type,
-        start_time: practice_sessions.start_time,
-        end_time: practice_sessions.end_time,
-        duration_minutes: practice_sessions.duration_minutes,
-        total_questions: practice_sessions.total_questions,
-        questions_attempted: practice_sessions.questions_attempted,
-        questions_correct: practice_sessions.questions_correct,
-        score: practice_sessions.score,
-        max_score: practice_sessions.max_score,
-        is_completed: practice_sessions.is_completed,
-        subject_name: subjects.subject_name,
-        topic_name: topics.topic_name
-      })
-      .from(practice_sessions)
-      .leftJoin(subjects, eq(practice_sessions.subject_id, subjects.subject_id))
-      .leftJoin(topics, eq(practice_sessions.topic_id, topics.topic_id))
-      .where(eq(practice_sessions.user_id, userId))
-      .orderBy(desc(practice_sessions.start_time))
-      .limit(limit)
-      .offset(offset);
-
-      // Get total count for pagination
-      const countResult = await db
-        .select({
-          count: count(practice_sessions.session_id)
-        })
-        .from(practice_sessions)
-        .where(eq(practice_sessions.user_id, userId));
+      // Get user's practice sessions - with retry for database connectivity
+      const [sessions, countResult] = await Promise.all([
+        withRetry(async () => 
+          db.select({
+            session_id: practice_sessions.session_id,
+            session_type: practice_sessions.session_type,
+            start_time: practice_sessions.start_time,
+            end_time: practice_sessions.end_time,
+            duration_minutes: practice_sessions.duration_minutes,
+            total_questions: practice_sessions.total_questions,
+            questions_attempted: practice_sessions.questions_attempted,
+            questions_correct: practice_sessions.questions_correct,
+            score: practice_sessions.score,
+            max_score: practice_sessions.max_score,
+            is_completed: practice_sessions.is_completed,
+            subject_name: subjects.subject_name,
+            topic_name: topics.topic_name
+          })
+          .from(practice_sessions)
+          .leftJoin(subjects, eq(practice_sessions.subject_id, subjects.subject_id))
+          .leftJoin(topics, eq(practice_sessions.topic_id, topics.topic_id))
+          .where(eq(practice_sessions.user_id, userId))
+          .orderBy(desc(practice_sessions.start_time))
+          .limit(limit)
+          .offset(offset)
+        ),
+        
+        // Get total count for pagination - with retry
+        withRetry(async () =>
+          db
+            .select({
+              count: count(practice_sessions.session_id)
+            })
+            .from(practice_sessions)
+            .where(eq(practice_sessions.user_id, userId))
+        )
+      ]);
 
       const total = Number(countResult[0]?.count || 0);
       

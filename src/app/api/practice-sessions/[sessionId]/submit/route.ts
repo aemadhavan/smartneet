@@ -1,6 +1,6 @@
 //File: src/app/api/practice-sessions/[sessionId]/submit/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import {
   practice_sessions,
   session_questions,
@@ -96,19 +96,22 @@ export async function POST(
       return rateLimitResponse;
     }
 
-    // Verify session exists and belongs to user
-    const [session] = await db
-      .select({
-        session_id: practice_sessions.session_id,
-        is_completed: practice_sessions.is_completed,
-      })
-      .from(practice_sessions)
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionIdNum),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
+    // Verify session exists and belongs to user - with retry for database connection issues
+    const [session] = await withRetry(async () => {
+      const result = await db
+        .select({
+          session_id: practice_sessions.session_id,
+          is_completed: practice_sessions.is_completed,
+        })
+        .from(practice_sessions)
+        .where(
+          and(
+            eq(practice_sessions.session_id, sessionIdNum),
+            eq(practice_sessions.user_id, userId)
+          )
+        );
+      return result;
+    });
 
     if (!session) {
       logger.warn('Session not found for answer submission', {
@@ -126,17 +129,20 @@ export async function POST(
         data: { sessionId }
       });
       
-      // Get the existing session stats for completed session
-      const [completedSession] = await db
-        .select({
-          questions_attempted: practice_sessions.questions_attempted,
-          questions_correct: practice_sessions.questions_correct,
-          score: practice_sessions.score,
-          max_score: practice_sessions.max_score,
-          is_completed: practice_sessions.is_completed
-        })
-        .from(practice_sessions)
-        .where(eq(practice_sessions.session_id, sessionIdNum));
+      // Get the existing session stats for completed session - with retry
+      const [completedSession] = await withRetry(async () => {
+        const result = await db
+          .select({
+            questions_attempted: practice_sessions.questions_attempted,
+            questions_correct: practice_sessions.questions_correct,
+            score: practice_sessions.score,
+            max_score: practice_sessions.max_score,
+            is_completed: practice_sessions.is_completed
+          })
+          .from(practice_sessions)
+          .where(eq(practice_sessions.session_id, sessionIdNum));
+        return result;
+      });
 
       return NextResponse.json({
         success: true,
@@ -200,42 +206,46 @@ export async function POST(
       );
     }
 
-    // OPTIMIZATION 2: Use parallel queries instead of sequential ones
+    // OPTIMIZATION 2: Use parallel queries instead of sequential ones - with retry
     const [sessionQuestions, existingAttempts] = await Promise.all([
       // Get session questions with question details in one query
-      db
-        .select({
-          session_question_id: session_questions.session_question_id,
-          question_id: session_questions.question_id,
-          details: questions.details,
-          marks: questions.marks,
-          negative_marks: questions.negative_marks,
-          question_type: questions.question_type,
-          topic_id: questions.topic_id
-        })
-        .from(session_questions)
-        .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
-        .where(
-          and(
-            eq(session_questions.session_id, sessionIdNum),
-            eq(session_questions.user_id, userId),
-            inArray(session_questions.question_id, questionIds)
+      withRetry(async () => 
+        db
+          .select({
+            session_question_id: session_questions.session_question_id,
+            question_id: session_questions.question_id,
+            details: questions.details,
+            marks: questions.marks,
+            negative_marks: questions.negative_marks,
+            question_type: questions.question_type,
+            topic_id: questions.topic_id
+          })
+          .from(session_questions)
+          .innerJoin(questions, eq(session_questions.question_id, questions.question_id))
+          .where(
+            and(
+              eq(session_questions.session_id, sessionIdNum),
+              eq(session_questions.user_id, userId),
+              inArray(session_questions.question_id, questionIds)
+            )
           )
-        ),
+      ),
       
       // Get existing attempts for these specific questions only
-      db
-        .select({ 
-          question_id: question_attempts.question_id 
-        })
-        .from(question_attempts)
-        .where(
-          and(
-            eq(question_attempts.session_id, sessionIdNum),
-            eq(question_attempts.user_id, userId),
-            inArray(question_attempts.question_id, questionIds)
+      withRetry(async () =>
+        db
+          .select({ 
+            question_id: question_attempts.question_id 
+          })
+          .from(question_attempts)
+          .where(
+            and(
+              eq(question_attempts.session_id, sessionIdNum),
+              eq(question_attempts.user_id, userId),
+              inArray(question_attempts.question_id, questionIds)
+            )
           )
-        )
+      )
     ]);
 
     // OPTIMIZATION 3: Use Maps for O(1) lookups instead of O(N) find operations
@@ -379,33 +389,35 @@ export async function POST(
       });
     }
 
-    // OPTIMIZATION 5: Batch all database operations in a single transaction
+    // OPTIMIZATION 5: Batch all database operations in a single transaction - with retry
     if (attemptsToInsert.length > 0) {
-      await db.transaction(async (tx) => {
-        // Insert all attempts at once
-        await tx.insert(question_attempts).values(attemptsToInsert);
-        
-        // Update timing data in batch if available
-        if (timingUpdates.length > 0) {
-          // Use Promise.all for parallel timing updates
-          await Promise.all(
-            timingUpdates.map(({ sessionQuestionId, timeSpent }) =>
-              tx
-                .update(session_questions)
-                .set({
-                  time_spent_seconds: timeSpent,
-                  updated_at: new Date()
-                })
-                .where(
-                  and(
-                    eq(session_questions.session_question_id, sessionQuestionId),
-                    eq(session_questions.session_id, sessionIdNum),
-                    eq(session_questions.user_id, userId)
+      await withRetry(async () => {
+        await db.transaction(async (tx) => {
+          // Insert all attempts at once
+          await tx.insert(question_attempts).values(attemptsToInsert);
+          
+          // Update timing data in batch if available
+          if (timingUpdates.length > 0) {
+            // Use Promise.all for parallel timing updates
+            await Promise.all(
+              timingUpdates.map(({ sessionQuestionId, timeSpent }) =>
+                tx
+                  .update(session_questions)
+                  .set({
+                    time_spent_seconds: timeSpent,
+                    updated_at: new Date()
+                  })
+                  .where(
+                    and(
+                      eq(session_questions.session_question_id, sessionQuestionId),
+                      eq(session_questions.session_id, sessionIdNum),
+                      eq(session_questions.user_id, userId)
+                    )
                   )
-                )
-            )
-          );
-        }
+              )
+            );
+          }
+        });
       });
     }
 
@@ -458,17 +470,20 @@ export async function POST(
       sessionUpdateData.duration_minutes = Math.ceil(timingData.totalSeconds / 60);
     }
 
-    const [updatedSession] = await db
-      .update(practice_sessions)
-      .set(sessionUpdateData)
-      .where(eq(practice_sessions.session_id, sessionIdNum))
-      .returning({
-        questions_attempted: practice_sessions.questions_attempted,
-        questions_correct: practice_sessions.questions_correct,
-        score: practice_sessions.score,
-        max_score: practice_sessions.max_score,
-        is_completed: practice_sessions.is_completed
-      });
+    const [updatedSession] = await withRetry(async () => {
+      const result = await db
+        .update(practice_sessions)
+        .set(sessionUpdateData)
+        .where(eq(practice_sessions.session_id, sessionIdNum))
+        .returning({
+          questions_attempted: practice_sessions.questions_attempted,
+          questions_correct: practice_sessions.questions_correct,
+          score: practice_sessions.score,
+          max_score: practice_sessions.max_score,
+          is_completed: practice_sessions.is_completed
+        });
+      return result;
+    });
 
     // Invalidate session caches
     await cacheService.invalidateUserSessionCaches(userId, sessionIdNum);

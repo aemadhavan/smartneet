@@ -475,17 +475,28 @@ export function usePracticeSession(
         }
         
         // If we get here, there was an error
-        throw new Error(responseData.error || 'Failed to submit answers.');
+        const errorMessage = responseData.error || 'Failed to submit answers.';
+        // Check if this is a database connection error
+        if (errorMessage.includes('unable to connect to the appropriate database') || 
+            errorMessage.includes('database connection') ||
+            errorMessage.includes('connection failed')) {
+          throw new Error('Database connection temporarily unavailable. Please try again.');
+        }
+        throw new Error(errorMessage);
       } catch (err) {
         console.error(`Error completing session (attempt ${attempt}/${maxRetries}):`, err);
         
-        // Check if this is a network error
+        // Check if this is a network error or database connection error
         const isNetworkError = err instanceof Error && 
           (err.name === 'AbortError' || 
            err.name === 'TypeError' ||
            err.message.includes('Failed to fetch') ||
            err.message.includes('Network') ||
            err.message.includes('fetch'));
+           
+        const isDatabaseError = err instanceof Error &&
+          (err.message.includes('Database connection temporarily unavailable') ||
+           err.message.includes('unable to connect to the appropriate database'));
         
         // Check if this is already completed
         const isAlreadyCompleted = err instanceof Error && 
@@ -500,10 +511,11 @@ export function usePracticeSession(
           return true;
         }
         
-        if (isNetworkError && attempt < maxRetries) {
-          // Show retry dialog for network errors
+        if ((isNetworkError || isDatabaseError) && attempt < maxRetries) {
+          // Show retry dialog for network or database errors
+          const errorType = isDatabaseError ? 'database connection' : 'network connection';
           const shouldRetry = confirm(
-            `Network connection failed. This might be due to a poor internet connection.\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
+            `${errorType.charAt(0).toUpperCase() + errorType.slice(1)} failed. This might be due to a temporary server issue.\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
           );
           
           if (shouldRetry) {
@@ -516,9 +528,10 @@ export function usePracticeSession(
         // If it's not a network error or we've exhausted retries, show error
         const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
         
-        if (isNetworkError) {
+        if (isNetworkError || isDatabaseError) {
+          const errorType = isDatabaseError ? 'database connection issues' : 'network issues';
           const shouldSaveLocally = confirm(
-            `Unable to submit your answers due to network issues. Your progress has been saved locally and will be submitted when you have a stable connection.\n\nWould you like to continue and mark this session as completed?`
+            `Unable to submit your answers due to ${errorType}. Your progress has been saved locally and will be submitted when the connection is stable.\n\nWould you like to continue and mark this session as completed?`
           );
           
           if (shouldSaveLocally) {

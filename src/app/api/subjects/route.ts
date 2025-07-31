@@ -1,30 +1,10 @@
 //File: src/app/api/subjects/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { subjects } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
-
-// Retry logic for database operations
-async function retryDbOperation<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      console.log(`Database operation attempt ${attempt} failed:`, error);
-      
-      if (attempt === maxRetries) {
-        throw error;
-      }
-      
-      // Exponential backoff: wait longer between retries
-      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error('Max retries exceeded');
-}
 
 // GET /api/subjects - Get all active subjects
 export async function GET(req: NextRequest) {
@@ -39,7 +19,7 @@ export async function GET(req: NextRequest) {
     const cacheKey = `api:subjects:isActive:${isActive}`;
     
     // Try to get data from cache first
-    const cachedData = await cache.get(cacheKey);
+    const cachedData = await cache.get(cacheKey).catch(() => null);
     if (cachedData) {
       return NextResponse.json({
         success: true,
@@ -48,8 +28,8 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
     }
     
-    // Cache miss - execute query with filters if provided using retry logic
-    const allSubjects = await retryDbOperation(async () => {
+    // Cache miss - execute query with filters if provided using centralized retry logic
+    const allSubjects = await withRetry(async () => {
       if (isActive !== undefined) {
         return await db.select().from(subjects).where(eq(subjects.is_active, isActive));
       } else {
@@ -58,7 +38,10 @@ export async function GET(req: NextRequest) {
     });
     
     // Store result in cache (using appropriate TTL based on data type)
-    await cache.set(cacheKey, allSubjects, 3600); // Cache for 1 hour
+    await cache.set(cacheKey, allSubjects, 3600).catch(() => {
+      // If cache set fails, log but don't break the response
+      console.warn('Failed to cache subjects data');
+    }); // Cache for 1 hour
     
     // Return the data from database
     return NextResponse.json({

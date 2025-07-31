@@ -6,6 +6,7 @@ import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import GoogleTagManager from './GoogleTagManager';
+import SignOutButton from '@/components/auth/SignOutButton';
 
 /**
  * Custom NavLink component with loading state
@@ -58,6 +59,9 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
  * Now includes the GoogleTagManager component for analytics.
  */
 const Header = () => {
+  const pathname = usePathname();
+  const isPracticePage = pathname?.startsWith('/practice');
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
       {/* Include Google Tag Manager */}
@@ -114,7 +118,25 @@ const Header = () => {
         {/* Authentication */}
         <div className="flex items-center space-x-4">
           <SignedIn>
-            <UserButton afterSignOutUrl="/" />
+            <div className="flex items-center space-x-2">
+              <UserButton 
+                afterSignOutUrl={process.env.NEXT_PUBLIC_APP_URL || "https://smarterneet.com"} 
+                appearance={{
+                  elements: {
+                    userButtonAvatarBox: "w-8 h-8",
+                    userButtonTrigger: "focus:shadow-none"
+                  }
+                }}
+                showName={false}
+                signInUrl="/sign-in"
+              />
+              {/* Backup sign out button - only show on practice pages where sign out might have issues */}
+              {isPracticePage && (
+                <SignOutButton className="text-sm text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-gray-100">
+                  Sign out
+                </SignOutButton>
+              )}
+            </div>
           </SignedIn>
           <SignedOut>
             <Link 
