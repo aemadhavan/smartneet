@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, withRetry } from '@/db';
 import { topics } from '@/db/schema';
-import { eq, isNull, and } from 'drizzle-orm';
+import { eq, isNull, and, SQL } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 
 // GET /api/topics - Get topics with optional filtering
@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
     }
     
     // Cache miss - proceed with database query
-    // Build conditions array
-    const conditions = [];
+    // Build conditions array with proper typing
+    const conditions: SQL<unknown>[] = [];
     
     if (subjectId) {
       conditions.push(eq(topics.subject_id, subjectId));
