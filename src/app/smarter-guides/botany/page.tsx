@@ -1,5 +1,6 @@
 //File: src/app/smarter-guides/botany/page.tsx
 import { Metadata } from "next"
+import Link from "next/link"
 import BotanyContent from "./BotanyContent"
 
 export const metadata: Metadata = {
@@ -20,5 +21,14 @@ export const metadata: Metadata = {
 
 
 export default function BotanyPage() {
-  return <BotanyContent />
+  return (
+    <>
+      <div className="container mx-auto px-4 pt-8">
+        <Link href="/smarter-guides" className="text-blue-600 hover:underline inline-block mb-4">
+          ← Back to Smarter Guides
+        </Link>
+      </div>
+      <BotanyContent />
+    </>
+  )
 }
