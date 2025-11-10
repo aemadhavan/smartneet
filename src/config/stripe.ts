@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 // Stripe configuration and version management
 export const STRIPE_CONFIG = {
   // API version - update this when Stripe releases a new version
-  API_VERSION: '2025-05-28.basil' as const,
+  API_VERSION: '2025-08-27.basil' as const,
   
   // App information
   APP_INFO: {

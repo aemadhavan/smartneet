@@ -4,7 +4,10 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['drizzle-orm'],
-  
+
+  // Temporarily disabled standalone mode due to Html import errors
+  // output: 'standalone',
+
   images: {
     domains: ['localhost'],
     formats: ['image/webp', 'image/avif'],
@@ -12,39 +15,59 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
 
-  // Disable aggressive preloading
+  // SWC compiler optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
+  // Optimize package imports for faster builds
   experimental: {
     optimizePackageImports: [
-      // Add your UI libraries here, example:
-      '@mantine/core',
-      '@mantine/hooks'
-    ]
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-label',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      'lucide-react',
+      'recharts',
+      'framer-motion',
+    ],
+  },
+
+  // Modularize imports for better tree-shaking
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+    '@radix-ui/react-icons': {
+      transform: '@radix-ui/react-icons/dist/{{member}}',
+    },
   },
 
   webpack: (config, { dev }) => {
+    // Enable filesystem caching for both dev and production builds
+    config.cache = {
+      type: 'filesystem',
+      buildDependencies: {
+        config: [path.resolve(__dirname, 'next.config.ts')]
+      },
+      cacheDirectory: path.resolve(process.cwd(), '.next/cache/webpack'),
+      compression: 'gzip',
+      maxAge: dev ? 604800000 : 172800000, // 7 days for dev, 2 days for prod
+      version: '1.0.0'
+    };
+
     if (!dev) {
-      config.cache = {
-        type: 'filesystem',
-        buildDependencies: {
-          config: [path.resolve(__dirname, 'next.config.ts')]
-        },
-        cacheDirectory: path.resolve(process.cwd(), '.next/cache'),
-        compression: 'gzip',
-        maxAge: 172800000, // 2 days
-        version: '1.0.0'
-      };
-      
       // Add chunk loading error handling
       config.output = {
         ...config.output,
         chunkLoadingGlobal: 'webpackChunksmartner',
         chunkLoadTimeout: 120000, // 2 minutes
       };
-      
+
       // Optimize chunk splitting
       config.optimization = {
         ...config.optimization,
@@ -119,5 +142,10 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
   disableLogger: true,
-  automaticVercelMonitors: true
+  automaticVercelMonitors: true,
+  sourcemaps: {
+    disable: true
+  },
+  autoInstrumentServerFunctions: false,
+  autoInstrumentMiddleware: false
 });
