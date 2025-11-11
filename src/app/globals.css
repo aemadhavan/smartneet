@@ -136,7 +136,16 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Safari text size adjust compatibility */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
+}
+
+/* Backdrop filter browser compatibility */
+.backdrop-blur-sm {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 /* 

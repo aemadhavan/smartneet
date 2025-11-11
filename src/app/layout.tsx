@@ -77,7 +77,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Additional meta tags to enhance SEO that aren't handled by Next.js metadata API */}
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        {/* Note: viewport is automatically set by Next.js, no need to duplicate */}
         <meta name="robots" content="index, follow" />
         <meta name="author" content="SmarterNEET Team" />
         <link rel="canonical" href="https://smarterneet.com/" />

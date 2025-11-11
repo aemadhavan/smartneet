@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "// Add these to your package.json scripts section": "",
+    "optimize:chemistry": "tsx scripts/apply-migration.ts",
+    "optimize:full": "bash scripts/quick-optimize.sh",
+    "perf:stats": "tsx -e \"import { QueryPerformanceTracker, CacheMetrics } from './src/lib/performance'; console.log('Query Stats:', QueryPerformanceTracker.getStats()); console.log('Cache Stats:', CacheMetrics.getStats());\"",
+    "db:indexes": "psql $XATA_DATABASE_URL -c \"SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'topics' AND schemaname = 'public' ORDER BY indexname;\"",
+    "db:analyze": "psql $XATA_DATABASE_URL -c \"ANALYZE topics; SELECT n_live_tup, n_dead_tup FROM pg_stat_user_tables WHERE relname = 'topics';\""
+  }
+}

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, withRetry } from '@/db';
 import { topics } from '@/db/schema';
-import { eq, isNull, and, SQL, sql } from 'drizzle-orm';
+import { eq, isNull, and, SQL, sql, asc } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 
 // GET /api/topics - Get topics with optional filtering
@@ -75,7 +75,8 @@ export async function GET(req: NextRequest) {
             sql`subtopics.parent_topic_id = ${topics.topic_id} AND subtopics.is_active = true`
           )
           .where(conditions.length > 0 ? and(...conditions) : undefined)
-          .groupBy(topics.topic_id);
+          .groupBy(topics.topic_id)
+          .orderBy(asc(topics.topic_id));
 
         return await query;
       });
@@ -83,9 +84,9 @@ export async function GET(req: NextRequest) {
       // Original query without subtopic counts
       topicsResult = await withRetry(async () => {
         if (conditions.length > 0) {
-          return await db.select().from(topics).where(and(...conditions));
+          return await db.select().from(topics).where(and(...conditions)).orderBy(asc(topics.topic_id));
         } else {
-          return await db.select().from(topics);
+          return await db.select().from(topics).orderBy(asc(topics.topic_id));
         }
       });
     }

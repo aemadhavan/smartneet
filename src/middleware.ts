@@ -18,6 +18,8 @@ const publicRoutes = createRouteMatcher([
   "/monitoring(.*)",
   "/pricing(.*)",
   "/api/subscription-plans(.*)",
+  "/biology(.*)",
+  "/chemistry(.*)",
   "/sitemap.xml",
   "/robots.txt",
   // Add more public routes as needed
@@ -50,7 +52,7 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   // Check if request is from mobile app
   const userAgent = req.headers.get('user-agent') || '';
   const clientId = req.headers.get('x-client-id') || '';
-  const isMobileApp = userAgent.includes('SmarterNEET-Mobile') || 
+  const isMobileApp = userAgent.includes('SmarterNEET-Mobile') ||
                       clientId.startsWith('flutter-') ||
                       userAgent.includes('Mobile');
 
@@ -69,14 +71,66 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
       '/api/topic-mastery',
       '/api/session-questions'
     ];
-    
-    const isAllowedApi = allowedMobileApis.some(api => 
+
+    const isAllowedApi = allowedMobileApis.some(api =>
       req.nextUrl.pathname.startsWith(api)
     );
-    
+
     if (isAllowedApi) {
       return; // Allow without auth
     }
+  }
+
+  // Create response to add headers
+  const response = NextResponse.next();
+
+  // Add performance and security headers
+  const headers = response.headers;
+
+  // Security Headers
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
+  headers.set('X-XSS-Protection', '1; mode=block');
+  headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  // Content Security Policy
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: https: blob:",
+    "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev",
+    "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "upgrade-insecure-requests"
+  ].join('; ');
+
+  headers.set('Content-Security-Policy', csp);
+
+  // Cache-Control headers for different content types
+  const pathname = req.nextUrl.pathname;
+
+  // Static assets - long cache with immutable
+  if (pathname.startsWith('/_next/static/')) {
+    headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  // API routes - no cache with proper directives
+  else if (pathname.startsWith('/api/')) {
+    headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    headers.set('Pragma', 'no-cache');
+    headers.set('Expires', '0');
+  }
+  // Chemistry/Biology pages - with stale-while-revalidate
+  else if (pathname.startsWith('/chemistry') || pathname.startsWith('/biology')) {
+    headers.set('Cache-Control', 'public, max-age=0, must-revalidate, stale-while-revalidate=3600');
+  }
+  // Other pages - with revalidation
+  else {
+    headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
   }
 
   // If not a public route, require authentication
@@ -88,6 +142,8 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
       return NextResponse.redirect(signInUrl);
     }
   }
+
+  return response;
 };
 
 export default clerkMiddleware(middleware);
