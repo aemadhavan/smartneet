@@ -67,12 +67,12 @@ export async function GET(req: NextRequest) {
             is_active: topics.is_active,
             created_at: topics.created_at,
             updated_at: topics.updated_at,
-            subtopicsCount: sql<number>`CAST(COUNT(${sql.identifier('subtopics', 'topic_id')}) AS INTEGER)`,
+            subtopicsCount: sql<number>`CAST(COUNT(subtopics.topic_id) AS INTEGER)`,
           })
           .from(topics)
           .leftJoin(
             sql`${topics} as subtopics`,
-            sql`${sql.identifier('subtopics', 'parent_topic_id')} = ${topics.topic_id} AND ${sql.identifier('subtopics', 'is_active')} = true`
+            sql`subtopics.parent_topic_id = ${topics.topic_id} AND subtopics.is_active = true`
           )
           .where(conditions.length > 0 ? and(...conditions) : undefined)
           .groupBy(topics.topic_id);
