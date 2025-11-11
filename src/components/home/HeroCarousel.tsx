@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import Image from "next/image";
 import { 
   Carousel,
@@ -61,26 +60,9 @@ const HeroCarousel = () => {
     { src: "/practice-analysis.webp", alt: "Detailed practice analysis showing performance metrics", width: 1200, height: 800 },
     { src: "/practice-summary.webp", alt: "Summary of practice session results", width: 1200, height: 800 },
   ];
-  
-  // Hero image animation - simplified for better performance
-  const heroImageAnimate = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1, 
-      transition: { 
-        duration: 0.5,
-        delay: 0.2 
-      } 
-    }
-  };
 
   return (
-    <motion.div
-      className="w-full lg:w-11/12 flex justify-center mx-auto"
-      variants={heroImageAnimate}
-      initial="hidden"
-      animate="visible"
-    >
+    <div className="w-full lg:w-11/12 flex justify-center mx-auto">
       <div className="w-full relative">
         {/* Simplified decorative elements with reduced blur operations */}
         <div className="absolute -top-12 -left-12 w-64 h-64 bg-indigo-600/5 rounded-full z-0"></div>
@@ -102,13 +84,14 @@ const HeroCarousel = () => {
                   <Card className="border-0 bg-white/5 overflow-hidden shadow-lg">
                     <CardContent className="flex items-center justify-center p-0">
                       <div className="relative w-full h-full">
-                        <Image 
-                          src={image.src} 
+                        <Image
+                          src={image.src}
                           width={image.width}
                           height={image.height}
                           alt={image.alt}
                           className="w-full h-auto object-contain"
-                          priority={index === 0} // Only prioritize the first image
+                          priority={index === 0}
+                          fetchPriority={index === 0 ? "high" : "low"}
                           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
                           loading={index === 0 ? "eager" : "lazy"}
                         />
@@ -126,8 +109,8 @@ const HeroCarousel = () => {
         {/* Simplified carousel indicators - reduced DOM elements */}
         <div className="flex justify-center mt-4 space-x-2">
           {images.map((_, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className={`w-2 h-2 rounded-full ${currentIndex === index ? 'bg-white' : 'bg-white/30'}`}
               onClick={() => api?.scrollTo(index)}
               style={{ cursor: 'pointer' }}
@@ -135,7 +118,7 @@ const HeroCarousel = () => {
           ))}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

@@ -1,19 +1,9 @@
 "use client";
 
-import { lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-// Removed invalid import since @/hooks/useAuth doesn't exist
-// import { useAuth } from "@/hooks/useAuth";
-
-// Import HeroCarousel with lazy loading
-const HeroCarousel = lazy(() => import("./HeroCarousel"));
-
-// Simple loading placeholder for the carousel
-const CarouselPlaceholder = () => (
-  <div className="w-full h-64 bg-indigo-800/20 rounded-lg animate-pulse"></div>
-);
+import HeroCarousel from "./HeroCarousel";
 
 // Simplified animation variants for better performance
 const fadeIn = {
@@ -171,11 +161,9 @@ export const RedesignedHeroSection = () => {
             </motion.div>
           </div>
           
-          {/* Hero Image - With Suspense and fallback */}
+          {/* Hero Image - Direct render for better LCP */}
           <div className="lg:w-1/2 flex justify-center">
-            <Suspense fallback={<CarouselPlaceholder />}>
-              <HeroCarousel />
-            </Suspense>
+            <HeroCarousel />
           </div>
         </div>
       </div>

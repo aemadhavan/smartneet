@@ -73,12 +73,12 @@ const Header = () => {
           <Image
             src="/smarterneet-logo.jpeg"
             alt="SmarterNEET Logo"
-            width={64}
-            height={64}
+            width={48}
+            height={48}
             className="rounded-full object-contain"
             priority
-            unoptimized
-            loading="eager"
+            quality={85}
+            sizes="48px"
           />
           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             SmarterNEET

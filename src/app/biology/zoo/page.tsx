@@ -1,214 +1,129 @@
 //File: src/app/biology/zoo/page.tsx
 
-"use client";
+import { Suspense } from 'react';
+import ZoologyContent from './ZoologyContent';
+import { db, withRetry } from '@/db';
+import { topics } from '@/db/schema';
+import { eq, isNull, and } from 'drizzle-orm';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useSubscriptionLimits } from '@/hooks/useSubscriptionLimits';
+// Enable static generation with revalidation
+export const revalidate = 3600; // Revalidate every hour
 
-interface Topic {
+// Force static generation at build time
+export const dynamic = 'force-static';
+export const dynamicParams = true;
+
+// Metadata for the page
+export const metadata = {
+  title: 'NEET Zoology - Animal Biology Topics | SmarterNEET',
+  description: 'Master NEET Zoology with comprehensive topics covering animal kingdom, structure, evolution, and classification. Practice questions for NEET preparation.',
+};
+
+interface TopicsWithSubtopicCount {
   topic_id: number;
   subject_id: number;
   topic_name: string;
   parent_topic_id: number | null;
   description: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-interface TopicsWithSubtopicCount extends Topic {
+  is_active: boolean | null;
+  created_at: Date | string | null;
+  updated_at: Date | string | null;
   subtopicsCount: number;
 }
 
-export default function ZoologyPage() {
-  const [topics, setTopics] = useState<TopicsWithSubtopicCount[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const { isPremium, loading: subscriptionLoading } = useSubscriptionLimits();
+// Server-side data fetching with optimized approach
+async function getZoologyTopics(): Promise<TopicsWithSubtopicCount[]> {
+  try {
+    const zoologySubjectId = 4;
 
-  useEffect(() => {
-    const fetchTopicsAndSubtopics = async () => {
-      if (subscriptionLoading) {
-        return;
-      }
-      try {
-        setIsLoading(true);
-        
-        // Find zoology subject ID (should be 4 based on your schema)
-        const zoologySubjectId = 4; // Zoology subject ID
-        
-        // Fetch root-level topics for Zoology
-        const topicsResponse = await fetch(`/api/topics?subjectId=${zoologySubjectId}&isRootLevel=true&isActive=true`);
-        
-        if (!topicsResponse.ok) {
-          throw new Error('Failed to fetch topics');
-        }
-        
-        const topicsData = await topicsResponse.json();
-        
-        if (!topicsData.success) {
-          throw new Error(topicsData.error || 'Failed to fetch topics');
-        }
-        
-        // For each topic, fetch the count of subtopics
-        const topicsWithSubtopicCounts = await Promise.all(
-          topicsData.data.map(async (topic: Topic) => {
-            const subtopicsResponse = await fetch(`/api/subtopics?topicId=${topic.topic_id}&isActive=true`);
-            
-            if (!subtopicsResponse.ok) {
-              return { ...topic, subtopicsCount: 0 };
-            }
-            
-            const subtopicsData = await subtopicsResponse.json();
-            const subtopicsCount = subtopicsData.success ? subtopicsData.data.length : 0;
-            
-            return { ...topic, subtopicsCount };
-          })
-        );
-        
-        setTopics(topicsWithSubtopicCounts);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchTopicsAndSubtopics();
-  }, [subscriptionLoading]);
+    // Step 1: Get root topics and all subtopics in single queries
+    const [rootTopics, allSubtopics] = await Promise.all([
+      withRetry(async () => {
+        return await db
+          .select()
+          .from(topics)
+          .where(
+            and(
+              eq(topics.subject_id, zoologySubjectId),
+              isNull(topics.parent_topic_id),
+              eq(topics.is_active, true)
+            )
+          );
+      }),
+      // Get all active subtopics for zoology in one query
+      withRetry(async () => {
+        return await db
+          .select()
+          .from(topics)
+          .where(
+            and(
+              eq(topics.subject_id, zoologySubjectId),
+              eq(topics.is_active, true)
+            )
+          );
+      })
+    ]);
 
-  // Function to determine if user can access the topic
-  const canAccessTopic = (index: number) => {
-    return isPremium || index < 2; // First two topics accessible for free users
-  };
+    // Step 2: Count subtopics in memory (no additional DB queries)
+    const topicsWithCounts = rootTopics.map((topic) => {
+      const subtopicsCount = allSubtopics.filter(
+        (subtopic) => subtopic.parent_topic_id === topic.topic_id
+      ).length;
 
-  if (isLoading || subscriptionLoading) {
-    return (
-      <div className="container mx-auto py-8 px-4 text-center">
-        <div className="w-16 h-16 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-gray-600">
-          {subscriptionLoading ? "Loading subscription status..." : "Loading zoology topics..."}
-        </p>
-      </div>
-    );
+      return {
+        ...topic,
+        subtopicsCount,
+      };
+    });
+
+    return topicsWithCounts;
+  } catch (error) {
+    console.error('Error fetching zoology topics:', error);
+    return [];
   }
+}
 
-  if (error) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 text-center">
-          <h2 className="text-lg font-semibold mb-2">Error Loading Data</h2>
-          <p>{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="mt-4 bg-red-100 text-red-800 px-4 py-2 rounded hover:bg-red-200"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
+// Loading skeleton component
+function LoadingSkeleton() {
   return (
     <div className="container mx-auto py-8 px-4">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">Zoology</h1>
-        <p className="text-gray-600 max-w-3xl">
-          Zoology is the branch of biology that studies the animal kingdom, including the structure, embryology, evolution, classification, habits, and distribution of all animals.
-        </p>
-        <div className="mt-10 flex justify-center">
-          <Link 
-            href={isPremium ? "/practice?subject=zoology" : "/practice?subject=zoology&limit=free"}
-            className="bg-amber-600 text-white px-6 py-3 rounded-md hover:bg-amber-700 text-lg font-medium shadow-sm"
-          >
-            Practice Zoology Questions
-          </Link>
-        </div>
-      </header>
-
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">NEET Zoology Overview</h2>
-        <div className="grid md:grid-cols-3 gap-4 text-center">
-          <div className="bg-amber-50 p-4 rounded-md">
-            <p className="text-amber-600 text-2xl font-bold mb-1">45</p>
-            <p className="text-gray-600">Questions</p>
-          </div>
-          <div className="bg-amber-50 p-4 rounded-md">
-            <p className="text-amber-600 text-2xl font-bold mb-1">180</p>
-            <p className="text-gray-600">Marks</p>
-          </div>
-          <div className="bg-amber-50 p-4 rounded-md">
-            <p className="text-amber-600 text-2xl font-bold mb-1">{topics.length}</p>
-            <p className="text-gray-600">Major Topics</p>
-          </div>
+      <div className="mb-8 animate-pulse">
+        <div className="h-8 bg-gray-200 rounded w-32 mb-4"></div>
+        <div className="h-4 bg-gray-200 rounded w-full max-w-3xl mb-4"></div>
+        <div className="h-12 bg-gray-200 rounded w-64 mx-auto mt-10"></div>
+      </div>
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8 animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-48 mb-4"></div>
+        <div className="grid md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-amber-50 p-4 rounded-md">
+              <div className="h-8 bg-gray-200 rounded w-12 mx-auto mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-20 mx-auto"></div>
+            </div>
+          ))}
         </div>
       </div>
-
-      {/* Free access notice - only show for non-premium users */}
-      {!isPremium && (
-        <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <p className="text-blue-700">
-            <span className="font-semibold">Free plan:</span> You have access to the first two topics. 
-            <Link href="/pricing" className="ml-2 text-blue-600 underline">Upgrade to premium</Link> for full access to all topics.
-          </p>
-        </div>
-      )}
-
-      {topics.length === 0 ? (
-        <div className="bg-gray-50 p-8 rounded-lg text-center">
-          <p className="text-gray-500">No topics available. Please check back later.</p>
-        </div>
-      ) : (
-        <div className="grid md:grid-cols-2 gap-6">
-          {topics.map((topic, index) => {
-            // Use the canAccessTopic function to determine accessibility
-            const isTopicAccessible = canAccessTopic(index);
-            
-            return (
-              <div key={topic.topic_id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 relative">
-                <div className={`p-6 ${!isTopicAccessible && 'relative'}`}>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{topic.topic_name}</h3>
-                  <p className="text-gray-600 mb-4">{topic.description || 'No description available'}</p>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500">{topic.subtopicsCount} subtopics</span>
-                    {isTopicAccessible ? (
-                      <Link 
-                        href={`/biology/zoo/topics/${topic.topic_id}`}
-                        className="text-indigo-600 hover:text-indigo-800 font-medium text-sm flex items-center"
-                      >
-                        Explore Topic →
-                      </Link>
-                    ) : (
-                      <Link 
-                        href={`/pricing?from=zoology-topic-${topic.topic_id}`}
-                        className="text-amber-600 hover:text-amber-800 font-medium text-sm flex items-center"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Unlock Premium Practice
-                      </Link>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Premium indicators for premium topics */}
-                {!isTopicAccessible && (
-                  <>
-                    <div className="absolute top-2 right-2 z-10 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-medium shadow-sm">
-                      Premium Practice
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-b from-transparent to-amber-50 opacity-25 pointer-events-none"></div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="grid md:grid-cols-2 gap-6">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white rounded-lg shadow-sm p-6 animate-pulse">
+            <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+          </div>
+        ))}
+      </div>
     </div>
+  );
+}
+
+// Server Component - fetches data during SSR
+export default async function ZoologyPage() {
+  // Fetch data on the server
+  const topicsData = await getZoologyTopics();
+
+  return (
+    <Suspense fallback={<LoadingSkeleton />}>
+      <ZoologyContent initialTopics={topicsData} />
+    </Suspense>
   );
 }

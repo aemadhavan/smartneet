@@ -35,7 +35,14 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
     req.nextUrl.pathname.startsWith('/smarterneet-logo.jpeg') ||
     req.nextUrl.pathname.startsWith('/smarteneet.svg') ||
     req.nextUrl.pathname.startsWith('/sitemap.xml') ||
-    req.nextUrl.pathname.startsWith('/robots.txt')
+    req.nextUrl.pathname.startsWith('/robots.txt') ||
+    req.nextUrl.pathname.endsWith('.webp') ||
+    req.nextUrl.pathname.endsWith('.png') ||
+    req.nextUrl.pathname.endsWith('.jpg') ||
+    req.nextUrl.pathname.endsWith('.jpeg') ||
+    req.nextUrl.pathname.endsWith('.gif') ||
+    req.nextUrl.pathname.endsWith('.svg') ||
+    req.nextUrl.pathname.endsWith('.ico')
   ) {
     return;
   }
@@ -88,6 +95,6 @@ export default clerkMiddleware(middleware);
 export const config = {
   matcher: [
     // Match all routes except static files, images, and 404
-    '/((?!_next/static|_next/image|favicon.ico|images|.well-known|404|smarterneet-logo.jpeg|smarteneet.svg|sitemap.xml|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|.well-known|404|smarterneet-logo.jpeg|smarteneet.svg|sitemap.xml|robots.txt|.*\\.webp|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.svg|.*\\.ico).*)',
   ],
 };
