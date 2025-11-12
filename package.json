@@ -131,5 +131,9 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.53.2"
-  }
+  },
+  "browserslist": [
+    "defaults and fully supports es6-module",
+    "maintained node versions"
+  ]
 }

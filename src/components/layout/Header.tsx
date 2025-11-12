@@ -2,11 +2,23 @@
 // src/components/layout/Header.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, startTransition } from 'react';
+import dynamic from 'next/dynamic';
 import GoogleTagManager from './GoogleTagManager';
-import SignOutButton from '@/components/auth/SignOutButton';
+
+// Import Clerk components directly since ClerkProvider is now in ClientProviders
+// The provider wraps the entire app, so these components can be used directly
+import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
+
+// Lazy load SignOutButton (less critical)
+const SignOutButton = dynamic(
+  () => import('@/components/auth/SignOutButton'),
+  {
+    ssr: false,
+    loading: () => <div className="w-16 h-6 bg-gray-200 rounded animate-pulse" />
+  }
+);
 
 /**
  * Custom NavLink component with loading state
@@ -18,14 +30,17 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // If already on the same page, don't show loading
     if (pathname === href) {
       return;
     }
-    
-    setIsLoading(true);
-    router.push(href);
+
+    // Use startTransition to prevent blocking the main thread
+    startTransition(() => {
+      setIsLoading(true);
+      router.push(href);
+    });
   };
 
   useEffect(() => {

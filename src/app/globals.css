@@ -140,6 +140,30 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
+
+  /* Removed content-visibility to prevent layout shifts (CLS optimization) */
+}
+
+/* Performance optimization: GPU acceleration for animations */
+@layer utilities {
+  /* Force GPU acceleration for transform and opacity changes */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform, opacity;
+  }
+
+  /* Apply to elements that will animate */
+  [class*="motion-"] {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
+  }
+
+  /* Optimize hover effects */
+  .hover-transform {
+    will-change: transform;
+    transform: translateZ(0);
+  }
 }
 
 /* Backdrop filter browser compatibility */
@@ -154,25 +178,27 @@
   for critical content, improving LCP and overall performance
 */
 
+/* Use translate3d instead of translateY for GPU acceleration */
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translate3d(0, 10px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
+/* Use scale3d for GPU acceleration */
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale3d(0.95, 0.95, 1);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: scale3d(1, 1, 1);
   }
 }
 

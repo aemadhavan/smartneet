@@ -1,22 +1,24 @@
 // File: src/app/page.tsx
 // This is a server component (no "use client" directive)
+// Optimized for LCP performance by splitting server and client components
 
 import { Suspense } from 'react';
 import { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 
-// Use static import for critical path rendering
-import RedesignedHeroSection from '@/components/home/RedesignedHeroSection';
+// Use static import for critical path rendering (includes LCP element)
+import OptimizedHeroSection from '@/components/home/OptimizedHeroSection';
 
 // Optimized skeleton with reduced animations and simpler structure
+// Fixed height to match actual content and prevent layout shift
 function SectionSkeleton() {
   return (
-    <div className="w-full py-16" aria-hidden="true">
+    <div className="w-full py-20" aria-hidden="true" style={{ minHeight: '600px' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="w-1/3 h-10 bg-gray-200 dark:bg-gray-700 rounded mb-8" />
+        <div className="w-1/3 h-10 bg-gray-200 dark:bg-gray-700 rounded mb-16" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 bg-gray-200 dark:bg-gray-700 rounded" />
+            <div key={i} className="h-80 bg-gray-200 dark:bg-gray-700 rounded" />
           ))}
         </div>
       </div>
@@ -91,13 +93,13 @@ export const metadata: Metadata = {
 // 3. Optimized suspense boundaries
 // 4. Added proper priority loading for below-the-fold content
 
-export default function HomePage() {
+export default async function HomePage() {
   return (
     <>
-      
+
       <div className="min-h-screen bg-white dark:from-gray-900 dark:to-gray-800 font-poppins relative overflow-x-hidden">
-        {/* Hero section - Critical path */}
-        <RedesignedHeroSection />
+        {/* Hero section - Critical path with optimized LCP rendering */}
+        <OptimizedHeroSection />
         
         {/* Non-critical sections with optimized loading */}
         <Suspense fallback={<SectionSkeleton />}>

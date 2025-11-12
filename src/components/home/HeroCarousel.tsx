@@ -63,7 +63,8 @@ const HeroCarousel = () => {
 
   return (
     <div className="w-full lg:w-11/12 flex justify-center mx-auto">
-      <div className="w-full relative">
+      {/* Fixed aspect ratio container to prevent layout shift */}
+      <div className="w-full relative" style={{ aspectRatio: '3/2', minHeight: '400px' }}>
         {/* Simplified decorative elements with reduced blur operations */}
         <div className="absolute -top-12 -left-12 w-64 h-64 bg-indigo-600/5 rounded-full z-0"></div>
         <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-purple-600/5 rounded-full z-0"></div>

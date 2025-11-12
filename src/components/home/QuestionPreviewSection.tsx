@@ -1,32 +1,8 @@
 "use client";
 
-import { motion, Variants } from "framer-motion";
 import Link from "next/link";
 import { questions } from "../data/questions";
 import { useState } from "react";
-
-const fadeIn: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { 
-      type: "spring" as const,
-      stiffness: 100,
-      damping: 15
-    }
-  }
-};
-
-const staggerContainer: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
 
 export const QuestionPreviewSection = () => {
   const [activeTab, setActiveTab] = useState("Biology");
@@ -45,20 +21,15 @@ export const QuestionPreviewSection = () => {
   };
   
   return (
-    <section className="py-16 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+    <section className="py-16 bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800" style={{ minHeight: '800px' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div 
-          className="text-center mb-12"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={fadeIn}
-        >
+        {/* Removed motion to prevent CLS */}
+        <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-gray-100 mb-4">Practice NEET-Style Questions That Mirror the Real Exam​</h2>
           <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">Get exam-ready with expert-crafted practice questions that follow the NEET format. Build familiarity with question types, difficulty levels, and time management.​
 
 More previous year questions are coming soon. Stay tuned!​</p>
-        </motion.div>
+        </div>
         
         {/* Subject Tabs */}
         <div className="flex justify-center mb-8">
@@ -79,18 +50,11 @@ More previous year questions are coming soon. Stay tuned!​</p>
           </div>
         </div>
         
-        {/* Questions */}
-        <motion.div 
-          className="space-y-6 max-w-4xl mx-auto"
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={staggerContainer}
-        >
+        {/* Questions - Removed motion to prevent CLS */}
+        <div className="space-y-6 max-w-4xl mx-auto">
           {questions.map((q) => (
-            <motion.div 
+            <div
               key={q.id}
-              variants={fadeIn}
               className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-100 dark:border-gray-700 overflow-hidden"
             >
               <div className="p-6">
@@ -120,9 +84,9 @@ More previous year questions are coming soon. Stay tuned!​</p>
                     const isSelected = selectedAnswers[q.id] === option.id;
                     const showResult = showResults[q.id];
                     const isCorrect = option.correct;
-                    
+
                     let optionClasses = "p-3 border rounded-md cursor-pointer transition-all ";
-                    
+
                     if (showResult) {
                       if (isSelected && isCorrect) {
                         optionClasses += "border-green-500 dark:border-green-400 bg-green-50 dark:bg-green-900/30 text-gray-900 dark:text-gray-100";
@@ -136,23 +100,15 @@ More previous year questions are coming soon. Stay tuned!​</p>
                     } else {
                       optionClasses += "border-gray-200 dark:border-gray-700 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-gray-800 dark:text-gray-200";
                     }
-                    
+
                     return (
-                      <div 
+                      <div
                         key={option.id}
                         onClick={() => !showResult && handleOptionClick(q.id, option.id)}
                         className={optionClasses}
                       >
-                        <div className="flex items-center justify-between">
-                          <span>{option.id}. {option.text}</span>
-                          {showResult && (
-                            <span className="ml-2">
-                              {isSelected && isCorrect && "✓"}
-                              {isSelected && !isCorrect && "✗"}
-                              {!isSelected && isCorrect && "✓"}
-                            </span>
-                          )}
-                        </div>
+                        <span>{option.id}. {option.text}</span>
+                        {showResult && (isSelected && isCorrect ? " ✓" : isSelected && !isCorrect ? " ✗" : isCorrect ? " ✓" : "")}
                       </div>
                     );
                   })}
@@ -186,16 +142,16 @@ More previous year questions are coming soon. Stay tuned!​</p>
                   <p className="text-gray-700 dark:text-gray-300">{q.explanation}</p>
                 </div>
               )}
-            </motion.div>
+            </div>
           ))}
-          
+
           {/* View More Button */}
           <div className="text-center mt-8">
             <Link href="/biology" className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all transform hover:-translate-y-1">
               View All Biology Questions
             </Link>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
