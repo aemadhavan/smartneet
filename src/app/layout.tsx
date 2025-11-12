@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ClientProviders from '@/components/ClientProviders';
@@ -35,7 +36,7 @@ const geistMono = Geist_Mono({
  * Enhanced metadata for the application with SEO optimizations.
  * Includes expanded description, keywords, Open Graph, and Twitter Card tags.
  */
-export const metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://smarterneet.com'),
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
   description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
