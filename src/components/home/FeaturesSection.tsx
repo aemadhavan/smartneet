@@ -37,7 +37,7 @@ const FeaturesSection = () => {
           </div>
           <h3 className="text-xl font-bold text-gray-900 mb-3">AI-Powered Analytics</h3>
           <p className="text-gray-600 mb-4">Track your performance with smart analytics. Get insights on accuracy, time taken, and weak areas — and receive improvement tips with every test.​</p>
-          <Link href="#" className="text-emerald-600 font-medium hover:text-emerald-800 inline-flex items-center">
+          <Link href="#" className="text-emerald-700 font-medium hover:text-emerald-900 inline-flex items-center">
             See How It Works
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

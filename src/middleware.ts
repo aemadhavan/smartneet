@@ -25,59 +25,69 @@ const publicRoutes = createRouteMatcher([
   // Add more public routes as needed
 ]);
 
+// Pre-compile static paths for faster matching
+const STATIC_PATHS = new Set([
+  '/_next',
+  '/static',
+  '/favicon.ico',
+  '/images',
+  '/.well-known',
+  '/smarterneet-logo.jpeg',
+  '/smarteneet.svg',
+  '/sitemap.xml',
+  '/robots.txt'
+]);
+
+const IMAGE_EXTENSIONS = new Set(['.webp', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico']);
+
+const ALLOWED_MOBILE_APIS = new Set([
+  '/api/subjects',
+  '/api/topics',
+  '/api/subtopics',
+  '/api/questions',
+  '/api/practice-sessions',
+  '/api/question-attempts',
+  '/api/subscription-plans',
+  '/api/question-types',
+  '/api/user-stats',
+  '/api/topic-mastery',
+  '/api/session-questions'
+]);
+
 // Apply middleware
 const middleware = async (auth: () => Promise<{ userId: string | null }>, req: NextRequest) => {
-  // Skip static files and images
-  if (
-    req.nextUrl.pathname.startsWith('/_next') ||
-    req.nextUrl.pathname.startsWith('/static') ||
-    req.nextUrl.pathname.startsWith('/favicon.ico') ||
-    req.nextUrl.pathname.startsWith('/images') ||
-    req.nextUrl.pathname.startsWith('/.well-known') ||
-    req.nextUrl.pathname.startsWith('/smarterneet-logo.jpeg') ||
-    req.nextUrl.pathname.startsWith('/smarteneet.svg') ||
-    req.nextUrl.pathname.startsWith('/sitemap.xml') ||
-    req.nextUrl.pathname.startsWith('/robots.txt') ||
-    req.nextUrl.pathname.endsWith('.webp') ||
-    req.nextUrl.pathname.endsWith('.png') ||
-    req.nextUrl.pathname.endsWith('.jpg') ||
-    req.nextUrl.pathname.endsWith('.jpeg') ||
-    req.nextUrl.pathname.endsWith('.gif') ||
-    req.nextUrl.pathname.endsWith('.svg') ||
-    req.nextUrl.pathname.endsWith('.ico')
-  ) {
-    return;
+  const pathname = req.nextUrl.pathname;
+
+  // Fast path: Skip static files and images using optimized checks
+  // Check static paths first (most common)
+  for (const path of STATIC_PATHS) {
+    if (pathname.startsWith(path)) {
+      return;
+    }
   }
 
-  // Check if request is from mobile app
-  const userAgent = req.headers.get('user-agent') || '';
-  const clientId = req.headers.get('x-client-id') || '';
-  const isMobileApp = userAgent.includes('SmarterNEET-Mobile') ||
-                      clientId.startsWith('flutter-') ||
-                      userAgent.includes('Mobile');
+  // Check image extensions
+  const lastDot = pathname.lastIndexOf('.');
+  if (lastDot !== -1) {
+    const ext = pathname.slice(lastDot);
+    if (IMAGE_EXTENSIONS.has(ext)) {
+      return;
+    }
+  }
+
+  // Check if request is from mobile app (only get headers once)
+  const userAgent = req.headers.get('user-agent');
+  const clientId = req.headers.get('x-client-id');
+
+  const isMobileApp = (userAgent && (userAgent.includes('SmarterNEET-Mobile') || userAgent.includes('Mobile'))) ||
+                      (clientId && clientId.startsWith('flutter-'));
 
   // If API request from mobile app, allow certain endpoints
-  if (isMobileApp && req.nextUrl.pathname.startsWith('/api/')) {
-    const allowedMobileApis = [
-      '/api/subjects',
-      '/api/topics',
-      '/api/subtopics',
-      '/api/questions',
-      '/api/practice-sessions',
-      '/api/question-attempts',
-      '/api/subscription-plans',
-      '/api/question-types',
-      '/api/user-stats',
-      '/api/topic-mastery',
-      '/api/session-questions'
-    ];
-
-    const isAllowedApi = allowedMobileApis.some(api =>
-      req.nextUrl.pathname.startsWith(api)
-    );
-
-    if (isAllowedApi) {
-      return; // Allow without auth
+  if (isMobileApp && pathname.startsWith('/api/')) {
+    for (const api of ALLOWED_MOBILE_APIS) {
+      if (pathname.startsWith(api)) {
+        return; // Allow without auth
+      }
     }
   }
 
@@ -96,11 +106,11 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   // Content Security Policy
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://*.clerk.accounts.dev https://*.clerk.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://*.clerk.accounts.dev https://*.clerk.com https://www.clarity.ms https://scripts.clarity.ms",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.accounts.dev",
     "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai https://*.clerk.accounts.dev data:",
     "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev",
+    "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev https://www.clarity.ms https://*.clarity.ms https://*.ingest.us.sentry.io https://*.sentry.io",
     "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com https://*.clerk.accounts.dev",
     "worker-src 'self' blob:",
     "media-src 'self' blob: data:",
@@ -114,7 +124,7 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   headers.set('Content-Security-Policy', csp);
 
   // Cache-Control headers for different content types
-  const pathname = req.nextUrl.pathname;
+  // Note: pathname already declared at line 59
 
   // Static assets - long cache with immutable
   if (pathname.startsWith('/_next/static/')) {

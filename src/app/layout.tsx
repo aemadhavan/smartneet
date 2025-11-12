@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ClientProviders from '@/components/ClientProviders';
+import GoogleTagManager from '@/components/layout/GoogleTagManager';
 import './globals.css';
 import { Geist, Geist_Mono } from "next/font/google";
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -35,13 +36,22 @@ const geistMono = Geist_Mono({
 /**
  * Enhanced metadata for the application with SEO optimizations.
  * Includes expanded description, keywords, Open Graph, and Twitter Card tags.
+ * Resource hints moved here for proper App Router handling.
  */
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://smarterneet.com'),
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
   description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
   keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation',
-  
+  authors: [{ name: 'SmarterNEET Team' }],
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: 'https://smarterneet.com/',
+  },
+
   // Open Graph tags for better social media sharing
   openGraph: {
     type: 'website',
@@ -59,7 +69,7 @@ export const metadata: Metadata = {
       }
     ]
   },
-  
+
   // Twitter Card tags for Twitter sharing
   twitter: {
     card: 'summary_large_image',
@@ -80,34 +90,9 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        {/* Additional meta tags to enhance SEO that aren't handled by Next.js metadata API */}
-        {/* Note: viewport is automatically set by Next.js, no need to duplicate */}
-        <meta name="robots" content="index, follow" />
-        <meta name="author" content="SmarterNEET Team" />
-        <link rel="canonical" href="https://smarterneet.com/" />
-
-        {/* Critical font preloading for LCP optimization */}
-        <link
-          rel="preload"
-          href="/_next/static/media/geist-sans.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
-
-        {/* Resource hints for performance optimization */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
-        <link rel="dns-prefetch" href="https://vitals.vercel-insights.com" />
-
-        {/* DNS prefetch for Clerk (lighter than preconnect) - connection established on demand */}
-        <link rel="dns-prefetch" href="https://accounts.clerk.com" />
-        <link rel="dns-prefetch" href="https://clerk.accounts.dev" />
-      </head>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white`}>
+        <GoogleTagManager />
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{display:'none', visibility:'hidden'}}></iframe></noscript>
         <Analytics />
         <ClientProviders>

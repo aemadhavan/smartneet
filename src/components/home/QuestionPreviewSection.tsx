@@ -33,7 +33,7 @@ More previous year questions are coming soon. Stay tuned!​</p>
         
         {/* Subject Tabs */}
         <div className="flex justify-center mb-8">
-          <div className="inline-flex p-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+          <div className="inline-flex p-1 bg-gray-200 dark:bg-gray-700 rounded-lg">
             {["Biology", "Physics", "Chemistry"].map((subject) => (
               <button
                 key={subject}
@@ -41,7 +41,7 @@ More previous year questions are coming soon. Stay tuned!​</p>
                 className={`px-4 py-2 rounded-md text-sm font-medium ${
                   activeTab === subject
                     ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-300 shadow-sm"
-                    : "text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                    : "text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white"
                 } transition-all`}
               >
                 {subject} {subject !== "Biology" && "(Coming Soon)"}
