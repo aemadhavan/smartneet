@@ -70,7 +70,10 @@ const nextConfig: NextConfig = {
       version: '1.0.0'
     };
 
+    // Enable source maps for production (hidden source maps for security)
     if (!dev) {
+      config.devtool = 'hidden-source-map';
+
       // Add chunk loading error handling
       config.output = {
         ...config.output,
@@ -135,6 +138,16 @@ const nextConfig: NextConfig = {
             value: 'public, max-age=86400, stale-while-revalidate=3600'
           }
         ]
+      },
+      // Block public access to source map files (defense-in-depth)
+      {
+        source: '/:path*.map',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow'
+          }
+        ]
       }
     ];
   },
@@ -153,8 +166,11 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
   disableLogger: true,
   automaticVercelMonitors: true,
+  // Enable source maps and upload to Sentry
   sourcemaps: {
-    disable: true
+    disable: false,
+    // Delete source maps from build output after upload to Sentry
+    deleteSourcemapsAfterUpload: true,
   },
   autoInstrumentServerFunctions: false,
   autoInstrumentMiddleware: false
