@@ -51,6 +51,18 @@ const nextConfig = {
     optimizeCss: true,
   },
 
+  // Tree-shake console.* in production and help bundler
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+
+  // Prefer per-icon imports for lucide to avoid pulling all icons
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+  },
+
   async headers() {
     return [
       {
@@ -58,10 +70,36 @@ const nextConfig = {
         source: '/:path*',
         headers: securityHeaders,
       },
+      {
+        source: '/assets/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+        ],
+      },
+      {
+        source: '/images/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=3600' }
+        ],
+      },
+      {
+        source: '/:path*.map',
+        headers: [
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow' }
+        ],
+      },
     ];
   },
   images: {
-    qualities: [75, 85, 90, 95, 100],
+    // Prefer modern formats and ensure good defaults
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    qualities: [60, 75, 85, 90, 95, 100],
+    remotePatterns: [
+      { protocol: 'https', hostname: 'localhost' },
+      { protocol: 'http', hostname: 'localhost' }
+    ],
   },
   webpack: (config, { isServer }) => {
     // Suppress the OpenTelemetry instrumentation warning

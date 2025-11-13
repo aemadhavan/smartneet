@@ -23,9 +23,10 @@ interface ClientProvidersProps {
 }
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
+  const isDev = process.env.NODE_ENV !== 'production';
   return (
     <>
-      <PerformanceMonitor />
+      {isDev && <PerformanceMonitor />}
       <ClerkProvider
         publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         appearance={{

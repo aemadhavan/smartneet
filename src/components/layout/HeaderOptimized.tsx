@@ -2,11 +2,15 @@
 // src/components/layout/HeaderOptimized.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
-import GoogleTagManager from './GoogleTagManager';
 import SignOutButton from '@/components/auth/SignOutButton';
+
+// Lazy load Clerk widgets to reduce initial JS
+const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
+const SignedOut = dynamic(() => import('@clerk/nextjs').then(m => m.SignedOut), { ssr: false });
+const UserButton = dynamic(() => import('@clerk/nextjs').then(m => m.UserButton), { ssr: false });
 
 /**
  * Optimized NavLink using Next.js Link instead of custom router logic
@@ -96,9 +100,6 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
-      {/* Include Google Tag Manager */}
-      <GoogleTagManager />
-
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo and brand name */}
         <Link href="/" className="flex items-center space-x-3">
@@ -109,7 +110,7 @@ const Header = () => {
             height={48}
             className="rounded-full object-contain"
             priority
-            quality={85}
+quality={60}
             sizes="48px"
           />
           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">

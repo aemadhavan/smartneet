@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Metadata } from 'next';
-import Header from '@/components/layout/Header';
+import Header from '@/components/layout/HeaderOptimized';
 import Footer from '@/components/layout/Footer';
 import ClientProviders from '@/components/ClientProviders';
 import GoogleTagManager from '@/components/layout/GoogleTagManager';
@@ -94,12 +94,12 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white`}>
         <GoogleTagManager />
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{display:'none', visibility:'hidden'}}></iframe></noscript>
-        <Analytics />
+        {process.env.NODE_ENV === 'production' && <Analytics />}
         <ClientProviders>
           <Header />
           <main>{children}</main>
           <Footer />
-          <SpeedInsights />
+          {process.env.NODE_ENV === 'production' && <SpeedInsights />}
         </ClientProviders>
       </body>
     </html>

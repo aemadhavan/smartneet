@@ -2,7 +2,6 @@
 // No client-side JavaScript required for initial render
 
 import Link from "next/link";
-import { auth } from "@clerk/nextjs/server";
 
 // Simple stats with reduced processing
 const stats = [
@@ -11,11 +10,8 @@ const stats = [
   { number: "100%", label: "NEET Aligned" }
 ];
 
+// Render as a fully static server component to enable prerendering and bfcache
 export async function HeroServerContent() {
-  // Server-side auth check (no client bundle needed)
-  const { userId } = await auth();
-  const isAuthenticated = !!userId;
-
   return (
     <div className="lg:w-1/2 z-10">
       <div className="inline-block mb-4 px-3 py-1 bg-white/10 rounded-full border border-white/20 text-sm">
@@ -34,10 +30,10 @@ export async function HeroServerContent() {
 
       <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-8">
         <Link
-          href={isAuthenticated ? "/practice" : "/sign-up"}
+          href="/sign-up"
           className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-medium rounded-xl shadow-lg transition-all text-center"
         >
-          {isAuthenticated ? "Practice Now" : "Start Learning"}
+          Start Learning
         </Link>
         <Link
           href="/biology"

@@ -5,11 +5,14 @@ import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect, startTransition } from 'react';
 import dynamic from 'next/dynamic';
-import GoogleTagManager from './GoogleTagManager';
 
-// Import Clerk components directly since ClerkProvider is now in ClientProviders
-// The provider wraps the entire app, so these components can be used directly
-import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
+// Clerk is heavy; lazy-load client widgets to reduce TBT
+const DynamicUserButton = dynamic(() => import('@clerk/nextjs').then(m => m.UserButton), {
+  ssr: false,
+  loading: () => <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+});
+const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
+const SignedOut = dynamic(() => import('@clerk/nextjs').then(m => m.SignedOut), { ssr: false });
 
 // Lazy load SignOutButton (less critical)
 const SignOutButton = dynamic(
@@ -71,7 +74,6 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 /**
  * Header component for the application.
  * Contains navigation links and authentication controls.
- * Now includes the GoogleTagManager component for analytics.
  */
 const Header = () => {
   const pathname = usePathname();
@@ -79,9 +81,6 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
-      {/* Include Google Tag Manager */}
-      <GoogleTagManager />
-      
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo and brand name */}
         <Link href="/" className="flex items-center space-x-3">
@@ -92,7 +91,7 @@ const Header = () => {
             height={48}
             className="rounded-full object-contain"
             priority
-            quality={85}
+quality={60}
             sizes="48px"
           />
           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -134,7 +133,7 @@ const Header = () => {
         <div className="flex items-center space-x-4">
           <SignedIn>
             <div className="flex items-center space-x-2">
-              <UserButton 
+              <DynamicUserButton 
                 afterSignOutUrl={process.env.NEXT_PUBLIC_APP_URL || "https://smarterneet.com"} 
                 appearance={{
                   elements: {
