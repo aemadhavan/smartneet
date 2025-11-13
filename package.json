@@ -138,7 +138,10 @@
     "@rollup/rollup-win32-x64-msvc": "^4.53.2"
   },
   "browserslist": [
-    "defaults and fully supports es6-module",
+    "chrome >= 120",
+    "edge >= 120",
+    "firefox >= 120",
+    "safari >= 16.4",
     "maintained node versions"
   ]
 }

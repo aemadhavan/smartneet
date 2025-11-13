@@ -9,12 +9,17 @@
  */
 
 import { ReactNode } from 'react';
-import { ClerkProvider } from '@clerk/nextjs';
 import dynamic from 'next/dynamic';
 
 // Dynamically import PerformanceMonitor (client-only, no SSR needed)
 const PerformanceMonitor = dynamic(
   () => import('@/components/PerformanceMonitor'),
+  { ssr: false }
+);
+
+// Defer ClerkProvider to the client to avoid pulling polyfills into the critical vendor chunk
+const ClerkProvider = dynamic(
+  () => import('@clerk/nextjs').then(m => m.ClerkProvider),
   { ssr: false }
 );
 

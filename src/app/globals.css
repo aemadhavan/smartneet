@@ -3,7 +3,6 @@
   It imports the Tailwind CSS styles and defines the color palette and font families.
 */
 @import "tailwindcss";
-@import "tw-animate-css";
 /*
   ---break---
 */
