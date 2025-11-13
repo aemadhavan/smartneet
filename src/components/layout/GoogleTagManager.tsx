@@ -23,7 +23,7 @@ const GoogleTagManager = () => {
   return (
     <>
       {/* Set default consent to denied so third‑party tags (GA/Clarity) do not set cookies without consent */}
-      <Script id="gtm-consent-default" strategy="beforeInteractive">
+      <Script id="gtm-consent-default" strategy="afterInteractive">
         {`window.dataLayer = window.dataLayer || []; window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
           // Consent Mode v2 defaults (no cookies)
           window.dataLayer.push({
