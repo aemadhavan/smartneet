@@ -106,12 +106,16 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   // Content Security Policy
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://*.clerk.accounts.dev https://*.clerk.com https://www.clarity.ms https://scripts.clarity.ms",
+    // Allow analytics, monitoring, Clerk, and Stripe scripts
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://*.clerk.accounts.dev https://*.clerk.com https://www.clarity.ms https://scripts.clarity.ms https://js.stripe.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.accounts.dev",
     "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai https://*.clerk.accounts.dev data:",
-    "img-src 'self' data: https: blob:",
-    "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev https://www.clarity.ms https://*.clarity.ms https://*.ingest.us.sentry.io https://*.sentry.io",
-    "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com https://*.clerk.accounts.dev",
+    // Allow Stripe tracking pixel in addition to existing sources
+    "img-src 'self' data: https: blob: https://q.stripe.com",
+    // Allow Clerk telemetry and Stripe APIs
+    "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev https://www.clarity.ms https://*.clarity.ms https://clerk-telemetry.com https://*.ingest.us.sentry.io https://*.sentry.io https://api.stripe.com https://hooks.stripe.com",
+    // Allow Stripe frames in addition to existing sources
+    "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com https://*.clerk.accounts.dev https://js.stripe.com https://hooks.stripe.com",
     "worker-src 'self' blob:",
     "media-src 'self' blob: data:",
     "object-src 'none'",

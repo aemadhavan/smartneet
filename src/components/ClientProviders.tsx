@@ -41,8 +41,8 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
           elements: { rootBox: "font-sans" },
           layout: { shimmer: false }
         }}
-        afterSignInUrl="/dashboard"
-        afterSignUpUrl="/dashboard"
+        // Use the new redirect props; this acts as a fallback when no redirect_url is present
+        fallbackRedirectUrl="/dashboard"
         signInUrl="/sign-in"
         signUpUrl="/sign-up"
       >
