@@ -77,6 +77,24 @@ const nextConfig = {
         ],
       },
       {
+        source: '/_next/static/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+        ],
+      },
+      {
+        source: '/smarterneet-logo.jpeg',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+        ],
+      },
+      {
+        source: '/:path*.webp',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }
+        ],
+      },
+      {
         source: '/images/:path*',
         headers: [
           { key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=3600' }
@@ -110,57 +128,12 @@ const nextConfig = {
       ];
     }
 
-    // Optimize bundle splitting for better caching and reduced main-thread work
+    // Allow Next.js to handle optimal chunking heuristics by default.
+    // Custom vendor chunking can accidentally pull too much JS into the initial route.
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
-        moduleIds: 'deterministic',
-        runtimeChunk: 'single',
-        splitChunks: {
-          chunks: 'all',
-          maxInitialRequests: 25,
-          minSize: 20000,
-          cacheGroups: {
-            // Vendor chunk for stable dependencies
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              priority: 10,
-              reuseExistingChunk: true,
-            },
-            // Separate chunk for heavy UI libraries
-            ui: {
-              test: /[\\/]node_modules[\\/](@radix-ui|framer-motion|lucide-react)[\\/]/,
-              name: 'ui-libs',
-              priority: 20,
-              reuseExistingChunk: true,
-            },
-            // Clerk in its own chunk for better caching
-            clerk: {
-              test: /[\\/]node_modules[\\/]@clerk[\\/]/,
-              name: 'clerk',
-              priority: 30,
-              reuseExistingChunk: true,
-            },
-            // Analytics and monitoring
-            analytics: {
-              test: /[\\/]node_modules[\\/](@vercel\/analytics|@vercel\/speed-insights|@sentry)[\\/]/,
-              name: 'analytics',
-              priority: 25,
-              reuseExistingChunk: true,
-            },
-            // Common chunks
-            common: {
-              minChunks: 2,
-              priority: 5,
-              reuseExistingChunk: true,
-            },
-          },
-        },
       };
-
-      // Minimize bundle size
-      config.optimization.minimize = true;
     }
 
     return config;

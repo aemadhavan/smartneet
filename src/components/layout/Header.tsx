@@ -78,6 +78,7 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 const Header = () => {
   const pathname = usePathname();
   const isPracticePage = pathname?.startsWith('/practice');
+  const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
@@ -130,6 +131,7 @@ quality={60}
         </nav>
 
         {/* Authentication */}
+        {needsAuthUI ? (
         <div className="flex items-center space-x-4">
           <SignedIn>
             <div className="flex items-center space-x-2">
@@ -167,6 +169,12 @@ quality={60}
             </Link>
           </SignedOut>
         </div>
+        ) : (
+          <div className="flex items-center space-x-4">
+            <Link href="/sign-in" className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>
+            <Link href="/sign-up" className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors">Sign Up</Link>
+          </div>
+        )}
       </div>
     </header>
   );

@@ -9,30 +9,16 @@ import { HeroClientCarousel } from "./HeroClientCarousel";
 const DNAHelixBackground = () => {
   return (
     <div className="absolute inset-0 overflow-hidden z-0 opacity-30">
-      <svg className="absolute inset-0 w-full h-full opacity-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+      <svg className="absolute inset-0 w-full h-full opacity-10 pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden>
         <defs>
           <linearGradient id="dnaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#6366f1" />
             <stop offset="100%" stopColor="#a855f7" />
           </linearGradient>
         </defs>
-
-        <path
-          d="M0,20 Q25,40 50,20 Q75,0 100,20"
-          fill="none"
-          stroke="url(#dnaGradient)"
-          strokeWidth="0.5"
-        />
-        <path
-          d="M0,80 Q25,100 50,80 Q75,60 100,80"
-          fill="none"
-          stroke="url(#dnaGradient)"
-          strokeWidth="0.5"
-        />
+        <path d="M0,20 Q25,40 50,20 Q75,0 100,20" fill="none" stroke="url(#dnaGradient)" strokeWidth="0.5" />
+        <path d="M0,80 Q25,100 50,80 Q75,60 100,80" fill="none" stroke="url(#dnaGradient)" strokeWidth="0.5" />
       </svg>
-
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-600/10 rounded-full"></div>
-      <div className="absolute bottom-12 right-12 w-80 h-80 bg-emerald-500/10 rounded-full"></div>
     </div>
   );
 };

@@ -4,12 +4,12 @@
  * Client-side providers wrapper
  * OPTIMIZED: Enhanced loading strategy to reduce main-thread work
  * - PerformanceMonitor: Loaded dynamically with no SSR
- * - ClerkProvider: Configured with appearance prop for faster hydration
- * - Clerk loads only necessary components via dynamic imports
+ * - ClerkProvider: Loaded only on routes that need auth UI (dashboard, practice, auth pages)
  */
 
 import { ReactNode } from 'react';
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 
 // Dynamically import PerformanceMonitor (client-only, no SSR needed)
 const PerformanceMonitor = dynamic(
@@ -29,29 +29,35 @@ interface ClientProvidersProps {
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
   const isDev = process.env.NODE_ENV !== 'production';
+  const pathname = usePathname();
+
+  // Routes that actually need Clerk on first paint
+  const needsClerk = pathname?.startsWith('/dashboard')
+    || pathname?.startsWith('/practice')
+    || pathname?.startsWith('/admin')
+    || pathname?.startsWith('/sign-in')
+    || pathname?.startsWith('/sign-up');
+
   return (
     <>
       {isDev && <PerformanceMonitor />}
-      <ClerkProvider
-        publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-        appearance={{
-          // Minimize initial bundle size by using system fonts
-          elements: {
-            rootBox: "font-sans"
-          },
-          layout: {
-            // Reduce layout complexity for faster rendering
-            shimmer: false
-          }
-        }}
-        // Load Clerk components only when needed
-        afterSignInUrl="/dashboard"
-        afterSignUpUrl="/dashboard"
-        signInUrl="/sign-in"
-        signUpUrl="/sign-up"
-      >
-        {children}
-      </ClerkProvider>
+      {needsClerk ? (
+        <ClerkProvider
+          publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+          appearance={{
+            elements: { rootBox: "font-sans" },
+            layout: { shimmer: false }
+          }}
+          afterSignInUrl="/dashboard"
+          afterSignUpUrl="/dashboard"
+          signInUrl="/sign-in"
+          signUpUrl="/sign-up"
+        >
+          {children}
+        </ClerkProvider>
+      ) : (
+        <>{children}</>
+      )}
     </>
   );
 }
