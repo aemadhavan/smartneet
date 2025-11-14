@@ -2,8 +2,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import dynamic from 'next/dynamic';
 const LaTeXRenderer = dynamic(
-  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer),
-  { ssr: false }
+  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer)
 );
 import { 
   Question, 
@@ -19,8 +18,7 @@ import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 import { logger } from '@/lib/logger'; // Import the logger service
 import QuestionErrorBoundary from './QuestionErrorBoundary';
 const NetworkStatusIndicator = dynamic(
-  () => import('../ui/NetworkStatusIndicator').then(m => m.NetworkStatusIndicator),
-  { ssr: false }
+  () => import('../ui/NetworkStatusIndicator').then(m => m.NetworkStatusIndicator)
 );
 
 // Dynamically import heavy question-type components to reduce initial bundle size

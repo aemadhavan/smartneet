@@ -2,8 +2,7 @@
 import dynamic from 'next/dynamic';
 
 const LaTeXRenderer = dynamic(
-  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer),
-  { ssr: false }
+  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer)
 );
 
 interface OptionButtonProps {
