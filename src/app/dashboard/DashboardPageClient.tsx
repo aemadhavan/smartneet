@@ -1,7 +1,6 @@
 // File: src/app/dashboard/DashboardPageClient.tsx
 "use client";
 
-import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   DashboardHeader,
@@ -11,9 +10,7 @@ import {
   RecentSessionsTable,
   LazyChart,
   AIRecommendationsPanel,
-  LoadingSpinner,
 } from '@/components/dashboard';
-import { fetchDashboardData } from '@/lib/dashboard/data-fetching';
 import { DashboardData } from '@/types/dashboard';
 
 // Dynamically import dashboard sections to reduce initial bundle size
@@ -36,44 +33,16 @@ const DashboardCharts = dynamic(() => import('@/components/dashboard/DashboardCh
   ssr: false,
 });
 
-export default function DashboardPageClient() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+interface DashboardPageClientProps {
+  initialData: DashboardData;
+}
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const data = (await fetchDashboardData()) as DashboardData;
-        if (!cancelled) {
-          setDashboardData(data);
-        }
-      } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading || !dashboardData) {
-    return <LoadingSpinner message="Loading your dashboard..." />;
-  }
-
-  const { stats } = dashboardData;
+export default function DashboardPageClient({ initialData }: DashboardPageClientProps) {
+  const { stats } = initialData;
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
-      {dashboardData.hasError && (
+      {initialData.hasError && (
         <div className="mb-4 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
           We couldnt load some of your stats. Data may be incomplete. Please try refreshing the page.
         </div>
@@ -89,7 +58,7 @@ export default function DashboardPageClient() {
         {/* Topic Mastery Column */}
         <div className="md:col-span-1">
           <TopicMasteryPanel
-            topicMastery={dashboardData.topicMastery}
+            topicMastery={initialData.topicMastery}
             masteredTopics={stats.masteredTopics}
           />
 
@@ -100,21 +69,21 @@ export default function DashboardPageClient() {
         <div className="md:col-span-2">
           <LazyChart>
             <DashboardCharts
-              performanceOverTime={dashboardData.performanceOverTime}
-              subjectPerformance={dashboardData.subjectPerformance}
-              questionTypeData={dashboardData.questionTypeData}
+              performanceOverTime={initialData.performanceOverTime}
+              subjectPerformance={initialData.subjectPerformance}
+              questionTypeData={initialData.questionTypeData}
             />
           </LazyChart>
         </div>
       </div>
 
       {/* Recent Sessions */}
-      <RecentSessionsTable sessions={dashboardData.recentSessions} />
+      <RecentSessionsTable sessions={initialData.recentSessions} />
 
       {/* AI Recommendations */}
       <AIRecommendationsPanel
-        focusAreas={dashboardData.focusAreas}
-        strongAreas={dashboardData.strongAreas}
+        focusAreas={initialData.focusAreas}
+        strongAreas={initialData.strongAreas}
         stats={stats}
       />
     </div>
