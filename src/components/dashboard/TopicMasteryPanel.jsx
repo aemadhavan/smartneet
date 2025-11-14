@@ -91,7 +91,11 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
       <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+          <label htmlFor="topic-mastery-search" className="sr-only">
+            Search topics
+          </label>
           <input
+            id="topic-mastery-search"
             type="text"
             placeholder="Search topics..."
             className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -103,7 +107,11 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
         <div className="flex gap-2">
           <div className="relative flex items-center">
             <Filter size={16} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <label htmlFor="topic-mastery-filter" className="sr-only">
+              Filter topics by mastery level
+            </label>
             <select
+              id="topic-mastery-filter"
               className="pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -117,16 +125,22 @@ const TopicMasteryPanel = ({ topicMastery, masteredTopics }) => {
             </select>
           </div>
           
-          <select
-            className="py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-          >
-            <option value="name">Sort by Name</option>
-            <option value="mastery">Sort by Mastery</option>
-            <option value="accuracy">Sort by Accuracy</option>
-            <option value="questions">Sort by Questions</option>
-          </select>
+          <div className="flex items-center">
+            <label htmlFor="topic-mastery-sort" className="sr-only">
+              Sort topics
+            </label>
+            <select
+              id="topic-mastery-sort"
+              className="py-1.5 px-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="name">Sort by Name</option>
+              <option value="mastery">Sort by Mastery</option>
+              <option value="accuracy">Sort by Accuracy</option>
+              <option value="questions">Sort by Questions</option>
+            </select>
+          </div>
         </div>
       </div>
       

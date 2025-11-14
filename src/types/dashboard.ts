@@ -78,4 +78,5 @@ export interface DashboardData {
   performanceOverTime: PerformanceOverTime[];
   focusAreas: AreaData[];
   strongAreas: AreaData[];
+  hasError?: boolean;
 }
