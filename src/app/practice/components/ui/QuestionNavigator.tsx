@@ -67,12 +67,12 @@ export function QuestionNavigator({
       className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6"
       ref={navigatorRef}
     >
-      <h3 
+      <h2 
         className="text-sm font-medium text-gray-600 dark:text-gray-300 mb-4"
         id="navigator-heading"
       >
         Question Navigator
-      </h3>
+      </h2>
       <div 
         className="flex flex-wrap gap-2"
         role="navigation" 
