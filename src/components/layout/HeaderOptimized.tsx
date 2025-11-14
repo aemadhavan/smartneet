@@ -5,7 +5,6 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
-import SignOutButton from '@/components/auth/SignOutButton';
 
 // Lazy load Clerk widgets to reduce initial JS
 const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
@@ -44,7 +43,7 @@ NavLink.displayName = 'NavLink';
 /**
  * Memoized UserSection to prevent re-renders when navigation changes
  */
-const UserSection = memo(({ isPracticePage }: { isPracticePage: boolean }) => {
+const UserSection = memo(() => {
   return (
     <div className="flex items-center space-x-4">
       <SignedIn>
@@ -60,12 +59,6 @@ const UserSection = memo(({ isPracticePage }: { isPracticePage: boolean }) => {
             showName={false}
             signInUrl="/sign-in"
           />
-          {/* Backup sign out button - only show on practice pages where sign out might have issues */}
-          {isPracticePage && (
-            <SignOutButton className="text-sm text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-gray-100">
-              Sign out
-            </SignOutButton>
-          )}
         </div>
       </SignedIn>
       <SignedOut>
@@ -96,7 +89,6 @@ UserSection.displayName = 'UserSection';
  */
 const Header = () => {
   const pathname = usePathname();
-  const isPracticePage = pathname?.startsWith('/practice');
   const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
 
   return (
@@ -150,7 +142,7 @@ quality={60}
 
         {/* Authentication */}
         {needsAuthUI ? (
-          <UserSection isPracticePage={isPracticePage} />
+          <UserSection />
         ) : (
           <div className="flex items-center space-x-4">
             <Link href="/sign-in" className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>

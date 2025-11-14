@@ -14,15 +14,6 @@ const DynamicUserButton = dynamic(() => import('@clerk/nextjs').then(m => m.User
 const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
 const SignedOut = dynamic(() => import('@clerk/nextjs').then(m => m.SignedOut), { ssr: false });
 
-// Lazy load SignOutButton (less critical)
-const SignOutButton = dynamic(
-  () => import('@/components/auth/SignOutButton'),
-  {
-    ssr: false,
-    loading: () => <div className="w-16 h-6 bg-gray-200 rounded animate-pulse" />
-  }
-);
-
 /**
  * Custom NavLink component with loading state
  */
@@ -77,7 +68,6 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
  */
 const Header = () => {
   const pathname = usePathname();
-  const isPracticePage = pathname?.startsWith('/practice');
   const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
 
   return (
@@ -146,12 +136,6 @@ quality={60}
                 showName={false}
                 signInUrl="/sign-in"
               />
-              {/* Backup sign out button - only show on practice pages where sign out might have issues */}
-              {isPracticePage && (
-                <SignOutButton className="text-sm text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-gray-100">
-                  Sign out
-                </SignOutButton>
-              )}
             </div>
           </SignedIn>
           <SignedOut>
