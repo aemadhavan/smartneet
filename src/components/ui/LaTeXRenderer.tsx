@@ -43,6 +43,9 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
   useEffect(() => {
     if (!containerRef.current || !katex) return;
 
+    // Ensure KaTeX styles are loaded before rendering math content
+    ensureKatexCssLoaded();
+
     try {
       // Function to render LaTeX with mixed content
       const renderMixedContent = (text: string): string => {
