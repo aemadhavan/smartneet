@@ -1,14 +1,47 @@
 // File: src/app/practice/components/ui/LoadingSpinner.tsx
 interface LoadingSpinnerProps {
-    message?: string;
-  }
-  
-  export function LoadingSpinner({ message = 'Loading...' }: LoadingSpinnerProps) {
-    return (
-      <div className="container mx-auto py-16 px-4 flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="w-16 h-16 border-t-4 border-indigo-500 border-solid rounded-full animate-spin mb-8"></div>
-        <p className="text-gray-600 text-lg">{message}</p>
+  message?: string;
+}
+
+// Skeleton loader that mimics the final practice layout (header, question card,
+// and navigator). This reduces layout shift when real content appears.
+export function LoadingSpinner({ message = 'Loading practice session...' }: LoadingSpinnerProps) {
+  return (
+    <div className="container mx-auto py-8 px-4">
+      {/* Header skeleton */}
+      <div className="mb-6">
+        <div className="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse mb-4" />
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5" />
       </div>
-    );
-  }
-  
+
+      {/* Question card skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+        <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse mb-4" />
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="h-10 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse"
+            />
+          ))}
+        </div>
+        <p className="mt-6 text-sm text-gray-500 dark:text-gray-400">
+          {message}
+        </p>
+      </div>
+
+      {/* Question navigator skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse mb-4" />
+        <div className="flex flex-wrap gap-2">
+          {Array.from({ length: 10 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-700 animate-pulse"
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
