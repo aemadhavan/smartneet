@@ -5,8 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import SessionCompletePage from './complete';
 import { 
-  SubjectSelector, 
-  QuestionNavigator, 
+  SubjectSelector,
   ErrorDisplay 
 } from './components/ui';
 import {
@@ -362,33 +361,25 @@ export default function PracticeClientPage() {
   if (session && session.questions && session.questions.length > 0) {
     return (
       <div className="container mx-auto py-8 px-4">
-        <div className="space-y-6">
-          <QuestionNavigator
-            questions={session.questions}
-            currentIndex={currentQuestionIndex}
-            userAnswers={userAnswers}
-            onQuestionSelect={setCurrentQuestionIndex}
-          />
-          <SessionContent
-            session={session}
-            title={getSessionTitle()}
-            currentQuestionIndex={currentQuestionIndex}
-            userAnswers={userAnswers}
-            isPremium={isPremium}
-            limitParam={limitParam}
-            limitStatus={limitStatus}
-            limitsRefreshKey={limitsRefreshKey}
-            showLimitNotification={showLimitNotification}
-            limitMessage={limitMessage}
-            setCurrentQuestionIndex={setCurrentQuestionIndex}
-            handleOptionSelect={handleOptionSelect}
-            handleNextQuestion={handleNextQuestion}
-            handleCompleteSession={handleCompleteSession}
-            isCompleting={isCompleting}
-            elapsedTime={sessionTimer.formattedTime}
-            isTimerRunning={sessionTimer.isRunning}
-          />
-        </div>
+        <SessionContent
+          session={session}
+          title={getSessionTitle()}
+          currentQuestionIndex={currentQuestionIndex}
+          userAnswers={userAnswers}
+          isPremium={isPremium}
+          limitParam={limitParam}
+          limitStatus={limitStatus}
+          limitsRefreshKey={limitsRefreshKey}
+          showLimitNotification={showLimitNotification}
+          limitMessage={limitMessage}
+          setCurrentQuestionIndex={setCurrentQuestionIndex}
+          handleOptionSelect={handleOptionSelect}
+          handleNextQuestion={handleNextQuestion}
+          handleCompleteSession={handleCompleteSession}
+          isCompleting={isCompleting}
+          elapsedTime={sessionTimer.formattedTime}
+          isTimerRunning={sessionTimer.isRunning}
+        />
       </div>
     );
   }

@@ -101,14 +101,16 @@ const SessionContent = memo(function SessionContent({
         onQuestionSelect={setCurrentQuestionIndex}
       />
 
-      {/* Limit notification */}
-      {showLimitNotification && 
-        <SubscriptionLimitNotification 
-          message={limitMessage}
-        />
-      }
+      {/* Limit notification region with reserved space to reduce layout shift */}
+      <div className="mt-4 min-h-[64px]" aria-live="polite">
+        {showLimitNotification && (
+          <SubscriptionLimitNotification 
+            message={limitMessage}
+          />
+        )}
+      </div>
     </div>
   );
 });
 
-export { SessionContent };
+export default SessionContent;

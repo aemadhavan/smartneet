@@ -1,5 +1,6 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
+import dynamic from 'next/dynamic';
 import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
 import { 
   Question, 
@@ -11,18 +12,30 @@ import {
   SequenceOrderingDetails,
   DiagramBasedDetails
 } from '@/app/practice/types';
-import { 
-  MultipleChoiceQuestion, 
-  MatchingQuestion, 
-  AssertionReasonQuestion,
-  MultipleCorrectStatementsQuestion,
-  SequenceOrderingQuestion,
-  DiagramBasedQuestion
-} from '@/app/practice/components/questions';
 import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 import { logger } from '@/lib/logger'; // Import the logger service
 import QuestionErrorBoundary from './QuestionErrorBoundary';
 import { NetworkStatusIndicator } from '../ui/NetworkStatusIndicator';
+
+// Dynamically import heavy question-type components to reduce initial bundle size
+const MultipleChoiceQuestion = dynamic(() =>
+  import('./MultipleChoiceQuestion').then(m => m.MultipleChoiceQuestion)
+);
+const MatchingQuestion = dynamic(() =>
+  import('./MatchingQuestion').then(m => m.MatchingQuestion)
+);
+const AssertionReasonQuestion = dynamic(() =>
+  import('./AssertionReasonQuestion').then(m => m.AssertionReasonQuestion)
+);
+const MultipleCorrectStatementsQuestion = dynamic(() =>
+  import('./MultipleCorrectStatementsQuestion').then(m => m.MultipleCorrectStatementsQuestion)
+);
+const SequenceOrderingQuestion = dynamic(() =>
+  import('./SequenceOrderingQuestion').then(m => m.SequenceOrderingQuestion)
+);
+const DiagramBasedQuestion = dynamic(() =>
+  import('./DiagramBasedQuestion').then(m => m.DiagramBasedQuestion)
+);
 
 interface QuestionDisplayProps {
   question: Question;

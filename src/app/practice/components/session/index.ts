@@ -5,4 +5,4 @@ export { DailyLimitReached } from './DailyLimitReached';
 export { EmptyState } from './EmptyState';
 export { FreeAccessBanner } from './FreeAccessBanner';
 export { SessionHeader } from './SessionHeader';
-export { SessionContent } from './SessionContent';
+export { default as SessionContent } from './SessionContent';
