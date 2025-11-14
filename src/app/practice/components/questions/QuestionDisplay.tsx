@@ -1,7 +1,10 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
 import dynamic from 'next/dynamic';
-import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
+const LaTeXRenderer = dynamic(
+  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer),
+  { ssr: false }
+);
 import { 
   Question, 
   QuestionDetails,
@@ -15,7 +18,10 @@ import {
 import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 import { logger } from '@/lib/logger'; // Import the logger service
 import QuestionErrorBoundary from './QuestionErrorBoundary';
-import { NetworkStatusIndicator } from '../ui/NetworkStatusIndicator';
+const NetworkStatusIndicator = dynamic(
+  () => import('../ui/NetworkStatusIndicator').then(m => m.NetworkStatusIndicator),
+  { ssr: false }
+);
 
 // Dynamically import heavy question-type components to reduce initial bundle size
 const MultipleChoiceQuestion = dynamic(() =>

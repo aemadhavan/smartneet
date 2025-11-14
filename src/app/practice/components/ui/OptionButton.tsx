@@ -1,5 +1,10 @@
 // src/app/practice/components/ui/OptionButton.tsx
-import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
+import dynamic from 'next/dynamic';
+
+const LaTeXRenderer = dynamic(
+  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer),
+  { ssr: false }
+);
 
 interface OptionButtonProps {
   option: {

@@ -1,4 +1,7 @@
 // src/app/practice/hooks/usePracticeSessionSWR.ts
+// NOTE: This hook is currently unused in the practice flow. It remains for
+// potential future experiments but is excluded from the main bundle by
+// avoiding any imports from this file in route components.
 import { useState, useCallback, useRef, useMemo } from 'react';
 import useSWRMutation from 'swr/mutation';
 import { Subject, SessionResponse } from '../types';

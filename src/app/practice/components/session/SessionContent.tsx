@@ -74,9 +74,12 @@ const SessionContent = memo(function SessionContent({
         {limitStatus && <SubscriptionLimitDisplay refreshKey={limitsRefreshKey} />}
       </SessionHeader>
 
-      {!isPremium && limitParam === 'free' && (
-        <FreeAccessBanner />
-      )}
+      {/* Free access banner region with reserved space to reduce layout shift */}
+      <div className="mb-4 min-h-[64px]" aria-live="polite">
+        {!isPremium && limitParam === 'free' && (
+          <FreeAccessBanner />
+        )}
+      </div>
 
       {/* Question display */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
