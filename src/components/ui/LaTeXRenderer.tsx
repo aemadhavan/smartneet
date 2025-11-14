@@ -10,9 +10,15 @@ interface LaTeXRendererProps {
   inline?: boolean;
 }
 
-// Dynamically import KaTeX to avoid SSR issues. We'll load it lazily inside
-// the effect only when we detect LaTeX-like content.
+// Dynamically import KaTeX to avoid SSR issues
 let katex: typeof KaTeX | null = null;
+
+// Load the KaTeX runtime JS on the client, but do NOT load the heavy CSS up front
+if (typeof window !== 'undefined') {
+  import('katex').then((KaTeX) => {
+    katex = KaTeX.default;
+  });
+}
 
 // Lazy-load KaTeX CSS the first time this component mounts.
 // This keeps the CSS out of the critical path and avoids blocking LCP.
@@ -35,33 +41,11 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !katex) return;
 
-    // Fast path: if there are no obvious math / chemistry markers, avoid
-    // loading KaTeX entirely and just render the raw content.
-    const hasPotentialMath = /[$₀-₉⁰-⁹α-ωΑ-Ω]/.test(content);
-    if (!hasPotentialMath) {
-      containerRef.current.innerHTML = content;
-      return;
-    }
-
-    let cancelled = false;
-
-    const render = async () => {
-      try {
-        // Lazily load KaTeX runtime on first use
-        if (!katex) {
-          const KaTeXModule = await import('katex');
-          if (cancelled) return;
-          katex = KaTeXModule.default;
-        }
-
-        // Defer CSS load until we actually render LaTeX
-        ensureKatexCssLoaded();
-        if (!containerRef.current || !katex) return;
-
-        // Function to render LaTeX with mixed content
-        const renderMixedContent = (text: string): string => {
+    try {
+      // Function to render LaTeX with mixed content
+      const renderMixedContent = (text: string): string => {
         // Pre-process common chemistry notation patterns that aren't properly wrapped
         let preprocessed = text;
         
@@ -128,25 +112,25 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
       };
 
       const renderedContent = renderMixedContent(content);
-      if (!cancelled && containerRef.current) {
-        containerRef.current.innerHTML = renderedContent;
-      }
+      containerRef.current.innerHTML = renderedContent;
     } catch (error) {
-      if (!cancelled) {
-        console.error('LaTeX rendering error:', error);
-        // Fallback to original content if rendering fails
-        if (containerRef.current) {
-          containerRef.current.innerHTML = content;
-        }
+      console.error('LaTeX rendering error:', error);
+      // Fallback to original content if rendering fails
+      if (containerRef.current) {
+        containerRef.current.innerHTML = content;
       }
     }
-
-    void render();
-
-    return () => {
-      cancelled = true;
-    };
   }, [content, inline]);
+
+  // Loading state while KaTeX is being imported
+  if (typeof window !== 'undefined' && !katex) {
+    return (
+      <div 
+        className={`${className} animate-pulse`}
+        dangerouslySetInnerHTML={{ __html: content }}
+      />
+    );
+  }
 
   return (
     <div
