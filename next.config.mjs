@@ -10,7 +10,7 @@ const ContentSecurityPolicy = `
   connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev https://www.clarity.ms https://*.clarity.ms https://clerk-telemetry.com https://*.ingest.us.sentry.io https://*.sentry.io https://api.stripe.com https://hooks.stripe.com;
   font-src 'self' https://fonts.gstatic.com;
   img-src 'self' data: https://img.clerk.com https://images.clerk.dev https://q.stripe.com;
-  frame-src 'self' https://www.googletagmanager.com https://*.clerk.accounts.dev https://js.stripe.com https://hooks.stripe.com;
+  frame-src 'self' https://www.googletagmanager.com https://*.clerk.accounts.dev https://js.stripe.com https://hooks.stripe.com https://vercel.live;
   object-src 'none';
   base-uri 'self';
   form-action 'self';

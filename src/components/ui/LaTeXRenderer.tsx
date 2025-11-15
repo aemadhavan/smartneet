@@ -25,15 +25,15 @@ if (typeof window !== 'undefined') {
 function ensureKatexCssLoaded() {
   if (typeof document === 'undefined') return;
   if (document.getElementById('katex-css')) return;
+
   const link = document.createElement('link');
   link.id = 'katex-css';
   link.rel = 'stylesheet';
-  link.href = '/_next/static/css/katex.min.css';
-  // Fallback path when Next inlines assets under node_modules
-  // If the above path 404s, inject from CDN.
-  link.onerror = () => {
-    link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
-  };
+
+  // Load directly from the official CDN instead of a hard-coded
+  // Next.js "_next/static" path, which was causing 404s in production.
+  link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css';
+
   document.head.appendChild(link);
 }
 

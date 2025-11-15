@@ -115,7 +115,7 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
     // Allow Clerk telemetry and Stripe APIs
     "connect-src 'self' https://www.google-analytics.com https://vitals.vercel-insights.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com wss://*.clerk.accounts.dev https://www.clarity.ms https://*.clarity.ms https://clerk-telemetry.com https://*.ingest.us.sentry.io https://*.sentry.io https://api.stripe.com https://hooks.stripe.com",
     // Allow Stripe frames in addition to existing sources
-    "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com https://*.clerk.accounts.dev https://js.stripe.com https://hooks.stripe.com",
+    "frame-src 'self' https://www.googletagmanager.com https://challenges.cloudflare.com https://*.clerk.accounts.dev https://js.stripe.com https://hooks.stripe.com https://vercel.live",
     "worker-src 'self' blob:",
     "media-src 'self' blob: data:",
     "object-src 'none'",
