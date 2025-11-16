@@ -73,6 +73,12 @@ const nextConfig: NextConfig = {
       version: '1.0.0'
     };
 
+    // Suppress known harmless warnings from Sentry's OpenTelemetry instrumentation
+    config.ignoreWarnings = [
+      /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
+      { module: /require-in-the-middle/ },
+    ];
+
     // Enable source maps for production (hidden source maps for security)
     if (!dev) {
       config.devtool = 'hidden-source-map';
@@ -264,12 +270,10 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
   disableLogger: true,
   automaticVercelMonitors: true,
-  // Enable source maps and upload to Sentry
   sourcemaps: {
     disable: false,
-    // Delete source maps from build output after upload to Sentry
     deleteSourcemapsAfterUpload: true,
   },
   autoInstrumentServerFunctions: false,
-  autoInstrumentMiddleware: false
+  autoInstrumentMiddleware: false,
 });

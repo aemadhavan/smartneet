@@ -21,7 +21,7 @@ const geistSans = Geist({
   display: 'optional', // Changed from 'swap' to 'optional' for better CLS
   preload: true,
   fallback: ['system-ui', 'arial'],
-  adjustFontFallback: true,
+  adjustFontFallback: false,
 });
 
 const geistMono = Geist_Mono({
@@ -30,7 +30,7 @@ const geistMono = Geist_Mono({
   display: 'optional', // Changed from 'swap' to 'optional' for better CLS
   preload: false,
   fallback: ['Courier New', 'monospace'],
-  adjustFontFallback: true,
+  adjustFontFallback: false,
 });
 
 /**
@@ -95,7 +95,7 @@ export default function RootLayout({
         {/* Preconnect only to critical origins actually in use */}
         <link rel="preconnect" href="https://www.googletagmanager.com" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col`} suppressHydrationWarning>
         {process.env.NEXT_PUBLIC_DISABLE_ANALYTICS !== '1' && <GoogleTagManager />}
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{display:'none', visibility:'hidden'}}></iframe></noscript>
         {process.env.NODE_ENV === 'production' && <Analytics />}

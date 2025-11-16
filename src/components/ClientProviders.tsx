@@ -4,42 +4,37 @@
  * Client-side providers wrapper
  * OPTIMIZED: Enhanced loading strategy to reduce main-thread work
  * - PerformanceMonitor: Loaded dynamically with no SSR
- * - ClerkProvider: Loaded only on routes that need auth UI (dashboard, practice, auth pages)
+ * - ClerkProvider: Imported directly and wrapped in Suspense to handle internal boundaries
  */
 
-import { ReactNode } from 'react';
-import dynamic from 'next/dynamic';
+import { ReactNode, Suspense } from 'react';
+import { ClerkProvider } from '@clerk/nextjs';
 
-// Dynamically import PerformanceMonitor (client-only, no SSR needed)
-const PerformanceMonitor = dynamic(
-  () => import('@/components/PerformanceMonitor'),
-  { ssr: false }
-);
-
-// Defer ClerkProvider to the client to avoid pulling polyfills into the critical vendor chunk
-const ClerkProvider = dynamic(
-  () => import('@clerk/nextjs').then(m => m.ClerkProvider),
-  { ssr: false }
-);
+// Temporarily disabled PerformanceMonitor due to conflicts with Sentry instrumentation
+// TODO: Re-enable after investigating webpack/Sentry conflict
+// const PerformanceMonitor = dynamic(
+//   () => import('@/components/PerformanceMonitor').catch(() => ({ default: () => null })),
+//   {
+//     ssr: false,
+//     loading: () => null
+//   }
+// );
 
 interface ClientProvidersProps {
   children: ReactNode;
 }
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
-  const isDev = process.env.NODE_ENV !== 'production';
-
   // NOTE: ClerkProvider must always be present anywhere we use <SignedIn>/<SignedOut>/hooks.
-  // We still load it via a dynamic import with ssr: false so it doesn't impact the server bundle.
+  // We wrap children in Suspense to handle Clerk's internal Suspense boundaries and avoid hydration mismatches.
 
   return (
     <>
-      {isDev && <PerformanceMonitor />}
+      {/* Temporarily disabled PerformanceMonitor due to Sentry conflict */}
       <ClerkProvider
         publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         appearance={{
-          elements: { rootBox: "font-sans" },
-          layout: { shimmer: false }
+          elements: { rootBox: "font-sans" }
         }}
         // Use the new redirect props; this acts as a fallback when no redirect_url is present
         signInFallbackRedirectUrl="/dashboard"
@@ -47,7 +42,9 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
         signInUrl="/sign-in"
         signUpUrl="/sign-up"
       >
-        {children}
+        <Suspense fallback={null}>
+          {children}
+        </Suspense>
       </ClerkProvider>
     </>
   );
