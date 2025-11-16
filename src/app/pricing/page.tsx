@@ -1,8 +1,14 @@
 // src/app/pricing/page.tsx
 import { Suspense } from 'react';
+import { Metadata } from 'next';
 import { Loader2 } from 'lucide-react';
 import PricingUserSection from './PricingUserSection';
 import ErrorDisplay from './ErrorDisplay';
+
+export const metadata: Metadata = {
+  title: 'Pricing Plans - SmarterNEET | Affordable NEET Preparation',
+  description: 'Choose the perfect NEET preparation plan for your needs. Access unlimited practice questions, personalized analytics, and AI-powered tests. Affordable pricing with flexible monthly and yearly subscriptions.',
+};
 
 // Types
 type SubscriptionPlan = {

@@ -5,6 +5,9 @@ import path from 'path';
 const nextConfig: NextConfig = {
   serverExternalPackages: ['drizzle-orm'],
 
+  // Transpile Sentry instrumentation packages to fix Turbopack/pnpm hoisting issues
+  transpilePackages: ['import-in-the-middle', 'require-in-the-middle'],
+
   // Temporarily disabled standalone mode due to Html import errors
   // output: 'standalone',
 
@@ -60,7 +63,21 @@ const nextConfig: NextConfig = {
     },
   },
 
-  webpack: (config, { dev, webpack }) => {
+  webpack: (config, { dev, isServer }) => {
+    // Mark require-in-the-middle as external on server to prevent Webpack bundling it
+    // This stops the "Critical dependency" warning from Sentry's OpenTelemetry instrumentation
+    if (isServer) {
+      if (Array.isArray(config.externals)) {
+        config.externals.push('require-in-the-middle', 'import-in-the-middle');
+      } else {
+        config.externals = [
+          ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+          'require-in-the-middle',
+          'import-in-the-middle',
+        ];
+      }
+    }
+
     // Enable filesystem caching for both dev and production builds
     config.cache = {
       type: 'filesystem',
@@ -72,12 +89,6 @@ const nextConfig: NextConfig = {
       maxAge: dev ? 604800000 : 172800000, // 7 days for dev, 2 days for prod
       version: '1.0.0'
     };
-
-    // Suppress known harmless warnings from Sentry's OpenTelemetry instrumentation
-    config.ignoreWarnings = [
-      /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
-      { module: /require-in-the-middle/ },
-    ];
 
     // Enable source maps for production (hidden source maps for security)
     if (!dev) {
