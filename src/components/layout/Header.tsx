@@ -103,8 +103,10 @@ quality={60}
           </NavLink>
           <NavLink href="/chemistry" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Chemistry
-          </NavLink>         
-          
+          </NavLink>
+          <NavLink href="/physics" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Physics
+          </NavLink>
           <NavLink href="/smarter-guides" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Smarter Guides (Bodhi AI)
           </NavLink>
@@ -116,7 +118,6 @@ quality={60}
               Practice
             </NavLink>
           </SignedIn>
-          <span className="text-gray-400">Physics (Coming soon)</span>
           
         </nav>
 

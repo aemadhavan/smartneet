@@ -125,7 +125,9 @@ quality={60}
           <NavLink href="/chemistry" className="text-gray-700">
             Chemistry
           </NavLink>
-
+          <NavLink href="/physics" className="text-gray-700">
+            Physics
+          </NavLink>
           <NavLink href="/smarter-guides" className="text-gray-700">
             Smarter Guides (Bodhi AI)
           </NavLink>
@@ -137,7 +139,6 @@ quality={60}
               Practice
             </NavLink>
           </SignedIn>
-          <span className="text-gray-400">Physics (Coming soon)</span>
         </nav>
 
         {/* Authentication */}

@@ -208,23 +208,31 @@ export async function POST(request: NextRequest) {
         context: 'practice-sessions.POST',
         error: e instanceof Error ? e : String(e)
       });
-      
+
       // Check if it's a database constraint error
       if (e instanceof Error && e.message.includes('23505')) {
         return NextResponse.json(
-          { 
+          {
             message: "Duplicate session or questions detected",
             error: "A constraint violation occurred. Please try again."
           },
           { status: 409 }, // Conflict status code
         );
       }
-      
+
+      // In development, provide more details for debugging
+      const isDev = process.env.NODE_ENV === 'development';
+
       // Provide generic error message without exposing implementation details
       return NextResponse.json(
-        { 
+        {
           message: "Failed to create practice session",
-          error: "An unexpected error occurred"
+          error: "An unexpected error occurred",
+          // Include error details in development for easier debugging
+          ...(isDev && e instanceof Error ? {
+            devError: e.message,
+            devStack: e.stack?.split('\n').slice(0, 5).join('\n')
+          } : {})
         },
         { status: 500 },
       );
