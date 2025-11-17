@@ -26,14 +26,14 @@ function getPool() {
       ssl: {
         rejectUnauthorized: false // This might be needed for Xata connections
       },
-      max: 20, // Increased maximum connections for better concurrent handling
-      min: 2, // Maintain minimum connections for faster response
-      idleTimeoutMillis: 60000, // Keep connections longer to reduce reconnection overhead
-      connectionTimeoutMillis: 10000, // Increased timeout for slower networks
+      max: 5, // Reduced for serverless - prevents connection exhaustion
+      min: 0, // No persistent connections - better for serverless cold starts
+      idleTimeoutMillis: 30000, // Release idle connections sooner to prevent stale connections
+      connectionTimeoutMillis: 20000, // Increased timeout for database connection establishment
       allowExitOnIdle: true // Allow the process to exit if pool is idle
     });
 
-    // Add error handling
+    // Add error handling for idle client errors
     poolInstance.on('error', (err) => {
       console.error('Unexpected error on idle client', err);
       // Don't exit in production - just log the error
@@ -64,15 +64,21 @@ export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3):
       
       // Retry for database connection errors
       const errorMessage = dbError.message || String(error);
-      const isRetryableError = 
-        dbError.code === 'XATA_CONCURRENCY_LIMIT' || 
+      const isRetryableError =
+        dbError.code === 'ECONNRESET' ||  // Connection reset by peer
+        dbError.code === 'ENOTFOUND' ||   // DNS lookup failed
+        dbError.code === 'ETIMEDOUT' ||   // Connection timeout
+        dbError.code === 'ECONNREFUSED' || // Connection refused
+        dbError.code === 'XATA_CONCURRENCY_LIMIT' ||
         dbError.code === '53300' ||  // Too many connections
         dbError.code === '08006' ||  // Connection terminated
         dbError.code === '08001' ||  // Unable to establish connection
         errorMessage.includes('unable to connect to the appropriate database') ||
         errorMessage.includes('connection terminated') ||
+        errorMessage.includes('connection timeout') ||  // Added for timeout errors
         errorMessage.includes('too many connections') ||
-        errorMessage.includes('connection failed');
+        errorMessage.includes('connection failed') ||
+        errorMessage.includes('ECONNRESET');
         
       if (isRetryableError) {
         lastError = dbError;
@@ -92,7 +98,8 @@ export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3):
 }
 
 // Optional: Test query to verify connection with retry
-async function testConnection() {
+// Export this function so it can be called manually if needed
+export async function testConnection() {
   try {
     await withRetry(async () => {
       const client = await pool.connect();
@@ -109,8 +116,11 @@ async function testConnection() {
   }
 }
 
-// Run the test connection
-testConnection();
+// Only test connection if explicitly enabled via environment variable
+// This prevents connection churn on every module load
+if (process.env.DB_TEST_CONNECTION === 'true') {
+  testConnection();
+}
 
 // Re-export schema
 export * from './schema';

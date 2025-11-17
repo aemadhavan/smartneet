@@ -140,6 +140,10 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
     headers.set('Pragma', 'no-cache');
     headers.set('Expires', '0');
   }
+  // Homepage - optimized for bfcache with short cache
+  else if (pathname === '/') {
+    headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=86400');
+  }
   // Chemistry/Biology pages - with stale-while-revalidate
   else if (pathname.startsWith('/chemistry') || pathname.startsWith('/biology')) {
     headers.set('Cache-Control', 'public, max-age=0, must-revalidate, stale-while-revalidate=3600');

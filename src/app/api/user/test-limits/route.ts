@@ -75,12 +75,12 @@ export async function GET(request: Request) {
     
     if (!response) {
       try {
-        // Set a timeout for database operations (5 seconds)
+        // Set a timeout for database operations (15 seconds to account for retries and first connection)
         let timeoutId: NodeJS.Timeout | null = null;
         const dbTimeoutPromise = new Promise<TestLimitResponse>((_, reject) => {
           timeoutId = setTimeout(() => {
             reject(new Error('Database operation timeout'));
-          }, 5000);
+          }, 15000);
         });
         
         // Database query promise

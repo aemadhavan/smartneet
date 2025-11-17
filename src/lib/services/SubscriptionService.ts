@@ -1,6 +1,6 @@
 // src/lib/services/SubscriptionService.ts
 import { eq, and, sql } from 'drizzle-orm';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { 
   subscription_plans, 
   user_subscriptions,
@@ -180,9 +180,11 @@ export class SubscriptionService {
         metadata: null
       };
       
-      const [subscription] = await db.insert(user_subscriptions) // Assuming default sub creation is not part of a larger tx here
-        .values(newSubscription)
-        .returning();
+      const [subscription] = await withRetry(async () =>
+        db.insert(user_subscriptions)
+          .values(newSubscription)
+          .returning()
+      );
       
       // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
       
@@ -297,18 +299,20 @@ export class SubscriptionService {
       // If no tests taken or last test was on a different day, reset counter
       if (!lastTestDate || !this.isSameDay(lastTestDate, now)) {
         console.log(`[DEBUG] Resetting counter for user ${userId} - new day detected`);
-        
-        await db.update(user_subscriptions)
-          .set({ 
-            tests_used_today: 0,
-            updated_at: now
-          })
-          .where(eq(user_subscriptions.user_id, userId));
-        
+
+        await withRetry(async () =>
+          db.update(user_subscriptions)
+            .set({
+              tests_used_today: 0,
+              updated_at: now
+            })
+            .where(eq(user_subscriptions.user_id, userId))
+        );
+
         // Clear cache to ensure fresh data
         const cacheKey = `user:${userId}:subscription`;
         await cache.delete(cacheKey).catch(() => {}); // Ignore cache errors
-        
+
         console.log(`[DEBUG] Counter reset complete for user ${userId}`);
       } else {
         console.log(`[DEBUG] No reset needed for user ${userId} - same day`);
@@ -363,16 +367,18 @@ export class SubscriptionService {
   async incrementTestCount(userId: string): Promise<void> {
     try {
       const today = new Date();
-      
-      await db.update(user_subscriptions)
-        .set({ 
-          tests_used_today: sql`${user_subscriptions.tests_used_today} + 1`,
-          tests_used_total: sql`${user_subscriptions.tests_used_total} + 1`,
-          last_test_date: today,
-          updated_at: today
-        })
-        .where(eq(user_subscriptions.user_id, userId));
-      
+
+      await withRetry(async () =>
+        db.update(user_subscriptions)
+          .set({
+            tests_used_today: sql`${user_subscriptions.tests_used_today} + 1`,
+            tests_used_total: sql`${user_subscriptions.tests_used_total} + 1`,
+            last_test_date: today,
+            updated_at: today
+          })
+          .where(eq(user_subscriptions.user_id, userId))
+      );
+
       // await CacheInvalidator.invalidateUserSubscription(userId); // Moved
     } catch (error) {
       console.error(`Error incrementing test count for user ${userId}:`, error);

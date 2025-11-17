@@ -78,10 +78,11 @@ export function HeroClientCarousel() {
   }, [api]);
 
   // Array of images for the carousel
+  // Optimized dimensions to match actual display size (~408px on mobile to ~600px on desktop)
   const images: CarouselImage[] = [
-    { src: "/dashboard.webp", alt: "Dashboard visualization showing NEET practice analytics", width: 1200, height: 800 },
-    { src: "/practice-analysis.webp", alt: "Detailed practice analysis showing performance metrics", width: 1200, height: 800 },
-    { src: "/practice-summary.webp", alt: "Summary of practice session results", width: 1200, height: 800 },
+    { src: "/dashboard.webp", alt: "Dashboard visualization showing NEET practice analytics", width: 800, height: 600 },
+    { src: "/practice-analysis.webp", alt: "Detailed practice analysis showing performance metrics", width: 800, height: 600 },
+    { src: "/practice-summary.webp", alt: "Summary of practice session results", width: 800, height: 600 },
   ];
 
   return (
@@ -117,8 +118,9 @@ export function HeroClientCarousel() {
                             className="w-full h-auto object-contain"
                             priority={index === 0}
                             fetchPriority={index === 0 ? "high" : "low"}
-                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 600px"
                             loading={index === 0 ? "eager" : "lazy"}
+                            quality={85}
                           />
                         </div>
                       </CardContent>

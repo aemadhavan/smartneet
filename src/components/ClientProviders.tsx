@@ -5,10 +5,12 @@
  * OPTIMIZED: Enhanced loading strategy to reduce main-thread work
  * - PerformanceMonitor: Loaded dynamically with no SSR
  * - ClerkProvider: Imported directly and wrapped in Suspense to handle internal boundaries
+ * - BfcacheHandler: Handles back/forward cache restoration
  */
 
 import { ReactNode, Suspense } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
+import BfcacheHandler from '@/components/BfcacheHandler';
 
 // Temporarily disabled PerformanceMonitor due to conflicts with Sentry instrumentation
 // TODO: Re-enable after investigating webpack/Sentry conflict
@@ -31,6 +33,7 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
   return (
     <>
       {/* Temporarily disabled PerformanceMonitor due to Sentry conflict */}
+      <BfcacheHandler />
       <ClerkProvider
         publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
         appearance={{
