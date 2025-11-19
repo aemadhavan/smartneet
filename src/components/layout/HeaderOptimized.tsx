@@ -103,7 +103,7 @@ const Header = () => {
             height={48}
             className="rounded-full object-contain"
             priority
-quality={60}
+            quality={60}
             sizes="48px"
           />
           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -131,14 +131,18 @@ quality={60}
           <NavLink href="/smarter-guides" className="text-gray-700">
             Smarter Guides (Bodhi AI)
           </NavLink>
-          <SignedIn>
-            <NavLink href="/dashboard" className="text-gray-700">
-              Dashboard
-            </NavLink>
-            <NavLink href="/practice" className="text-gray-700">
-              Practice
-            </NavLink>
-          </SignedIn>
+
+          {/* Only render authenticated links if NOT on a performance route (where Clerk is disabled) */}
+          {!(pathname?.startsWith('/smarter-guides') || pathname === '/' || pathname?.startsWith('/biology') || pathname?.startsWith('/chemistry') || pathname?.startsWith('/physics') || pathname?.startsWith('/pricing')) && (
+            <SignedIn>
+              <NavLink href="/dashboard" className="text-gray-700">
+                Dashboard
+              </NavLink>
+              <NavLink href="/practice" className="text-gray-700">
+                Practice
+              </NavLink>
+            </SignedIn>
+          )}
         </nav>
 
         {/* Authentication */}

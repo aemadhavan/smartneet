@@ -96,6 +96,15 @@ export default function BotanyContent() {
 
   return (
     <div className="container mx-auto px-4 py-12">
+      <Link
+        href="/smarter-guides"
+        className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Back to Guides
+      </Link>
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-4">Botany</h1>
         <p className="text-xl text-gray-600">
@@ -117,11 +126,10 @@ export default function BotanyContent() {
                     key={subtopic.subtopicId}
                     href={`/smarter-guides/botany/${subtopic.slug}`}
                     onClick={() => handleLinkClick(subtopic.slug)}
-                    className={`group flex items-center justify-between p-4 rounded-lg border transition-colors ${
-                      loadingLink === subtopic.slug 
-                        ? 'bg-blue-50 border-blue-200 cursor-wait' 
+                    className={`group flex items-center justify-between p-4 rounded-lg border transition-colors ${loadingLink === subtopic.slug
+                        ? 'bg-blue-50 border-blue-200 cursor-wait'
                         : 'hover:bg-gray-50'
-                    }`}
+                      }`}
                   >
                     <span className="font-medium">{subtopic.title}</span>
                     {loadingLink === subtopic.slug ? (

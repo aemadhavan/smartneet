@@ -3,8 +3,20 @@ import Link from "next/link"
 import { BookOpen, Beaker, Leaf, Microscope, Sparkles, UserCheck, Layers3, Clock } from "lucide-react"
 
 export const metadata: Metadata = {
-  title: "Smarter Guides - NEET Preparation",
-  description: "AI-powered study guides for NEET exam preparation in Botany, Zoology, Chemistry, and Physics",
+  title: "Smarter Guides - NEET Preparation | SmarterNEET",
+  description: "Master NEET with Smarter Guides. Access AI-powered study material for Botany, Zoology, Chemistry, and Physics. Personalized learning paths for medical aspirants.",
+  openGraph: {
+    title: "Smarter Guides - NEET Preparation | SmarterNEET",
+    description: "Master NEET with Smarter Guides. Access AI-powered study material for Botany, Zoology, Chemistry, and Physics. Personalized learning paths for medical aspirants.",
+    type: "website",
+    url: "https://smarterneet.com/smarter-guides",
+    siteName: "SmarterNEET",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Smarter Guides - NEET Preparation | SmarterNEET",
+    description: "Master NEET with Smarter Guides. Access AI-powered study material for Botany, Zoology, Chemistry, and Physics.",
+  }
 }
 
 const subjects = [
@@ -14,6 +26,7 @@ const subjects = [
     icon: Leaf,
     href: "/smarter-guides/botany",
     color: "bg-green-100 border-green-400",
+    hexColor: "#dcfce7", // green-100
     available: true,
   },
   {
@@ -22,6 +35,7 @@ const subjects = [
     icon: Microscope,
     href: "/smarter-guides/zoology",
     color: "bg-blue-100 border-blue-400",
+    hexColor: "#dbeafe", // blue-100
     available: false,
   },
   {
@@ -30,6 +44,7 @@ const subjects = [
     icon: Beaker,
     href: "/smarter-guides/chemistry",
     color: "bg-purple-100 border-purple-400",
+    hexColor: "#f3e8ff", // purple-100
     available: false,
   },
   {
@@ -38,6 +53,7 @@ const subjects = [
     icon: BookOpen,
     href: "/smarter-guides/physics",
     color: "bg-red-100 border-red-400",
+    hexColor: "#fee2e2", // red-100
     available: false,
   },
 ]
@@ -77,7 +93,10 @@ export default function SmarterGuidesPage() {
             key={subject.title}
             className={`relative group rounded-2xl border-2 ${subject.color} p-8 shadow-sm transition-transform duration-300 hover:scale-105 hover:shadow-lg flex flex-col items-start bg-white overflow-hidden`}
           >
-            <div className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity w-32 h-32 rounded-full" style={{background: `radial-gradient(circle, ${subject.color.split(' ')[0]}, transparent 70%)`}} />
+            <div
+              className="absolute right-0 top-0 opacity-10 group-hover:opacity-20 transition-opacity w-32 h-32 rounded-full"
+              style={{ background: `radial-gradient(circle, ${subject.hexColor}, transparent 70%)` }}
+            />
             <subject.icon className="h-12 w-12 mb-4 text-gray-900 z-10" />
             <h2 className="text-2xl font-semibold mb-2 z-10">{subject.title}</h2>
             <p className="text-gray-600 mb-4 z-10">{subject.description}</p>
@@ -89,7 +108,7 @@ export default function SmarterGuidesPage() {
                 Explore
               </Link>
             ) : (
-              <span className="mt-auto inline-block bg-gray-200 text-gray-500 px-6 py-2 rounded-lg font-semibold cursor-not-allowed">
+              <span className="mt-auto inline-block bg-gray-200 text-gray-700 px-6 py-2 rounded-lg font-semibold cursor-not-allowed">
                 <Clock className="inline-block w-4 h-4 mr-1 -mt-1" /> Coming Soon
               </span>
             )}
@@ -120,4 +139,4 @@ export default function SmarterGuidesPage() {
       </div>
     </div>
   )
-} 
+}

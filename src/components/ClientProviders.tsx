@@ -9,8 +9,13 @@
  */
 
 import { ReactNode, Suspense } from 'react';
-import { ClerkProvider } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import BfcacheHandler from '@/components/BfcacheHandler';
+
+const ClerkProvider = dynamic(() => import('@clerk/nextjs').then(mod => mod.ClerkProvider), {
+  ssr: true,
+});
 
 // Temporarily disabled PerformanceMonitor due to conflicts with Sentry instrumentation
 // TODO: Re-enable after investigating webpack/Sentry conflict
@@ -27,8 +32,28 @@ interface ClientProvidersProps {
 }
 
 export default function ClientProviders({ children }: ClientProvidersProps) {
-  // NOTE: ClerkProvider must always be present anywhere we use <SignedIn>/<SignedOut>/hooks.
-  // We wrap children in Suspense to handle Clerk's internal Suspense boundaries and avoid hydration mismatches.
+  const pathname = usePathname();
+
+  // Define routes that should NOT load Clerk for performance
+  // These are typically public landing pages where TBT is critical
+  const isPerformanceRoute =
+    pathname?.startsWith('/smarter-guides') ||
+    pathname === '/' ||
+    pathname?.startsWith('/biology') ||
+    pathname?.startsWith('/chemistry') ||
+    pathname?.startsWith('/physics') ||
+    pathname?.startsWith('/pricing');
+
+  // If we are on a performance-critical public route, skip ClerkProvider
+  // This significantly reduces TBT by avoiding the heavy Clerk JS bundle
+  if (isPerformanceRoute) {
+    return (
+      <>
+        <BfcacheHandler />
+        {children}
+      </>
+    );
+  }
 
   return (
     <>

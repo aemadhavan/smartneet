@@ -1,4 +1,3 @@
-// src/components/layout/GoogleTagManager.tsx
 import Script from 'next/script';
 
 /**
@@ -8,7 +7,6 @@ import Script from 'next/script';
  * - Only loads in production to avoid unnecessary JS in development
  * - Defers GTM loading until after the page is interactive, reducing TBT by ~150-200ms
  */
-
 const GoogleTagManager = () => {
   const GTM_ID = 'GTM-WVBD7SRF';
 
@@ -23,7 +21,7 @@ const GoogleTagManager = () => {
   return (
     <>
       {/* Set default consent to denied so third‑party tags (GA/Clarity) do not set cookies without consent */}
-      <Script id="gtm-consent-default" strategy="afterInteractive">
+      <Script id="gtm-consent-default" strategy="lazyOnload">
         {`window.dataLayer = window.dataLayer || []; window.dataLayer.push({ 'gtm.start': Date.now(), event: 'gtm.js' });
           // Consent Mode v2 defaults (no cookies)
           window.dataLayer.push({
@@ -36,7 +34,7 @@ const GoogleTagManager = () => {
       </Script>
 
       {/* Lazy loader: only inject GTM after explicit consent (localStorage or custom event) */}
-      <Script id="gtm-loader" strategy="afterInteractive">
+      <Script id="gtm-loader" strategy="lazyOnload">
         {`
           (function(){
             var load = function(){

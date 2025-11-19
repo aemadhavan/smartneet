@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
 import { Metadata } from 'next';
 import Header from '@/components/layout/HeaderOptimized';
-import Footer from '@/components/layout/Footer';
+import dynamic from 'next/dynamic';
 import ClientProviders from '@/components/ClientProviders';
+
+const Footer = dynamic(() => import('@/components/layout/Footer'));
 import GoogleTagManager from '@/components/layout/GoogleTagManager';
 import './globals.css';
 import { Geist, Geist_Mono } from "next/font/google";
@@ -97,7 +99,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col`} suppressHydrationWarning>
         {process.env.NEXT_PUBLIC_DISABLE_ANALYTICS !== '1' && <GoogleTagManager />}
-        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{display:'none', visibility:'hidden'}}></iframe></noscript>
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }}></iframe></noscript>
         {process.env.NODE_ENV === 'production' && <Analytics />}
         <ClientProviders>
           <Header />
