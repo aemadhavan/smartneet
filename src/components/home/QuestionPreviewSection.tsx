@@ -156,3 +156,6 @@ More previous year questions are coming soon. Stay tuned!​</p>
     </section>
   );
 }
+
+// Add default export to support both import styles
+export default QuestionPreviewSection;

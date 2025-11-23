@@ -36,22 +36,23 @@ const FeaturesSection = dynamic(
 );
 
 // Load content sections with higher loading priority
+// Using default imports for better webpack compatibility
 const QuestionPreviewSection = dynamic(
-  () => import('@/components/home/QuestionPreviewSection').then(mod => mod.QuestionPreviewSection),
+  () => import('@/components/home/QuestionPreviewSection'),
   {
     loading: () => <SectionSkeleton />,
   }
 );
 
 const InteractiveDemoSection = dynamic(
-  () => import('@/components/home/InteractiveDemoSection').then(mod => mod.InteractiveDemoSection),
+  () => import('@/components/home/InteractiveDemoSection'),
   {
     loading: () => <SectionSkeleton />,
   }
 );
 
 const CTASection = dynamic(
-  () => import('@/components/home/CTASection').then(mod => mod.CTASection),
+  () => import('@/components/home/CTASection'),
   {
     loading: () => <SectionSkeleton />,
     ssr: true
