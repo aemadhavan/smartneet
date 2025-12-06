@@ -75,7 +75,7 @@ const SessionContent = memo(function SessionContent({
       </SessionHeader>
 
       {/* Free access banner region with reserved space to reduce layout shift */}
-      <div className="mb-4 min-h-[64px]" aria-live="polite">
+      <div className="mb-4 min-h-16" aria-live="polite">
         {!isPremium && limitParam === 'free' && (
           <FreeAccessBanner />
         )}
@@ -105,7 +105,7 @@ const SessionContent = memo(function SessionContent({
       />
 
       {/* Limit notification region with reserved space to reduce layout shift */}
-      <div className="mt-4 min-h-[64px]" aria-live="polite">
+      <div className="mt-4 min-h-16" aria-live="polite">
         {showLimitNotification && (
           <SubscriptionLimitNotification 
             message={limitMessage}

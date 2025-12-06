@@ -153,9 +153,27 @@ export async function POST(request: NextRequest) {
         questions: result.questions
       });
     } catch (e) {
-      // Check if it's a subscription limit error first
+      // Check if it's a "no questions available" error first
+      if (e instanceof Error && e.message.includes('No questions available')) {
+        logger.warn('Session creation failed - no questions available', {
+          userId,
+          context: 'practice-sessions.POST',
+          error: e.message
+        });
+
+        return NextResponse.json(
+          {
+            error: e.message,
+            code: 'NO_QUESTIONS_AVAILABLE',
+            message: 'The selected topic does not have questions available yet. Please try a different topic.'
+          },
+          { status: 422 } // Unprocessable Entity
+        );
+      }
+
+      // Check if it's a subscription limit error
       if (e instanceof Error && (
-        e.message.includes('daily limit') || 
+        e.message.includes('daily limit') ||
         e.message.includes('subscription limit') ||
         e.message.includes('Cannot take test') ||
         e.message.includes('premium users') ||
@@ -166,13 +184,13 @@ export async function POST(request: NextRequest) {
           context: 'practice-sessions.POST',
           error: e.message
         });
-        
+
         return NextResponse.json(
-          { 
+          {
             error: e.message,
             limitReached: true,
             upgradeRequired: e.message.includes('premium')
-          }, 
+          },
           { status: 403 }
         );
       }

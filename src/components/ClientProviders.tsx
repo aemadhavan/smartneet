@@ -41,8 +41,7 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
     pathname === '/' ||
     pathname?.startsWith('/biology') ||
     pathname?.startsWith('/chemistry') ||
-    pathname?.startsWith('/physics') ||
-    pathname?.startsWith('/pricing');
+    pathname?.startsWith('/physics');
 
   // If we are on a performance-critical public route, skip ClerkProvider
   // This significantly reduces TBT by avoiding the heavy Clerk JS bundle

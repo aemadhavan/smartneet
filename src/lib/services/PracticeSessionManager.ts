@@ -78,7 +78,32 @@ export class PracticeSessionManager {
       );
 
       if (questions.length === 0) {
-        throw new Error('No questions available for the selected criteria');
+        // Build a descriptive error message based on the criteria
+        const criteriaDescription = [];
+        if (request.subtopicId) {
+          criteriaDescription.push(`subtopic ID ${request.subtopicId}`);
+        }
+        if (request.topicId) {
+          criteriaDescription.push(`topic ID ${request.topicId}`);
+        }
+        criteriaDescription.push(`subject ID ${request.subjectId}`);
+
+        const errorMessage = criteriaDescription.length > 1
+          ? `No questions available for ${criteriaDescription.join(', ')}. This content may not be ready yet. Please try selecting a different topic or contact support.`
+          : `No questions available for this subject. Please contact support.`;
+
+        logger.warn('No questions found after fallback attempts', {
+          userId: request.userId,
+          context: 'PracticeSessionManager.createSession',
+          data: {
+            subjectId: request.subjectId,
+            topicId: request.topicId,
+            subtopicId: request.subtopicId,
+            requestedCount: request.questionCount || 10
+          }
+        });
+
+        throw new Error(errorMessage);
       }
 
       // Step 5: Create session in transaction with validated questions

@@ -53,3 +53,7 @@ node_modules/
 # Sentry Config File
 .env.sentry-build-plugin
 .env*.local
+
+
+#Ignore vscode AI rules
+.github\instructions\codacy.instructions.md

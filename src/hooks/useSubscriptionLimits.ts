@@ -256,22 +256,42 @@ export function useSubscriptionLimits(): UseSubscriptionLimitsResult {
 
   // Fetch data when component mounts or refresh is triggered
   useEffect(() => {
-    // Skip in SSR context
-    if (typeof window === 'undefined') {
-      return;
-    }
-    
-    // Fetch on mount or refresh counter change
-    fetchSubscriptionData(refreshCounter > 0);
-    
-    // Also set up a periodic refresh every 5 minutes
-    const intervalId = setInterval(() => {
-      fetchSubscriptionData(false);
-    }, 5 * 60 * 1000);
-    
-    return () => {
-      clearInterval(intervalId);
-    };
+    // TEMP: Bypass subscription check - set unlimited premium
+    setLimitStatus({
+      canTake: true,
+      isUnlimited: true,
+      usedToday: 0,
+      remainingToday: 999,
+      limitPerDay: null,
+      reason: null
+    });
+    setSubscription({
+      id: 999,
+      planName: 'Premium Plan (Bypass)',
+      planCode: 'premium',
+      status: 'active',
+      lastTestDate: null
+    });
+    setIsPremium(true);
+    setLoading(false);
+    return;
+
+    // // Skip in SSR context
+    // if (typeof window === 'undefined') {
+    //   return;
+    // }
+    //
+    // // Fetch on mount or refresh counter change
+    // fetchSubscriptionData(refreshCounter > 0);
+    //
+    // // Also set up a periodic refresh every 5 minutes
+    // const intervalId = setInterval(() => {
+    //   fetchSubscriptionData(false);
+    // }, 5 * 60 * 1000);
+    //
+    // return () => {
+    //   clearInterval(intervalId);
+    // };
   }, [fetchSubscriptionData, refreshCounter]);
 
   // Function to manually trigger a refresh

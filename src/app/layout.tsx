@@ -97,7 +97,7 @@ export default function RootLayout({
         {/* Preconnect only to critical origins actually in use */}
         <link rel="preconnect" href="https://www.googletagmanager.com" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white flex flex-col`} suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-linear-to-b from-gray-50 to-white flex flex-col`} suppressHydrationWarning>
         {process.env.NEXT_PUBLIC_DISABLE_ANALYTICS !== '1' && <GoogleTagManager />}
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }}></iframe></noscript>
         {process.env.NODE_ENV === 'production' && <Analytics />}

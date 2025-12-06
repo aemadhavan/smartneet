@@ -1,11 +1,11 @@
 // src/app/api/questions/[questionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { 
-  questions, 
-  topics, 
-  subtopics, 
-  subjects 
+import { db, withRetry } from '@/db';
+import {
+  questions,
+  topics,
+  subtopics,
+  subjects
 } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { auth } from '@clerk/nextjs/server';
@@ -45,34 +45,36 @@ export async function GET(
       });
     }
 
-    // Cache miss - fetch from database
-    const question = await db.select({
-      question_id: questions.question_id,
-      question_text: questions.question_text,
-      question_type: questions.question_type,
-      details: questions.details,
-      explanation: questions.explanation,
-      difficulty_level: questions.difficulty_level,
-      marks: questions.marks,
-      negative_marks: questions.negative_marks,
-      is_image_based: questions.is_image_based,
-      image_url: questions.image_url,
-      subject_id: questions.subject_id,
-      topic_id: questions.topic_id,
-      subtopic_id: questions.subtopic_id,
-      topic_name: topics.topic_name,
-      subtopic_name: subtopics.subtopic_name,
-      subject_name: subjects.subject_name
-    })
-    .from(questions)
-    .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
-    .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
-    .leftJoin(subjects, eq(questions.subject_id, subjects.subject_id))
-    .where(and(
-      eq(questions.question_id, questionId),
-      eq(questions.is_active, true)
-    ))
-    .limit(1);
+    // Cache miss - fetch from database with retry for connection resilience
+    const question = await withRetry(async () => {
+      return await db.select({
+        question_id: questions.question_id,
+        question_text: questions.question_text,
+        question_type: questions.question_type,
+        details: questions.details,
+        explanation: questions.explanation,
+        difficulty_level: questions.difficulty_level,
+        marks: questions.marks,
+        negative_marks: questions.negative_marks,
+        is_image_based: questions.is_image_based,
+        image_url: questions.image_url,
+        subject_id: questions.subject_id,
+        topic_id: questions.topic_id,
+        subtopic_id: questions.subtopic_id,
+        topic_name: topics.topic_name,
+        subtopic_name: subtopics.subtopic_name,
+        subject_name: subjects.subject_name
+      })
+      .from(questions)
+      .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
+      .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
+      .leftJoin(subjects, eq(questions.subject_id, subjects.subject_id))
+      .where(and(
+        eq(questions.question_id, questionId),
+        eq(questions.is_active, true)
+      ))
+      .limit(1);
+    });
 
     if (!question || question.length === 0) {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });

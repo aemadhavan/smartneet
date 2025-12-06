@@ -1,8 +1,8 @@
 // src/app/api/practice-sessions/[sessionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { 
-  practice_sessions, 
+import { db, withRetry } from '@/db';
+import {
+  practice_sessions,
   session_questions,
   questions,
   topics,
@@ -86,49 +86,51 @@ export async function GET(
     }
 
     // Get session details with subject, topic, and subtopic names for context
-    const sessionDataFromDb = await db.query.practice_sessions.findFirst({
-      where: and(
-        eq(practice_sessions.session_id, sessionId),
-        eq(practice_sessions.user_id, userId)
-      ),
-      columns: {
-        session_id: true,
-        session_type: true,
-        start_time: true,
-        end_time: true,
-        duration_minutes: true,
-        total_questions: true,
-        questions_attempted: true,
-        questions_correct: true,
-        score: true,
-        max_score: true,
-        is_completed: true,
-        notes: true,
-        settings: true,
-        subject_id: true,
-        topic_id: true,
-        subtopic_id: true
-      },
-      with: {
-        subject: { 
-          columns: { 
-            subject_name: true, 
-            subject_id: true 
-          } 
+    const sessionDataFromDb = await withRetry(async () => {
+      return await db.query.practice_sessions.findFirst({
+        where: and(
+          eq(practice_sessions.session_id, sessionId),
+          eq(practice_sessions.user_id, userId)
+        ),
+        columns: {
+          session_id: true,
+          session_type: true,
+          start_time: true,
+          end_time: true,
+          duration_minutes: true,
+          total_questions: true,
+          questions_attempted: true,
+          questions_correct: true,
+          score: true,
+          max_score: true,
+          is_completed: true,
+          notes: true,
+          settings: true,
+          subject_id: true,
+          topic_id: true,
+          subtopic_id: true
         },
-        topic: { 
-          columns: { 
-            topic_name: true, 
-            topic_id: true 
-          } 
-        },
-        subtopic: { 
-          columns: { 
-            subtopic_name: true, 
-            subtopic_id: true 
-          } 
+        with: {
+          subject: {
+            columns: {
+              subject_name: true,
+              subject_id: true
+            }
+          },
+          topic: {
+            columns: {
+              topic_name: true,
+              topic_id: true
+            }
+          },
+          subtopic: {
+            columns: {
+              subtopic_name: true,
+              subtopic_id: true
+            }
+          }
         }
-      }
+      });
     });
 
     if (!sessionDataFromDb) {
@@ -162,36 +164,38 @@ export async function GET(
       subtopic_name: sessionDataFromDb.subtopic?.subtopic_name ?? undefined,
     };
 
-    const sessionQuestionsDataFromDb = await db
-      .select({
-        session_question_id: session_questions.session_question_id,
-        question_order: session_questions.question_order,
-        is_bookmarked: session_questions.is_bookmarked,
-        time_spent_seconds: session_questions.time_spent_seconds,
-        
-        question_id: questions.question_id,
-        question_text: questions.question_text,
-        question_type: questions.question_type,
-        details: questions.details, 
-        explanation: questions.explanation, 
-        difficulty_level: questions.difficulty_level,
-        marks: questions.marks, 
-        negative_marks: questions.negative_marks, 
-        
-        question_topic_id: questions.topic_id,
-        question_topic_name: topics.topic_name,
-        question_subtopic_id: questions.subtopic_id,
-        question_subtopic_name: subtopics.subtopic_name,
-      })
-      .from(session_questions)
-      .innerJoin(questions, and(
-        eq(session_questions.question_id, questions.question_id),
-        eq(questions.is_active, true)
-      ))
-      .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
-      .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
-      .where(eq(session_questions.session_id, sessionId))
-      .orderBy(session_questions.question_order);
+    const sessionQuestionsDataFromDb = await withRetry(async () => {
+      return await db
+        .select({
+          session_question_id: session_questions.session_question_id,
+          question_order: session_questions.question_order,
+          is_bookmarked: session_questions.is_bookmarked,
+          time_spent_seconds: session_questions.time_spent_seconds,
+
+          question_id: questions.question_id,
+          question_text: questions.question_text,
+          question_type: questions.question_type,
+          details: questions.details,
+          explanation: questions.explanation,
+          difficulty_level: questions.difficulty_level,
+          marks: questions.marks,
+          negative_marks: questions.negative_marks,
+
+          question_topic_id: questions.topic_id,
+          question_topic_name: topics.topic_name,
+          question_subtopic_id: questions.subtopic_id,
+          question_subtopic_name: subtopics.subtopic_name,
+        })
+        .from(session_questions)
+        .innerJoin(questions, and(
+          eq(session_questions.question_id, questions.question_id),
+          eq(questions.is_active, true)
+        ))
+        .leftJoin(topics, eq(questions.topic_id, topics.topic_id))
+        .leftJoin(subtopics, eq(questions.subtopic_id, subtopics.subtopic_id))
+        .where(eq(session_questions.session_id, sessionId))
+        .orderBy(session_questions.question_order);
+    });
 
     const sessionQuestions: SessionQuestionDetail[] = sessionQuestionsDataFromDb.map(sq => ({
       session_question_id: sq.session_question_id,
@@ -322,15 +326,17 @@ export async function PATCH(
     }
 
     // Verify session exists and belongs to user
-    const [existingSession] = await db
-      .select()
-      .from(practice_sessions)
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionId),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
+    const [existingSession] = await withRetry(async () => {
+      return await db
+        .select()
+        .from(practice_sessions)
+        .where(
+          and(
+            eq(practice_sessions.session_id, sessionId),
+            eq(practice_sessions.user_id, userId)
+          )
+        );
+    });
 
     if (!existingSession) {
       logger.warn('Session not found or unauthorized for update', {
@@ -345,11 +351,13 @@ export async function PATCH(
     requestData.updated_at = new Date();
 
     // Update session
-    const [updatedSession] = await db
-      .update(practice_sessions)
-      .set(requestData)
-      .where(eq(practice_sessions.session_id, sessionId))
-      .returning();
+    const [updatedSession] = await withRetry(async () => {
+      return await db
+        .update(practice_sessions)
+        .set(requestData)
+        .where(eq(practice_sessions.session_id, sessionId))
+        .returning();
+    });
 
     // Invalidate session cache with the service
     await cacheService.invalidateUserSessionCaches(userId, sessionId);
@@ -408,15 +416,17 @@ export async function DELETE(
     }
 
     // Verify session exists and belongs to user
-    const [existingSession] = await db
-      .select()
-      .from(practice_sessions)
-      .where(
-        and(
-          eq(practice_sessions.session_id, sessionId),
-          eq(practice_sessions.user_id, userId)
-        )
-      );
+    const [existingSession] = await withRetry(async () => {
+      return await db
+        .select()
+        .from(practice_sessions)
+        .where(
+          and(
+            eq(practice_sessions.session_id, sessionId),
+            eq(practice_sessions.user_id, userId)
+          )
+        );
+    });
 
     if (!existingSession) {
       logger.warn('Session not found or unauthorized for deletion', {
@@ -428,9 +438,11 @@ export async function DELETE(
     }
 
     // Delete session (cascades to session_questions due to FK constraint)
-    await db
-      .delete(practice_sessions)
-      .where(eq(practice_sessions.session_id, sessionId));
+    await withRetry(async () => {
+      return await db
+        .delete(practice_sessions)
+        .where(eq(practice_sessions.session_id, sessionId));
+    });
 
     // Invalidate session cache with the service
     await cacheService.invalidateUserSessionCaches(userId, sessionId);

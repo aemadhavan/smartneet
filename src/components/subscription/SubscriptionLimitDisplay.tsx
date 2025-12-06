@@ -17,31 +17,43 @@ interface TestLimitStatus {
 export default function SubscriptionLimitDisplay({ refreshKey }: { refreshKey?: number }) {
   const [limitStatus, setLimitStatus] = useState<TestLimitStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const error = null; // Temporarily disabled - errors are bypassed
 
   useEffect(() => {
     const fetchLimitStatus = async () => {
-      try {
-        setLoading(true);
-        // Add a cache-busting query parameter when needed
-        const response = await fetch(`/api/user/test-limits?t=${refreshKey || Date.now()}`);
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Failed to fetch test limits');
-        }
-        
-        const data = await response.json();
-        setLimitStatus(data.limitStatus);
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
-        setError(errorMessage);
-        console.error('Error fetching test limits:', err);
-      } finally {
-        setLoading(false);
-      }
+      // TEMP: Bypass subscription limit check - set unlimited
+      setLimitStatus({
+        canTake: true,
+        isUnlimited: true,
+        usedToday: 0,
+        remainingToday: 999,
+        limitPerDay: null,
+        reason: undefined
+      });
+      setLoading(false);
+      return;
+
+      // try {
+      //   setLoading(true);
+      //   // Add a cache-busting query parameter when needed
+      //   const response = await fetch(`/api/user/test-limits?t=${refreshKey || Date.now()}`);
+      //
+      //   if (!response.ok) {
+      //     const errorData = await response.json().catch(() => ({}));
+      //     throw new Error(errorData.error || 'Failed to fetch test limits');
+      //   }
+      //
+      //   const data = await response.json();
+      //   setLimitStatus(data.limitStatus);
+      // } catch (err) {
+      //   const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      //   setError(errorMessage);
+      //   console.error('Error fetching test limits:', err);
+      // } finally {
+      //   setLoading(false);
+      // }
     };
-    
+
     fetchLimitStatus();
   }, [refreshKey]); // Add refreshKey to the dependency array
 
@@ -83,9 +95,9 @@ export default function SubscriptionLimitDisplay({ refreshKey }: { refreshKey?: 
     <div className={`text-sm ${limitReached ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-300'}`}>
       <div className="flex items-center mb-1">
         {limitReached ? (
-          <AlertCircle className="h-4 w-4 mr-1 flex-shrink-0" />
+          <AlertCircle className="h-4 w-4 mr-1 shrink-0" />
         ) : (
-          <Info className="h-4 w-4 mr-1 flex-shrink-0" />
+          <Info className="h-4 w-4 mr-1 shrink-0" />
         )}
         <span>
           {limitReached 

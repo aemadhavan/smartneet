@@ -1,6 +1,6 @@
 // src/app/api/topics/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { topics, subtopics } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
@@ -32,25 +32,29 @@ export async function GET(
     }
     
     // Cache miss - execute database queries
-    // Get topic details
-    const [topic] = await db
-      .select()
-      .from(topics)
-      .where(eq(topics.topic_id, topicId));
+    // Get topic details with retry for connection resilience
+    const [topic] = await withRetry(async () => {
+      return await db
+        .select()
+        .from(topics)
+        .where(eq(topics.topic_id, topicId));
+    });
 
     if (!topic) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Topic not found' 
+      return NextResponse.json({
+        success: false,
+        error: 'Topic not found'
       }, { status: 404 });
     }
 
-    // Get subtopics for this topic
-    const relatedSubtopics = await db
-      .select()
-      .from(subtopics)
-      .where(eq(subtopics.topic_id, topicId))
-      .orderBy(subtopics.subtopic_name);
+    // Get subtopics for this topic with retry for connection resilience
+    const relatedSubtopics = await withRetry(async () => {
+      return await db
+        .select()
+        .from(subtopics)
+        .where(eq(subtopics.topic_id, topicId))
+        .orderBy(subtopics.subtopic_name);
+    });
     
     // Prepare response data
     const responseData = {

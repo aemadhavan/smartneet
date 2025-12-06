@@ -238,6 +238,12 @@ export function usePracticeSession(
               errorData = { error: response.statusText };
             }
 
+            // Check if this is a "no questions available" error (422)
+            if (response.status === 422 && errorData.code === 'NO_QUESTIONS_AVAILABLE') {
+              const errorMessage = errorData.message || errorData.error || "No questions are available for the selected topic. Please try a different topic.";
+              throw new Error(errorMessage);
+            }
+
             // Check if this is a subscription limit error
             if (response.status === 403 && (errorData.limitReached || errorData.upgradeRequired)) {
               const errorMessage = errorData.error || "You've reached your daily practice limit. Upgrade to Premium for unlimited practice tests.";
@@ -328,12 +334,16 @@ export function usePracticeSession(
             return null;
           }
 
-          // Check if this is a rate limit or subscription error - don't retry these
-          const isRateLimitError = err instanceof Error &&
-            (err.message.includes('Too many requests') || err.message.includes('Rate limit') || err.message.includes('reached your daily limit'));
+          // Check if this is a rate limit, subscription, or "no questions" error - don't retry these
+          const isNonRetryableError = err instanceof Error &&
+            (err.message.includes('Too many requests') ||
+             err.message.includes('Rate limit') ||
+             err.message.includes('reached your daily limit') ||
+             err.message.includes('No questions are available') ||
+             err.message.includes('No questions available'));
 
-          if (isRateLimitError) {
-            setError(err instanceof Error ? err.message : 'Rate limit exceeded');
+          if (isNonRetryableError) {
+            setError(err instanceof Error ? err.message : 'Unable to create session');
             return null;
           }
 

@@ -10,8 +10,6 @@ import {
 } from './components/ui';
 import {
   LoadingSpinner,
-  PremiumContentGate,
-  DailyLimitReached,
   EmptyState,
   SessionContent
 } from './components/session';
@@ -68,7 +66,7 @@ export default function PracticeClientPage() {
   } = useSubscriptionLimits();
   
   const [limitsRefreshKey, setLimitsRefreshKey] = useState(0);
-  const [isCheckingAccess, setIsCheckingAccess] = useState<boolean>(false);
+  const isCheckingAccess = false; // Temporarily disabled - access checks are bypassed
   const [accessDenied, setAccessDenied] = useState<boolean>(false);
 
   // Custom hooks for data fetching and state management
@@ -130,38 +128,41 @@ export default function PracticeClientPage() {
   // Check if the topic requires premium access
   useEffect(() => {
     const checkTopicAccess = async () => {
+      // TEMP: Bypass subscription check
+      return;
+
       // Don't check access until subscription data is loaded
-      if (limitsLoading) {
-        return;
-      }
-      
-      if (topicId && !isPremium) {
-        setIsCheckingAccess(true);
-        try {
-          const accessResponse = await fetch(`/api/topics/${topicId}/access?isPremium=${isPremium}&limitParam=${limitParam || ''}`);
-          
-          if (!accessResponse.ok) {
-            throw new Error('Failed to check topic access');
-          }
-          
-          const accessData = await accessResponse.json();
-          
-          if (!accessData.success) {
-            throw new Error(accessData.error || 'Failed to check topic access');
-          }
-          
-          // Set access denied based on API response
-          if (!accessData.data.hasAccess) {
-            setAccessDenied(true);
-          }
-        } catch (error) {
-          console.error('Error checking topic access:', error);
-        } finally {
-          setIsCheckingAccess(false);
-        }
-      }
+      // if (limitsLoading) {
+      //   return;
+      // }
+
+      // if (topicId && !isPremium) {
+      //   setIsCheckingAccess(true);
+      //   try {
+      //     const accessResponse = await fetch(`/api/topics/${topicId}/access?isPremium=${isPremium}&limitParam=${limitParam || ''}`);
+
+      //     if (!accessResponse.ok) {
+      //       throw new Error('Failed to check topic access');
+      //     }
+
+      //     const accessData = await accessResponse.json();
+
+      //     if (!accessData.success) {
+      //       throw new Error(accessData.error || 'Failed to check topic access');
+      //     }
+
+      //     // Set access denied based on API response
+      //     if (!accessData.data.hasAccess) {
+      //       setAccessDenied(true);
+      //     }
+      //   } catch (error) {
+      //     console.error('Error checking topic access:', error);
+      //   } finally {
+      //     setIsCheckingAccess(false);
+      //   }
+      // }
     };
-    
+
     checkTopicAccess();
   }, [topicId, isPremium, limitParam, limitsLoading]);
 
@@ -192,34 +193,35 @@ export default function PracticeClientPage() {
       }
       
       try {
-        if (limitStatus && !limitStatus.canTake) {
-          // Show limit notification if user can't take more tests
-          setLimitMessage(limitStatus.reason || "You've reached your daily practice limit");
-          setShowLimitNotification(true);
-        } else {
-          console.log('Creating new session for subject:', selectedSubject, 'at', new Date().toISOString());
-          const sessionStartTime = Date.now();
-          const newSession = await createSessionRef.current(selectedSubject);
-          const sessionEndTime = Date.now();
-          
-          // Log performance metrics
-          console.log('Performance Metrics:', {
-            sessionCreation: sessionEndTime - sessionStartTime,
-            totalPageLoad: sessionEndTime - performanceMetrics.current.pageLoadStart,
-            subjectsLoad: performanceMetrics.current.subjectsLoadTime,
-            limitsCheck: performanceMetrics.current.limitsCheckTime
-          });
-          
-          if (!cancelled && newSession) {
-            setSessionInitialized(true);
-            setLimitsRefreshKey(prev => prev + 1);
-            try {
-              refetchLimitsRef.current();
-            } catch (refetchError) {
-              console.warn('Failed to refetch limits:', refetchError);
-            }
+        // TEMP: Bypass limit check
+        // if (limitStatus && !limitStatus.canTake) {
+        //   // Show limit notification if user can't take more tests
+        //   setLimitMessage(limitStatus.reason || "You've reached your daily practice limit");
+        //   setShowLimitNotification(true);
+        // } else {
+        console.log('Creating new session for subject:', selectedSubject, 'at', new Date().toISOString());
+        const sessionStartTime = Date.now();
+        const newSession = await createSessionRef.current(selectedSubject);
+        const sessionEndTime = Date.now();
+
+        // Log performance metrics
+        console.log('Performance Metrics:', {
+          sessionCreation: sessionEndTime - sessionStartTime,
+          totalPageLoad: sessionEndTime - performanceMetrics.current.pageLoadStart,
+          subjectsLoad: performanceMetrics.current.subjectsLoadTime,
+          limitsCheck: performanceMetrics.current.limitsCheckTime
+        });
+
+        if (!cancelled && newSession) {
+          setSessionInitialized(true);
+          setLimitsRefreshKey(prev => prev + 1);
+          try {
+            refetchLimitsRef.current();
+          } catch (refetchError) {
+            console.warn('Failed to refetch limits:', refetchError);
           }
         }
+        // }
       } catch (error) {
         if (!cancelled) {
           console.error('Failed to initialize session:', error);
@@ -323,9 +325,10 @@ export default function PracticeClientPage() {
   }
 
   // Render premium content access denied state
-  if (accessDenied) {
-    return <PremiumContentGate />;
-  }
+  // TEMP: Bypass access denied check
+  // if (accessDenied) {
+  //   return <PremiumContentGate />;
+  // }
 
   // Render error state with more specific error messaging
   if (error) {
@@ -348,14 +351,15 @@ export default function PracticeClientPage() {
   }
   
   // Render limit reached screen if user has hit their daily limit
-  if (limitStatus && !limitStatus.canTake && !session) {
-    return (
-      <DailyLimitReached 
-        reason={limitStatus.reason ?? undefined} 
-        onRetry={handleRetry} 
-      />
-    );
-  }
+  // TEMP: Bypass limit reached check
+  // if (limitStatus && !limitStatus.canTake && !session) {
+  //   return (
+  //     <DailyLimitReached
+  //       reason={limitStatus.reason ?? undefined}
+  //       onRetry={handleRetry}
+  //     />
+  //   );
+  // }
 
   // Render practice session
   if (session && session.questions && session.questions.length > 0) {
