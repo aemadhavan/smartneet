@@ -91,7 +91,6 @@
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4.1.7",
-    "@tailwindcss/upgrade": "^4.1.7",
     "@types/katex": "^0.16.7",
     "@types/node": "^20.17.30",
     "@types/pg": "^8.11.13",
