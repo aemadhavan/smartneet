@@ -30,8 +30,8 @@ export function OptionButton({ option, isSelected, onClick, index }: OptionButto
       tabIndex={isSelected ? 0 : -1}
     >
       <div className="flex items-start">
-        <span 
-          className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-3 ${
+        <span
+          className={`shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium mr-3 ${
             isSelected
               ? 'border-indigo-500 bg-indigo-500 text-white'
               : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
