@@ -49,7 +49,7 @@ export function MultipleCorrectStatementsQuestion({
             {details.statement_details.statements?.map((statement, index) => (
               <div key={index} className="bg-gray-50 dark:bg-gray-800 p-3 rounded">
                 <div className="flex">
-                  <span className="font-medium mr-2 text-gray-900 dark:text-gray-100 flex-shrink-0">
+                  <span className="font-medium mr-2 text-gray-900 dark:text-gray-100 shrink-0">
                     {statement.statement_label}:
                   </span>
                   <div className="flex-1">
