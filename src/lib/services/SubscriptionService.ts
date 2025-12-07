@@ -223,6 +223,9 @@ export class SubscriptionService {
    * Check if user can take a test
    */
   async canUserTakeTest(userId: string): Promise<{ canTake: boolean; reason?: string }> {
+    // TEMP: Bypass subscription limit check
+    return { canTake: true };
+
     try {
       const subscription = await this.getUserSubscription(userId);
       
@@ -248,26 +251,29 @@ export class SubscriptionService {
       const updatedSubscription = await this.getUserSubscription(userId);
       
       // Check if limit reached
-      if ((updatedSubscription.tests_used_today ?? 0) >= plan.test_limit_daily) {
-        // Calculate next UTC midnight
-        const now = new Date();
-        const nextUtcMidnight = new Date(Date.UTC(
-          now.getUTCFullYear(),
-          now.getUTCMonth(),
-          now.getUTCDate() + 1, // next day
-          0, 0, 0, 0
-        ));
+      if (plan.test_limit_daily !== null && plan.test_limit_daily !== undefined) {
+        const dailyLimit = plan.test_limit_daily as number;
+        if ((updatedSubscription.tests_used_today ?? 0) >= dailyLimit) {
+          // Calculate next UTC midnight
+          const now = new Date();
+          const nextUtcMidnight = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate() + 1, // next day
+            0, 0, 0, 0
+          ));
 
-        // Convert to user's local time string
-        const localTimeString = nextUtcMidnight.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const localDateString = nextUtcMidnight.toLocaleDateString();
+          // Convert to user's local time string
+          const localTimeString = nextUtcMidnight.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const localDateString = nextUtcMidnight.toLocaleDateString();
 
-        const message = `You can take more tests after ${localTimeString} on ${localDateString} (your local time).`;
+          const message = `You can take more tests after ${localTimeString} on ${localDateString} (your local time).`;
 
-        return {
-          canTake: false,
-          reason: `You've reached your daily limit of ${plan.test_limit_daily} tests. Upgrade to premium for unlimited tests. ${message}`
-        };
+          return {
+            canTake: false,
+            reason: `You've reached your daily limit of ${dailyLimit} tests. Upgrade to premium for unlimited tests. ${message}`
+          };
+        }
       }
       
       return { canTake: true };

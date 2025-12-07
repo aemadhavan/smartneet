@@ -10,12 +10,8 @@
 
 import { ReactNode, Suspense } from 'react';
 import { usePathname } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import BfcacheHandler from '@/components/BfcacheHandler';
-
-const ClerkProvider = dynamic(() => import('@clerk/nextjs').then(mod => mod.ClerkProvider), {
-  ssr: true,
-});
+import { ClerkProvider } from '@clerk/nextjs';
 
 // Temporarily disabled PerformanceMonitor due to conflicts with Sentry instrumentation
 // TODO: Re-enable after investigating webpack/Sentry conflict

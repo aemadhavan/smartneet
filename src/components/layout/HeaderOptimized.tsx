@@ -2,14 +2,9 @@
 // src/components/layout/HeaderOptimized.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
-
-// Lazy load Clerk widgets to reduce initial JS
-const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
-const SignedOut = dynamic(() => import('@clerk/nextjs').then(m => m.SignedOut), { ssr: false });
-const UserButton = dynamic(() => import('@clerk/nextjs').then(m => m.UserButton), { ssr: false });
+import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 /**
  * Optimized NavLink using Next.js Link instead of custom router logic
@@ -43,7 +38,28 @@ NavLink.displayName = 'NavLink';
 /**
  * Memoized UserSection to prevent re-renders when navigation changes
  */
-const UserSection = memo(() => {
+const UserSection = memo(({ isPerformanceRoute }: { isPerformanceRoute: boolean }) => {
+  // On performance routes, Clerk is not loaded, so show simple sign-in links
+  if (isPerformanceRoute) {
+    return (
+      <div className="flex items-center space-x-4">
+        <Link
+          href="/sign-in"
+          className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
+        >
+          Sign In
+        </Link>
+        <Link
+          href="/sign-up"
+          className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+        >
+          Sign Up
+        </Link>
+      </div>
+    );
+  }
+
+  // On other routes, Clerk is loaded, so use Clerk components
   return (
     <div className="flex items-center space-x-4">
       <SignedIn>
@@ -89,7 +105,14 @@ UserSection.displayName = 'UserSection';
  */
 const Header = () => {
   const pathname = usePathname();
-  const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
+
+  // Define performance routes (must match ClientProviders.tsx logic)
+  const isPerformanceRoute =
+    pathname?.startsWith('/smarter-guides') ||
+    pathname === '/' ||
+    pathname?.startsWith('/biology') ||
+    pathname?.startsWith('/chemistry') ||
+    pathname?.startsWith('/physics');
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
@@ -106,7 +129,7 @@ const Header = () => {
             quality={60}
             sizes="48px"
           />
-          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <span className="text-xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             SmarterNEET
           </span>
         </Link>
@@ -131,9 +154,11 @@ const Header = () => {
           <NavLink href="/smarter-guides" className="text-gray-700">
             Smarter Guides (Bodhi AI)
           </NavLink>
+        </nav>
 
-          {/* Only render authenticated links if NOT on a performance route (where Clerk is disabled) */}
-          {!(pathname?.startsWith('/smarter-guides') || pathname === '/' || pathname?.startsWith('/biology') || pathname?.startsWith('/chemistry') || pathname?.startsWith('/physics') || pathname?.startsWith('/pricing')) && (
+        {/* Authenticated navigation links - only show when Clerk is loaded */}
+        {!isPerformanceRoute && (
+          <nav className="hidden md:flex items-center space-x-6">
             <SignedIn>
               <NavLink href="/dashboard" className="text-gray-700">
                 Dashboard
@@ -142,18 +167,11 @@ const Header = () => {
                 Practice
               </NavLink>
             </SignedIn>
-          )}
-        </nav>
-
-        {/* Authentication */}
-        {needsAuthUI ? (
-          <UserSection />
-        ) : (
-          <div className="flex items-center space-x-4">
-            <Link href="/sign-in" className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>
-            <Link href="/sign-up" className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors">Sign Up</Link>
-          </div>
+          </nav>
         )}
+
+        {/* Authentication - Pass isPerformanceRoute to UserSection */}
+        <UserSection isPerformanceRoute={isPerformanceRoute} />
       </div>
     </header>
   );
