@@ -16,6 +16,9 @@ interface OptionButtonProps {
 }
 
 export function OptionButton({ option, isSelected, onClick, index }: OptionButtonProps) {
+  // Get display number with fallback to index
+  const displayNumber = option.option_number ?? (index !== undefined ? index + 1 : '?');
+
   return (
     <button
       onClick={onClick}
@@ -26,7 +29,7 @@ export function OptionButton({ option, isSelected, onClick, index }: OptionButto
       }`}
       role="radio"
       aria-checked={isSelected}
-      aria-labelledby={`option-${index || option.option_number}`}
+      aria-labelledby={`option-${index ?? option.option_number ?? 'unknown'}`}
       tabIndex={isSelected ? 0 : -1}
     >
       <div className="flex items-start">
@@ -37,7 +40,7 @@ export function OptionButton({ option, isSelected, onClick, index }: OptionButto
               : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400'
           }`}
         >
-          {option.option_number}
+          {displayNumber}
         </span>
         <div className="flex-1 min-w-0">
           <LaTeXRenderer 
