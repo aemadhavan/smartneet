@@ -107,7 +107,7 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   const csp = [
     "default-src 'self'",
     // Allow analytics, monitoring, Clerk, and Stripe scripts
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://*.clerk.accounts.dev https://*.clerk.com https://www.clarity.ms https://scripts.clarity.ms https://js.stripe.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://vercel.live https://va.vercel-scripts.com https://clerk.smarterneet.com https://*.clerk.accounts.dev https://*.clerk.com https://www.clarity.ms https://scripts.clarity.ms https://js.stripe.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.clerk.accounts.dev",
     "font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai https://*.clerk.accounts.dev data:",
     // Allow Stripe tracking pixel in addition to existing sources
