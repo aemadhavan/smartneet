@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Subject, SessionResponse } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import { useTimer, useQuestionTimer } from './useTimer';
+import { handleFetchError, fetchWithTimeout } from '@/utils/fetchErrorHandler';
 
 interface SubscriptionError {
   message: string;
@@ -183,24 +184,20 @@ export function usePracticeSession(
             sessionPayload.subtopic_id = subtopicId;
           }
           
-          // Create AbortController for timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), currentTimeout);
-          
           // Add timestamp to URL to avoid cache issues
           const apiUrl = '/api/practice-sessions';
           const queryParams = new URLSearchParams();
-          
+
           // Add parameters to query string
           Object.entries(sessionPayload).forEach(([key, value]) => {
             if (value !== undefined) {
               queryParams.append(key, value.toString());
             }
           });
-          
+
           // Add timestamp for cache busting
           queryParams.append('t', Date.now().toString());
-          
+
           // Add progressive delay for retries and cold start handling
           if (attempt === 0) {
             // First attempt: small delay for cold start
@@ -211,20 +208,26 @@ export function usePracticeSession(
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
             currentTimeout = Math.min(currentTimeout * 1.5, 25000); // Increase timeout for retries
           }
-          
-          const response = await fetch(`${apiUrl}?${queryParams.toString()}`, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-              'Accept': 'application/json',
-              ...(idempotencyKey ? { 'x-idempotency-key': idempotencyKey } : {})
+
+          // Use fetchWithTimeout utility for proper error handling
+          const response = await fetchWithTimeout(
+            `${apiUrl}?${queryParams.toString()}`,
+            {
+              method: 'POST',
+              timeout: currentTimeout,
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Accept': 'application/json',
+                ...(idempotencyKey ? { 'x-idempotency-key': idempotencyKey } : {})
+              }
+            },
+            () => {
+              // Timeout callback - provide user feedback
+              console.log(`Request timeout after ${currentTimeout}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
             }
-          });
-          
-          clearTimeout(timeoutId);
+          );
           
           if (!response.ok) {
             let errorData;
@@ -234,11 +237,17 @@ export function usePracticeSession(
               // If we can't parse JSON, use status text
               errorData = { error: response.statusText };
             }
-            
+
+            // Check if this is a "no questions available" error (422)
+            if (response.status === 422 && errorData.code === 'NO_QUESTIONS_AVAILABLE') {
+              const errorMessage = errorData.message || errorData.error || "No questions are available for the selected topic. Please try a different topic.";
+              throw new Error(errorMessage);
+            }
+
             // Check if this is a subscription limit error
             if (response.status === 403 && (errorData.limitReached || errorData.upgradeRequired)) {
               const errorMessage = errorData.error || "You've reached your daily practice limit. Upgrade to Premium for unlimited practice tests.";
-              
+
               // Call the subscription error callback if provided
               if (onSessionError) {
                 onSessionError({
@@ -247,21 +256,33 @@ export function usePracticeSession(
                   limitReached: errorData.limitReached
                 });
               }
-              
+
               throw new Error(errorMessage);
             }
-            
+
             // Check if this is a rate limit error (429) - don't retry these
             if (response.status === 429) {
               const errorMessage = errorData.error || "Too many requests. Please wait a moment before trying again.";
               throw new Error(errorMessage);
             }
-            
-            // If it's a server error (5xx), retry with exponential backoff
+
+            // If it's a server error (5xx), log dev details and retry with exponential backoff
             if (response.status >= 500) {
+              // In development, log the full error response for debugging
+              if (process.env.NODE_ENV === 'development') {
+                console.group('🔴 Server Error (500) - Will Retry');
+                console.error('Status:', response.status);
+                console.error('Full Error Response:', errorData);
+                console.error('Attempt:', `${attempt + 1}/${MAX_RETRIES}`);
+                if (errorData.devError) {
+                  console.error('Dev Error:', errorData.devError);
+                  console.error('Dev Stack:', errorData.devStack);
+                }
+                console.groupEnd();
+              }
               throw new Error('Server error, will retry');
             }
-            
+
             throw new Error(errorData.error || 'Failed to create practice session');
           }
           
@@ -300,22 +321,34 @@ export function usePracticeSession(
           
           return data;
         } catch (err) {
-          console.error(`Error creating session (attempt ${attempt + 1}/${MAX_RETRIES}):`, err);
-          
-          // Check if this is a rate limit or subscription error - don't retry these
-          const isRateLimitError = err instanceof Error && 
-            (err.message.includes('Too many requests') || err.message.includes('Rate limit') || err.message.includes('reached your daily limit'));
-          
-          if (isRateLimitError) {
-            setError(err.message);
+          // Use the error handler utility
+          const errorInfo = handleFetchError(err, 'practice session creation');
+
+          // Don't log expected errors (AbortError)
+          if (errorInfo.shouldLog) {
+            console.error(`Error creating session (attempt ${attempt + 1}/${MAX_RETRIES}):`, err);
+          }
+
+          // If it's an expected abort (component unmounted), return immediately
+          if (errorInfo.isExpected) {
             return null;
           }
-          
-          // Specific handling for network errors
-          const isNetworkError = err instanceof Error && 
-            (err.name === 'AbortError' || err.message.includes('network') || err.message.includes('failed to fetch'));
-          
-          if (isNetworkError) {
+
+          // Check if this is a rate limit, subscription, or "no questions" error - don't retry these
+          const isNonRetryableError = err instanceof Error &&
+            (err.message.includes('Too many requests') ||
+             err.message.includes('Rate limit') ||
+             err.message.includes('reached your daily limit') ||
+             err.message.includes('No questions are available') ||
+             err.message.includes('No questions available'));
+
+          if (isNonRetryableError) {
+            setError(err instanceof Error ? err.message : 'Unable to create session');
+            return null;
+          }
+
+          // Check if we should retry this error
+          if (errorInfo.shouldRetry) {
             // If we have network issues, try to recover from cached session
             if (sessionCacheKey.current) {
               const cachedSession = sessionCache.getCache(sessionCacheKey.current);
@@ -335,22 +368,21 @@ export function usePracticeSession(
                 return cachedSession.session;
               }
             }
-            
-            // If this is the last attempt, show the error
+
+            // If this is the last attempt, show the error with user-friendly message
             if (attempt === MAX_RETRIES - 1) {
-              setError('Network error: Please check your connection and try again.');
+              setError(errorInfo.userMessage || 'Unable to create practice session. Please try again.');
               return null;
             }
-            
+
             // Wait with exponential backoff before retrying
-            // Reduced wait times to account for Vercel's limitations
             await new Promise(resolve => setTimeout(resolve, Math.min(500 * Math.pow(2, attempt), 3000)));
             currentTimeout = Math.min(currentTimeout * 1.2, 9000); // Cap timeout at 9s to stay under Vercel's limit
             continue;
           }
-          
-          // For non-network errors, show the error immediately
-          setError(err instanceof Error ? err.message : 'Failed to load practice session. Please try again.');
+
+          // For errors that shouldn't be retried, show the error immediately
+          setError(errorInfo.userMessage || 'Failed to load practice session. Please try again.');
           return null;
         } finally {
           setLoading(false);
@@ -447,20 +479,20 @@ export function usePracticeSession(
     
     const attemptSubmission = async (attempt: number = 1): Promise<boolean> => {
       try {
-        // Set timeout for network request
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-        
-        const response = await fetch(`/api/practice-sessions/${session.sessionId}/submit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(submissionPayload),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
+        // Use fetchWithTimeout utility for proper error handling
+        // Longer timeout for submissions to avoid premature failures
+        const response = await fetchWithTimeout(
+          `/api/practice-sessions/${session.sessionId}/submit`,
+          {
+            method: 'POST',
+            timeout: 20000, // 20 second timeout (submissions are critical)
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(submissionPayload),
+          }
+          // No timeout callback - we'll handle it in the catch block with user dialog
+        );
     
         const responseData = await response.json();
         
@@ -484,24 +516,23 @@ export function usePracticeSession(
         }
         throw new Error(errorMessage);
       } catch (err) {
-        console.error(`Error completing session (attempt ${attempt}/${maxRetries}):`, err);
-        
-        // Check if this is a network error or database connection error
-        const isNetworkError = err instanceof Error && 
-          (err.name === 'AbortError' || 
-           err.name === 'TypeError' ||
-           err.message.includes('Failed to fetch') ||
-           err.message.includes('Network') ||
-           err.message.includes('fetch'));
-           
+        // Use the error handler utility
+        const errorInfo = handleFetchError(err, 'session submission');
+
+        // If it's an expected abort (component unmounted), return false silently
+        if (errorInfo.isExpected) {
+          return false;
+        }
+
+        // Check for database connection errors
         const isDatabaseError = err instanceof Error &&
           (err.message.includes('Database connection temporarily unavailable') ||
            err.message.includes('unable to connect to the appropriate database'));
-        
+
         // Check if this is already completed
-        const isAlreadyCompleted = err instanceof Error && 
+        const isAlreadyCompleted = err instanceof Error &&
           err.message.includes('already completed');
-        
+
         if (isAlreadyCompleted) {
           // If it's already completed, just mark as completed locally
           setSessionCompleted(true);
@@ -510,25 +541,44 @@ export function usePracticeSession(
           }
           return true;
         }
-        
-        if ((isNetworkError || isDatabaseError) && attempt < maxRetries) {
-          // Show retry dialog for network or database errors
-          const errorType = isDatabaseError ? 'database connection' : 'network connection';
+
+        // For retryable errors (timeout, network, database), show user-friendly dialog
+        if ((errorInfo.shouldRetry || isDatabaseError) && attempt < maxRetries) {
+          // Determine error type for user message
+          let errorType: string;
+          let errorDetails: string;
+
+          if (isDatabaseError) {
+            errorType = 'database connection';
+            errorDetails = 'The server is experiencing database connectivity issues.';
+          } else if (err instanceof Error && err.message.includes('timed out')) {
+            errorType = 'request timeout';
+            errorDetails = 'The server is taking longer than expected to respond. This might be due to high server load.';
+          } else {
+            errorType = 'network connection';
+            errorDetails = 'There seems to be a problem with your internet connection.';
+          }
+
           const shouldRetry = confirm(
-            `${errorType.charAt(0).toUpperCase() + errorType.slice(1)} failed. This might be due to a temporary server issue.\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
+            `⚠️ Submission ${errorType} issue\n\n${errorDetails}\n\nWould you like to retry? (Attempt ${attempt} of ${maxRetries})`
           );
-          
+
           if (shouldRetry) {
             // Wait before retrying with exponential backoff
             await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, attempt - 1), 5000)));
             return attemptSubmission(attempt + 1);
           }
         }
-        
-        // If it's not a network error or we've exhausted retries, show error
-        const errorMessage = err instanceof Error ? err.message : 'Failed to submit answers';
-        
-        if (isNetworkError || isDatabaseError) {
+
+        // Log only critical non-retryable errors (not timeouts/network issues)
+        if (errorInfo.shouldLog && !errorInfo.shouldRetry) {
+          console.error(`Critical error completing session (attempt ${attempt}/${maxRetries}):`, err);
+        }
+
+        // If it's not a retryable error or we've exhausted retries, show error
+        const errorMessage = errorInfo.userMessage || (err instanceof Error ? err.message : 'Failed to submit answers');
+
+        if (errorInfo.shouldRetry || isDatabaseError) {
           const errorType = isDatabaseError ? 'database connection issues' : 'network issues';
           const shouldSaveLocally = confirm(
             `Unable to submit your answers due to ${errorType}. Your progress has been saved locally and will be submitted when the connection is stable.\n\nWould you like to continue and mark this session as completed?`

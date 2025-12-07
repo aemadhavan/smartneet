@@ -4,16 +4,15 @@ import { motion, Variants } from "framer-motion";
 
 /**
  * Fade-in animation variants for Framer Motion.
+ * Removed y-axis movement to prevent layout shift (CLS optimization).
  */
 const fadeIn: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { 
-      type: "spring" as const,
-      stiffness: 100,
-      damping: 15
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.4,
+      ease: "easeOut"
     }
   }
 };
@@ -38,43 +37,9 @@ const staggerContainer: Variants = {
  */
 export const CTASection = () => {
   return (
-    <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden">
-      {/* Animated background elements */}
+    <section className="py-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white relative overflow-hidden" style={{ minHeight: '500px' }}>
+      {/* Simplified background elements - reduced DOM nodes */}
       <div className="absolute inset-0 z-0 overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full">
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-            <path 
-              fill="none" 
-              stroke="rgba(255,255,255,0.1)" 
-              strokeWidth="0.5"
-              d="M0,0 L100,100" 
-            />
-            <path 
-              fill="none" 
-              stroke="rgba(255,255,255,0.1)" 
-              strokeWidth="0.5"
-              d="M100,0 L0,100" 
-            />
-            {Array.from({length: 10}).map((_, i) => (
-              <path 
-                key={i}
-                fill="none" 
-                stroke="rgba(255,255,255,0.1)" 
-                strokeWidth="0.3"
-                d={`M${i*10},0 L${i*10},100`} 
-              />
-            ))}
-            {Array.from({length: 10}).map((_, i) => (
-              <path 
-                key={i}
-                fill="none" 
-                stroke="rgba(255,255,255,0.1)" 
-                strokeWidth="0.3"
-                d={`M0,${i*10} L100,${i*10}`} 
-              />
-            ))}
-          </svg>
-        </div>
         <div className="absolute -top-24 -left-24 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-12 right-12 w-60 h-60 bg-white/10 rounded-full blur-3xl"></div>
       </div>

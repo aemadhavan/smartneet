@@ -1,4 +1,15 @@
 // src/app/admin/page.tsx
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Admin Dashboard - SmarterNEET',
+  description: 'Administration panel for managing NEET exam content. Control subjects, topics, questions, and question papers for the SmarterNEET platform.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
+
 export default function AdminDashboard() {
     return (
       <div>

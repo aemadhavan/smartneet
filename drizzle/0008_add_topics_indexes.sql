@@ -1,0 +1,1 @@
+ALTER TABLE "subtopics" ALTER COLUMN "subtopic_name" SET DATA TYPE varchar(500);

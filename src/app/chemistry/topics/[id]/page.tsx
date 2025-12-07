@@ -61,37 +61,40 @@ export default function ChemistryTopicDetailPage() {
         // Set loading state for data fetching
         setIsLoading(true);
 
-        // 1. Fetch all topics to determine if the current topic is premium
-        const chemistrySubjectId = 2; // Chemistry subject ID
-        const topicsResponse = await fetch(`/api/topics?subjectId=${chemistrySubjectId}&isRootLevel=true&isActive=true`);
-        if (!topicsResponse.ok) throw new Error('Failed to fetch topics list');
-        const topicsData = await topicsResponse.json();
-        if (!topicsData.success) throw new Error(topicsData.error || 'Failed to fetch topics list');
-        setAllTopics(topicsData.data);
-        
-        const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id.toString() === topicId);
-        const foundIndex = topicIndex === -1 ? 999 : topicIndex; // Use a high index if not found to require premium
-        const isPremiumTopic = foundIndex > 1;
-        setIsFreeTopic(!isPremiumTopic);
-        
-        // 2. If it's a premium topic and the user is not premium, redirect.
-        if (isPremiumTopic && !isPremium) {
-          isRedirecting = true; // Set the flag
-          router.push(`/pricing?from=chemistry-topic-${topicId}`);
-          return;
-        }
-        
-        // 3. User has access, fetch the specific topic details.
+        // 1. First, fetch the specific topic details to check if it exists
         const response = await fetch(`/api/topics/${topicId}`);
         if (!response.ok) throw new Error('Failed to fetch topic details');
         const data = await response.json();
         if (!data.success) throw new Error(data.error || 'Failed to fetch topic details');
         setTopic(data.topic);
         setSubtopics(data.subtopics);
-        
+
         if (data.subtopics && data.subtopics.length > 0) {
           setActiveSubtopicId(data.subtopics[0].subtopic_id);
         }
+
+        // 2. Fetch all topics to determine if the current topic is premium
+        const chemistrySubjectId = 2; // Chemistry subject ID
+        const topicsResponse = await fetch(`/api/topics?subjectId=${chemistrySubjectId}&isRootLevel=true&isActive=true`);
+        if (!topicsResponse.ok) throw new Error('Failed to fetch topics list');
+        const topicsData = await topicsResponse.json();
+        if (!topicsData.success) throw new Error(topicsData.error || 'Failed to fetch topics list');
+        setAllTopics(topicsData.data);
+
+        const topicIndex = topicsData.data.findIndex((t: Topic) => t.topic_id === data.topic.topic_id);
+        const foundIndex = topicIndex === -1 ? 999 : topicIndex; // Use a high index if not found to require premium
+        const isPremiumTopic = foundIndex > 1;
+        setIsFreeTopic(!isPremiumTopic);
+
+        // 3. If it's a premium topic and the user is not premium, redirect.
+        // Important: Only redirect AFTER we've successfully loaded the topic data
+        if (isPremiumTopic && !isPremium) {
+          console.log(`Topic ${topicId} is premium (index: ${foundIndex}), redirecting to pricing`);
+          isRedirecting = true; // Set the flag
+          router.push(`/pricing?from=chemistry-topic-${topicId}`);
+          return;
+        }
+
       } catch (err) {
         console.error('Error fetching topic data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
@@ -101,7 +104,7 @@ export default function ChemistryTopicDetailPage() {
         }
       }
     };
-    
+
     checkAccessAndFetchData();
   }, [topicId, isPremium, subscriptionLoading, router]); // router is included to satisfy exhaustive-deps, its push method is stable.
 

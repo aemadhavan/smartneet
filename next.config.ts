@@ -4,61 +4,173 @@ import path from 'path';
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['drizzle-orm'],
-  
+
+  // Transpile Sentry instrumentation packages to fix Turbopack/pnpm hoisting issues
+  transpilePackages: ['import-in-the-middle', 'require-in-the-middle'],
+
+  // Temporarily disabled standalone mode due to Html import errors
+  // output: 'standalone',
+
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'https',
+        hostname: 'localhost',
+      },
+    ],
     formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    qualities: [60, 75, 85, 90, 100],
   },
 
-  // Disable aggressive preloading
+  // SWC compiler optimizations
+  // SWC minification is now enabled by default in Next.js 15+
+  // Target modern browsers to avoid unnecessary polyfills (~14KB savings)
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
+  // Optimize package imports for faster builds
   experimental: {
     optimizePackageImports: [
-      // Add your UI libraries here, example:
-      '@mantine/core',
-      '@mantine/hooks'
-    ]
+      '@clerk/nextjs',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-label',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-slot',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      'lucide-react',
+      'recharts',
+      'framer-motion',
+    ],
   },
 
-  webpack: (config, { dev }) => {
+  // Modularize imports for better tree-shaking
+  modularizeImports: {
+    'lucide-react': {
+      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+    },
+    '@radix-ui/react-icons': {
+      transform: '@radix-ui/react-icons/dist/{{member}}',
+    },
+  },
+
+  webpack: (config, { dev, isServer }) => {
+    // Mark require-in-the-middle as external on server to prevent Webpack bundling it
+    // This stops the "Critical dependency" warning from Sentry's OpenTelemetry instrumentation
+    if (isServer) {
+      if (Array.isArray(config.externals)) {
+        config.externals.push('require-in-the-middle', 'import-in-the-middle');
+      } else {
+        config.externals = [
+          ...(Array.isArray(config.externals) ? config.externals : [config.externals].filter(Boolean)),
+          'require-in-the-middle',
+          'import-in-the-middle',
+        ];
+      }
+    }
+
+    // Enable filesystem caching for both dev and production builds
+    config.cache = {
+      type: 'filesystem',
+      buildDependencies: {
+        config: [path.resolve(__dirname, 'next.config.ts')]
+      },
+      cacheDirectory: path.resolve(process.cwd(), '.next/cache/webpack'),
+      compression: 'gzip',
+      maxAge: dev ? 604800000 : 172800000, // 7 days for dev, 2 days for prod
+      version: '1.0.0'
+    };
+
+    // Enable source maps for production (hidden source maps for security)
     if (!dev) {
-      config.cache = {
-        type: 'filesystem',
-        buildDependencies: {
-          config: [path.resolve(__dirname, 'next.config.ts')]
-        },
-        cacheDirectory: path.resolve(process.cwd(), '.next/cache'),
-        compression: 'gzip',
-        maxAge: 172800000, // 2 days
-        version: '1.0.0'
-      };
-      
+      config.devtool = 'hidden-source-map';
+
       // Add chunk loading error handling
       config.output = {
         ...config.output,
         chunkLoadingGlobal: 'webpackChunksmartner',
         chunkLoadTimeout: 120000, // 2 minutes
       };
-      
-      // Optimize chunk splitting
+
+      // Optimize chunk splitting with granular vendor splitting
       config.optimization = {
         ...config.optimization,
+        // Reduce main-thread blocking by keeping runtime separate
+        runtimeChunk: 'single',
+        // Minimize with parallel processing to reduce bundle sizes
+        minimize: true,
         splitChunks: {
           chunks: 'all',
           cacheGroups: {
+            // Split Clerk into its own chunk to be lazy loaded
+            clerk: {
+              test: /[\\/]node_modules[\\/]@clerk[\\/]/,
+              name: 'clerk',
+              priority: 30,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // Split large UI libraries
+            radix: {
+              test: /[\\/]node_modules[\\/]@radix-ui[\\/]/,
+              name: 'radix-ui',
+              priority: 25,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // Split recharts (used in dashboard/analytics)
+            recharts: {
+              test: /[\\/]node_modules[\\/]recharts[\\/]/,
+              name: 'recharts',
+              priority: 25,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // Split framer-motion (animations)
+            framer: {
+              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
+              name: 'framer-motion',
+              priority: 25,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // Split Embla carousel to reduce main-app chunk size
+            embla: {
+              test: /[\\/]node_modules[\\/]embla-carousel/,
+              name: 'embla-carousel',
+              priority: 25,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // React and core dependencies
+            react: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+              name: 'react-vendor',
+              priority: 20,
+              reuseExistingChunk: true,
+              enforce: true,
+            },
+            // Other vendor code
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendor',
+              priority: 10,
+              reuseExistingChunk: true,
+              // Only create vendor chunk if module is used in multiple places
+              minChunks: 2,
+            },
             default: {
               minChunks: 2,
               priority: -20,
-              reuseExistingChunk: true,
-            },
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              priority: -10,
               reuseExistingChunk: true,
             },
             common: {
@@ -68,6 +180,13 @@ const nextConfig: NextConfig = {
               reuseExistingChunk: true,
             },
           },
+          // Limit max initial requests to balance between caching and HTTP overhead
+          maxInitialRequests: 25,
+          maxAsyncRequests: 30,
+          // Only split chunks larger than 20KB
+          minSize: 20000,
+          // Aggressive splitting for chunks larger than 200KB to prevent long tasks
+          maxSize: 200000,
         },
       };
     }
@@ -82,6 +201,19 @@ const nextConfig: NextConfig = {
           {
             key: "Document-Policy",
             value: "js-profiling"
+          },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on"
+          }
+        ]
+      },
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Link',
+            value: '<https://fonts.googleapis.com>; rel=preconnect, <https://fonts.gstatic.com>; rel=preconnect; crossorigin, <https://www.googletagmanager.com>; rel=preconnect'
           }
         ]
       },
@@ -102,7 +234,36 @@ const nextConfig: NextConfig = {
             value: 'public, max-age=86400, stale-while-revalidate=3600'
           }
         ]
+      },
+      // Cache Google Tag Manager script for 1 day
+      {
+        source: '/gtm.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=86400'
+          }
+        ]
+      },
+      // Block public access to source map files (defense-in-depth)
+      {
+        source: '/:path*.map',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow'
+          }
+        ]
       }
+    ];
+  },
+
+  async rewrites() {
+    return [
+      {
+        source: '/gtm.js',
+        destination: 'https://www.googletagmanager.com/gtm.js?id=GTM-WVBD7SRF',
+      },
     ];
   },
 
@@ -119,5 +280,11 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
   disableLogger: true,
-  automaticVercelMonitors: true
+  automaticVercelMonitors: true,
+  sourcemaps: {
+    disable: false,
+    deleteSourcemapsAfterUpload: true,
+  },
+  autoInstrumentServerFunctions: false,
+  autoInstrumentMiddleware: false,
 });

@@ -1,5 +1,18 @@
 // File: src/lib/dashboard/data-fetching.js
 
+// Determine base URL for server-side fetches. On the client we can use relative URLs.
+const getBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    return '';
+  }
+
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    'http://localhost:3000'
+  );
+};
+
 /**
  * Helper to derive subject performance from sessions
  * @param {Array} sessions - Session data
@@ -107,11 +120,12 @@ export const fetchDashboardData = async () => {
       subjectPerformance: subjectData,
       performanceOverTime: performanceData,
       focusAreas,
-      strongAreas
+      strongAreas,
+      hasError: false
     };
   } catch (error) {
     console.error("Failed to fetch dashboard data:", error);
-    // Return empty default data
+    // Return empty default data with an error flag so the UI can distinguish from a true empty state
     return {
       recentSessions: [],
       topicMastery: [],
@@ -128,7 +142,8 @@ export const fetchDashboardData = async () => {
       subjectPerformance: [],
       performanceOverTime: [],
       focusAreas: [],
-      strongAreas: []
+      strongAreas: [],
+      hasError: true
     };
   }
 };
@@ -139,7 +154,7 @@ export const fetchDashboardData = async () => {
  */
 export const fetchRecentSessions = async () => {
   try {
-    const response = await fetch('/api/practice-sessions?limit=10');
+    const response = await fetch(`${getBaseUrl()}/api/practice-sessions?limit=10`);
     if (!response.ok) {
       throw new Error('Failed to fetch recent sessions');
     }
@@ -197,7 +212,7 @@ export const fetchRecentSessions = async () => {
  */
 export const fetchTopicMastery = async () => {
   try {
-    const response = await fetch('/api/topic-mastery');
+    const response = await fetch(`${getBaseUrl()}/api/topic-mastery`);
     if (!response.ok) {
       throw new Error('Failed to fetch topic mastery');
     }
@@ -244,7 +259,7 @@ export const fetchTopicMastery = async () => {
  */
 export const fetchUserStats = async () => {
   try {
-    const response = await fetch('/api/user-stats');
+    const response = await fetch(`${getBaseUrl()}/api/user-stats`);
     if (!response.ok) {
       throw new Error('Failed to fetch user stats');
     }
@@ -323,7 +338,7 @@ export const fetchUserStats = async () => {
  */
 export const fetchQuestionTypes = async () => {
   try {
-    const response = await fetch('/api/question-types');
+    const response = await fetch(`${getBaseUrl()}/api/question-types`);
     if (!response.ok) {
       throw new Error('Failed to fetch question type distribution');
     }

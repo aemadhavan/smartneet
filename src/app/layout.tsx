@@ -1,37 +1,59 @@
 import { ReactNode } from 'react';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
+import { Metadata } from 'next';
+import Header from '@/components/layout/HeaderOptimized';
+import dynamic from 'next/dynamic';
+import ClientProviders from '@/components/ClientProviders';
+
+const Footer = dynamic(() => import('@/components/layout/Footer'));
+import GoogleTagManager from '@/components/layout/GoogleTagManager';
 import './globals.css';
 import { Geist, Geist_Mono } from "next/font/google";
-import { ClerkProvider } from '@clerk/nextjs';
 import { SpeedInsights } from '@vercel/speed-insights/next';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/next";
 
 /**
  * This is the root layout for the application.
  * It defines the basic structure of the page, including the header, footer, and main content.
  */
 
+// Use 'optional' instead of 'swap' to prevent layout shift during font loading
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: 'optional', // Changed from 'swap' to 'optional' for better CLS
+  preload: true,
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: false,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: 'optional', // Changed from 'swap' to 'optional' for better CLS
+  preload: false,
+  fallback: ['Courier New', 'monospace'],
+  adjustFontFallback: false,
 });
 
 /**
  * Enhanced metadata for the application with SEO optimizations.
  * Includes expanded description, keywords, Open Graph, and Twitter Card tags.
+ * Resource hints moved here for proper App Router handling.
  */
-export const metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://smarterneet.com'),
   title: 'SmarterNEET - Advanced NEET Exam Preparation Platform',
   description: 'Master your NEET preparation with 10 years of previous questions, AI-powered practice tests, and personalized analytics. Our comprehensive platform helps medical students achieve better results with targeted learning and performance tracking.',
   keywords: 'NEET preparation, medical entrance exam, NEET practice tests, NEET question bank, AI learning, personalized analytics, medical education, NEET study materials, exam preparation',
-  
+  authors: [{ name: 'SmarterNEET Team' }],
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: 'https://smarterneet.com/',
+  },
+
   // Open Graph tags for better social media sharing
   openGraph: {
     type: 'website',
@@ -49,7 +71,7 @@ export const metadata = {
       }
     ]
   },
-  
+
   // Twitter Card tags for Twitter sharing
   twitter: {
     card: 'summary_large_image',
@@ -70,24 +92,21 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Additional meta tags to enhance SEO that aren't handled by Next.js metadata API */}
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="robots" content="index, follow" />
-        <meta name="author" content="SmarterNEET Team" />
-        <link rel="canonical" href="https://smarterneet.com/" />
+        {/* Preconnect only to critical origins actually in use */}
+        <link rel="preconnect" href="https://www.googletagmanager.com" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gradient-to-b from-gray-50 to-white`}>
-    
-      <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{display:'none', visibility:'hidden'}}></iframe></noscript>
-      <Analytics />
-        <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-linear-to-b from-gray-50 to-white flex flex-col`} suppressHydrationWarning>
+        {process.env.NEXT_PUBLIC_DISABLE_ANALYTICS !== '1' && <GoogleTagManager />}
+        <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }}></iframe></noscript>
+        {process.env.NODE_ENV === 'production' && <Analytics />}
+        <ClientProviders>
           <Header />
-          <main>{children}</main>
+          <main className="flex-1">{children}</main>
           <Footer />
-          <SpeedInsights />
-        </ClerkProvider>
+          {process.env.NODE_ENV === 'production' && <SpeedInsights />}
+        </ClientProviders>
       </body>
     </html>
   );

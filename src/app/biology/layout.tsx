@@ -27,13 +27,13 @@ export default function BiologyLayout({
               </Link>
             </div>
             <div className="hidden md:flex space-x-6">
-              <Link href="/biology/bot" className="text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-md hover:bg-gray-50">
+              <Link href="/biology/bot" className="text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-md hover:bg-gray-50" prefetch={true}>
                 Botany
               </Link>
-              <Link href="/biology/zoo" className="text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-md hover:bg-gray-50">
+              <Link href="/biology/zoo" className="text-gray-600 hover:text-indigo-600 px-3 py-2 rounded-md hover:bg-gray-50" prefetch={true}>
                 Zoology
               </Link>
-              <Link href="/practice" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">
+              <Link href="/practice" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700" prefetch={true}>
                 Practice Now
               </Link>
             </div>

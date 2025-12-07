@@ -2,13 +2,12 @@ import { motion, Variants } from "framer-motion";
 
 const fadeIn: Variants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { 
-        type: "spring" as const,
-        stiffness: 100,
-        damping: 15
+      transition: {
+        duration: 0.4,
+        ease: "easeOut"
       }
     }
 };

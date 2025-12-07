@@ -1,8 +1,8 @@
 // app/api/subtopics/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, withRetry } from '@/db';
 import { subtopics, topics } from '@/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, SQL } from 'drizzle-orm';
 import { cache } from '@/lib/cache';
 
 // GET /api/subtopics - Get subtopics with optional filtering
@@ -40,13 +40,15 @@ export async function GET(req: NextRequest) {
       if (cachedTopicIds) {
         relevantTopicIds = cachedTopicIds;
       } else {
-        // Not in cache, query the database
-        const topicsForSubject = await db.select({ topic_id: topics.topic_id })
-          .from(topics)
-          .where(eq(topics.subject_id, subjectId));
-        
+        // Not in cache, query the database with retry for connection resilience
+        const topicsForSubject = await withRetry(async () => {
+          return await db.select({ topic_id: topics.topic_id })
+            .from(topics)
+            .where(eq(topics.subject_id, subjectId));
+        });
+
         relevantTopicIds = topicsForSubject.map(t => t.topic_id);
-        
+
         // Cache the topic IDs for this subject
         await cache.set(subjectTopicsCacheKey, relevantTopicIds, 3600); // Cache for 1 hour
       }
@@ -65,7 +67,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Build conditions
-    const conditions = [];
+    const conditions: SQL[] = [];
     
     if (topicId) {
       conditions.push(eq(subtopics.topic_id, topicId));
@@ -78,12 +80,16 @@ export async function GET(req: NextRequest) {
       conditions.push(eq(subtopics.is_active, isActive));
     }
     
-    // Execute query
+    // Execute query with retry for connection resilience
     let subtopicsResult;
     if (conditions.length > 0) {
-      subtopicsResult = await db.select().from(subtopics).where(and(...conditions));
+      subtopicsResult = await withRetry(async () => {
+        return await db.select().from(subtopics).where(and(...conditions));
+      });
     } else {
-      subtopicsResult = await db.select().from(subtopics);
+      subtopicsResult = await withRetry(async () => {
+        return await db.select().from(subtopics);
+      });
     }
     
     // Cache the result

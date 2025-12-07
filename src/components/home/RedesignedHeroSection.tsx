@@ -1,29 +1,8 @@
 "use client";
 
-import { lazy, Suspense } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-// Removed invalid import since @/hooks/useAuth doesn't exist
-// import { useAuth } from "@/hooks/useAuth";
-
-// Import HeroCarousel with lazy loading
-const HeroCarousel = lazy(() => import("./HeroCarousel"));
-
-// Simple loading placeholder for the carousel
-const CarouselPlaceholder = () => (
-  <div className="w-full h-64 bg-indigo-800/20 rounded-lg animate-pulse"></div>
-);
-
-// Simplified animation variants for better performance
-const fadeIn = {
-  hidden: { opacity: 0, y: 10 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { duration: 0.4 }
-  }
-};
+import HeroCarousel from "./HeroCarousel";
 
 // Optimized DNA Helix Background Component - reduced complexity
 const DNAHelixBackground = () => {
@@ -142,40 +121,23 @@ export const RedesignedHeroSection = () => {
               ))}
             </div>
             
-            {/* Stats counter - Simplified with motion optimization */}
-            <motion.div 
-              className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-12" 
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: { 
-                  opacity: 1,
-                  transition: { 
-                    delayChildren: 0.3,
-                    staggerChildren: 0.1
-                  }
-                }
-              }}
-            >
+            {/* Stats counter - No motion to prevent CLS */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-12">
               {stats.map((stat, index) => (
-                <motion.div 
-                  key={index} 
+                <div
+                  key={index}
                   className="text-center p-3 rounded-lg bg-white/5 border border-white/10"
-                  variants={fadeIn}
                 >
                   <p className="text-2xl md:text-3xl font-bold text-white">{stat.number}</p>
                   <p className="text-indigo-200 text-sm">{stat.label}</p>
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           </div>
           
-          {/* Hero Image - With Suspense and fallback */}
+          {/* Hero Image - Direct render for better LCP */}
           <div className="lg:w-1/2 flex justify-center">
-            <Suspense fallback={<CarouselPlaceholder />}>
-              <HeroCarousel />
-            </Suspense>
+            <HeroCarousel />
           </div>
         </div>
       </div>

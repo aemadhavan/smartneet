@@ -3,15 +3,14 @@
 import { motion, Variants } from "framer-motion";
 import Link from "next/link";
 
+// Removed y-axis and scale movements to prevent layout shift (CLS optimization)
 const fadeIn: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { 
-      type: "spring" as const,
-      stiffness: 100,
-      damping: 15
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.4,
+      ease: "easeOut"
     }
   }
 };
@@ -26,26 +25,25 @@ const staggerContainer: Variants = {
   }
 };
 
+// Removed scale animation to prevent layout shift
 const heroImageAnimate: Variants = {
-  hidden: { scale: 0.8, opacity: 0 },
-  visible: { 
-    scale: 1, 
-    opacity: 1, 
-    transition: { 
-      type: "spring" as const,
-      stiffness: 50,
-      delay: 0.2 
-    } 
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: "easeOut",
+      delay: 0.2
+    }
   }
 };
 
 export const InteractiveDemoSection = () => {
   return (
-    <section className="py-20 bg-gradient-to-r from-indigo-50 to-purple-50 overflow-hidden relative">
-      {/* Decorative elements */}
+    <section className="py-20 bg-gradient-to-r from-indigo-50 to-purple-50 overflow-hidden relative" style={{ minHeight: '700px' }}>
+      {/* Simplified decorative elements - reduced from 3 to 2 */}
       <div className="absolute top-0 left-0 w-32 h-32 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
       <div className="absolute bottom-0 right-0 w-48 h-48 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div 
@@ -195,58 +193,31 @@ export const InteractiveDemoSection = () => {
                       <div className="grid grid-cols-2 gap-4 mt-6">
                         <div className="bg-indigo-50 p-4 rounded-lg">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Strength Areas</h4>
-                          <div className="space-y-1">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Human Physiology</span>
-                            </div>
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Genetics</span>
-                            </div>
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Ecology</span>
-                            </div>
-                          </div>
+                          <ul className="space-y-1 list-none">
+                            <li className="text-xs text-gray-600">• Human Physiology</li>
+                            <li className="text-xs text-gray-600">• Genetics</li>
+                            <li className="text-xs text-gray-600">• Ecology</li>
+                          </ul>
                         </div>
-                        
+
                         <div className="bg-indigo-50 p-4 rounded-lg">
                           <h4 className="text-sm font-medium text-gray-700 mb-2">Improvement Areas</h4>
-                          <div className="space-y-1">
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Plant Physiology</span>
-                            </div>
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Biomolecules</span>
-                            </div>
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                              <span className="text-xs text-gray-600">Cell Division</span>
-                            </div>
-                          </div>
+                          <ul className="space-y-1 list-none">
+                            <li className="text-xs text-gray-600">• Plant Physiology</li>
+                            <li className="text-xs text-gray-600">• Biomolecules</li>
+                            <li className="text-xs text-gray-600">• Cell Division</li>
+                          </ul>
                         </div>
                       </div>
                       
-                      {/* Recent Activity */}
+                      {/* Recent Activity - simplified structure */}
                       <div>
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Recent Activity</h4>
-                        <div className="space-y-2">
-                          <div className="flex items-center text-xs">
-                            <span className="text-gray-500 w-24">Today, 10:30 AM</span>
-                            <span className="text-gray-700">Completed Biology Mock Test #8</span>
-                          </div>
-                          <div className="flex items-center text-xs">
-                            <span className="text-gray-500 w-24">Yesterday</span>
-                            <span className="text-gray-700">Revised 45 Genetics questions</span>
-                          </div>
-                          <div className="flex items-center text-xs">
-                            <span className="text-gray-500 w-24">April 4, 2025</span>
-                            <span className="text-gray-700">Completed Full NEET Mock Test</span>
-                          </div>
-                        </div>
+                        <ul className="space-y-2 text-xs list-none">
+                          <li><span className="text-gray-500">Today, 10:30 AM</span> - <span className="text-gray-700">Completed Biology Mock Test #8</span></li>
+                          <li><span className="text-gray-500">Yesterday</span> - <span className="text-gray-700">Revised 45 Genetics questions</span></li>
+                          <li><span className="text-gray-500">April 4, 2025</span> - <span className="text-gray-700">Completed Full NEET Mock Test</span></li>
+                        </ul>
                       </div>
                     </div>
                   </div>

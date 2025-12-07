@@ -24,7 +24,10 @@ const SessionHeader = memo(function SessionHeader({
         <h1 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{title}</h1>
         
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          {children}
+          {/* Reserve space for header extras (e.g., subscription info) to reduce CLS */}
+          <div className="min-h-[32px] flex items-center">
+            {children}
+          </div>
           
           <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
             <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>

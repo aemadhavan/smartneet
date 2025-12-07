@@ -1,4 +1,10 @@
 import React from 'react';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'About Us - SmarterNEET | NEET Exam Preparation Platform',
+  description: 'Learn about SmarterNEET, your trusted partner in NEET exam preparation. Discover our mission to help medical students succeed with AI-powered practice tests, comprehensive question banks, and personalized learning analytics.',
+};
 
 const AboutUs = () => {
   return (

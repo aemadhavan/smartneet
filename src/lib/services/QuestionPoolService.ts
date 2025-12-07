@@ -140,7 +140,7 @@ export class QuestionPoolService {
   }
   
   /**
-   * Get personalized questions for a user
+   * Get personalized questions for a user with fallback logic
    */
   async getPersonalizedQuestions(
     userId: string,
@@ -152,60 +152,101 @@ export class QuestionPoolService {
     try {
       // Check if this is a Botany subject (Biology)
       const isBotanySubject = subjectId === SUBJECT_IDS.BIOLOGY;
-      
+
       // Check if user has premium subscription
       const isPremiumUser = await improvedSubscriptionService.isUserPremium(userId);
       const isFreemiumUser = !isPremiumUser;
-      
-      // Cache key for the potential questions pool
-      const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}:source:AI_Generated`;
-      
-      // Try to get the potential questions pool from cache
-      let potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey);
-      
-      if (!potentialQuestions) {
-        // Cache miss - execute query to get potential questions
-        potentialQuestions = await this.fetchPotentialQuestions(subjectId, topicId, subtopicId);
-        
-        // Cache the potential questions pool for future use
-        await cache.set(poolCacheKey, potentialQuestions, CACHE_TTLS.QUESTION_POOL);
-        
-        logger.info('Question pool cache miss', {
+
+      let potentialQuestions: QuestionWithDetails[] = [];
+      let queryStrategy = '';
+
+      // Strategy 1: Try with full specificity (subtopic level if provided)
+      if (subtopicId) {
+        const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:${subtopicId}:source:AI_Generated`;
+        potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey) || [];
+
+        if (!potentialQuestions.length) {
+          potentialQuestions = await this.fetchPotentialQuestions(subjectId, topicId, subtopicId);
+          if (potentialQuestions.length > 0) {
+            await cache.set(poolCacheKey, potentialQuestions, CACHE_TTLS.QUESTION_POOL);
+          }
+        }
+
+        queryStrategy = 'subtopic-level';
+        logger.info('Attempted subtopic-level query', {
           userId,
           context: 'QuestionPoolService.getPersonalizedQuestions',
-          data: { subjectId, topicId, subtopicId, cacheKey: poolCacheKey }
-        });
-      } else {
-        logger.debug('Question pool cache hit', {
-          userId,
-          context: 'QuestionPoolService.getPersonalizedQuestions',
-          data: { subjectId, topicId, subtopicId, cacheKey: poolCacheKey }
+          data: { subjectId, topicId, subtopicId, found: potentialQuestions.length }
         });
       }
-      
+
+      // Strategy 2: Fallback to topic level if no subtopic questions found
+      if (potentialQuestions.length === 0 && topicId) {
+        const poolCacheKey = `questions:pool:subject:${subjectId}:topic:${topicId}:subtopic:none:source:AI_Generated`;
+        potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey) || [];
+
+        if (!potentialQuestions.length) {
+          potentialQuestions = await this.fetchPotentialQuestions(subjectId, topicId, undefined);
+          if (potentialQuestions.length > 0) {
+            await cache.set(poolCacheKey, potentialQuestions, CACHE_TTLS.QUESTION_POOL);
+          }
+        }
+
+        queryStrategy = subtopicId ? 'topic-level-fallback' : 'topic-level';
+        logger.info('Attempted topic-level query', {
+          userId,
+          context: 'QuestionPoolService.getPersonalizedQuestions',
+          data: { subjectId, topicId, found: potentialQuestions.length, isFallback: !!subtopicId }
+        });
+      }
+
+      // Strategy 3: Final fallback to subject level
+      if (potentialQuestions.length === 0) {
+        const poolCacheKey = `questions:pool:subject:${subjectId}:topic:none:subtopic:none:source:AI_Generated`;
+        potentialQuestions = await cache.get<QuestionWithDetails[]>(poolCacheKey) || [];
+
+        if (!potentialQuestions.length) {
+          potentialQuestions = await this.fetchPotentialQuestions(subjectId, undefined, undefined);
+          if (potentialQuestions.length > 0) {
+            await cache.set(poolCacheKey, potentialQuestions, CACHE_TTLS.QUESTION_POOL);
+          }
+        }
+
+        queryStrategy = (topicId || subtopicId) ? 'subject-level-fallback' : 'subject-level';
+        logger.info('Attempted subject-level query', {
+          userId,
+          context: 'QuestionPoolService.getPersonalizedQuestions',
+          data: { subjectId, found: potentialQuestions.length, isFallback: !!(topicId || subtopicId) }
+        });
+      }
+
       // For free users practicing botany without a specific topic,
       // filter to only include first two topics
       if (isBotanySubject && isFreemiumUser && !topicId && potentialQuestions) {
         potentialQuestions = await this.filterFreemiumQuestions(potentialQuestions, subjectId);
       }
-      
+
       // Make sure potentialQuestions is an array before spreading
       const questionsArray = Array.isArray(potentialQuestions) ? potentialQuestions : [];
-      
+
       // Shuffle questions and take the requested number
       const shuffled = [...questionsArray].sort(() => 0.5 - Math.random());
       const selectedQuestions = shuffled.slice(0, questionCount);
-      
+
       logger.info('Selected personalized questions', {
         userId,
         context: 'QuestionPoolService.getPersonalizedQuestions',
-        data: { 
-          subjectId, 
+        data: {
+          subjectId,
+          topicId,
+          subtopicId,
+          queryStrategy,
           questionCount: selectedQuestions.length,
-          availableCount: questionsArray.length
+          availableCount: questionsArray.length,
+          requested: questionCount
         }
       });
-      
+
       return selectedQuestions;
     } catch (error) {
       logger.error('Error getting personalized questions', {

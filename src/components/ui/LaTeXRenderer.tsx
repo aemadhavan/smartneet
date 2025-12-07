@@ -2,7 +2,6 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import 'katex/dist/katex.min.css';
 import type KaTeX from 'katex';
 
 interface LaTeXRendererProps {
@@ -14,10 +13,28 @@ interface LaTeXRendererProps {
 // Dynamically import KaTeX to avoid SSR issues
 let katex: typeof KaTeX | null = null;
 
+// Load the KaTeX runtime JS on the client, but do NOT load the heavy CSS up front
 if (typeof window !== 'undefined') {
   import('katex').then((KaTeX) => {
     katex = KaTeX.default;
   });
+}
+
+// Lazy-load KaTeX CSS the first time this component mounts.
+// This keeps the CSS out of the critical path and avoids blocking LCP.
+function ensureKatexCssLoaded() {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById('katex-css')) return;
+
+  const link = document.createElement('link');
+  link.id = 'katex-css';
+  link.rel = 'stylesheet';
+
+  // Load directly from the official CDN instead of a hard-coded
+  // Next.js "_next/static" path, which was causing 404s in production.
+  link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css';
+
+  document.head.appendChild(link);
 }
 
 export function LaTeXRenderer({ content, className = '', inline = false }: LaTeXRendererProps) {
@@ -25,6 +42,9 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
 
   useEffect(() => {
     if (!containerRef.current || !katex) return;
+
+    // Ensure KaTeX styles are loaded before rendering math content
+    ensureKatexCssLoaded();
 
     try {
       // Function to render LaTeX with mixed content
@@ -66,7 +86,7 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
               output: 'html'
             });
             // Wrap in a span to prevent line breaks
-            return `<span class="latex-math-block">${renderedMath}</span>`;
+            return `<span class=\"latex-math-block\">${renderedMath}</span>`;
           } catch (e) {
             console.warn('LaTeX rendering error for block math:', mathContent, e);
             return match; // Return original if rendering fails
@@ -84,7 +104,7 @@ export function LaTeXRenderer({ content, className = '', inline = false }: LaTeX
               output: 'html'
             });
             // Wrap in a span to prevent line breaks
-            return `<span class="latex-math-inline">${renderedMath}</span>`;
+            return `<span class=\"latex-math-inline\">${renderedMath}</span>`;
           } catch (e) {
             console.warn('LaTeX rendering error for inline math:', mathContent, e);
             return match; // Return original if rendering fails
@@ -141,7 +161,7 @@ export function useChemistryLaTeX() {
     // These should already be in the format: Ca$^{2+}$, Cl$^{-}$, etc.
     
     // Handle reaction arrows (already in LaTeX format)
-    // These should already be in the format: $\rightarrow$, $\rightleftharpoons$, etc.
+    // These should already be in the format: $\\rightarrow$, $\\rightleftharpoons$, etc.
     
     return processed;
   };

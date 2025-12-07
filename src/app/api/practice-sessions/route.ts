@@ -153,9 +153,27 @@ export async function POST(request: NextRequest) {
         questions: result.questions
       });
     } catch (e) {
-      // Check if it's a subscription limit error first
+      // Check if it's a "no questions available" error first
+      if (e instanceof Error && e.message.includes('No questions available')) {
+        logger.warn('Session creation failed - no questions available', {
+          userId,
+          context: 'practice-sessions.POST',
+          error: e.message
+        });
+
+        return NextResponse.json(
+          {
+            error: e.message,
+            code: 'NO_QUESTIONS_AVAILABLE',
+            message: 'The selected topic does not have questions available yet. Please try a different topic.'
+          },
+          { status: 422 } // Unprocessable Entity
+        );
+      }
+
+      // Check if it's a subscription limit error
       if (e instanceof Error && (
-        e.message.includes('daily limit') || 
+        e.message.includes('daily limit') ||
         e.message.includes('subscription limit') ||
         e.message.includes('Cannot take test') ||
         e.message.includes('premium users') ||
@@ -166,13 +184,13 @@ export async function POST(request: NextRequest) {
           context: 'practice-sessions.POST',
           error: e.message
         });
-        
+
         return NextResponse.json(
-          { 
+          {
             error: e.message,
             limitReached: true,
             upgradeRequired: e.message.includes('premium')
-          }, 
+          },
           { status: 403 }
         );
       }
@@ -208,23 +226,31 @@ export async function POST(request: NextRequest) {
         context: 'practice-sessions.POST',
         error: e instanceof Error ? e : String(e)
       });
-      
+
       // Check if it's a database constraint error
       if (e instanceof Error && e.message.includes('23505')) {
         return NextResponse.json(
-          { 
+          {
             message: "Duplicate session or questions detected",
             error: "A constraint violation occurred. Please try again."
           },
           { status: 409 }, // Conflict status code
         );
       }
-      
+
+      // In development, provide more details for debugging
+      const isDev = process.env.NODE_ENV === 'development';
+
       // Provide generic error message without exposing implementation details
       return NextResponse.json(
-        { 
+        {
           message: "Failed to create practice session",
-          error: "An unexpected error occurred"
+          error: "An unexpected error occurred",
+          // Include error details in development for easier debugging
+          ...(isDev && e instanceof Error ? {
+            devError: e.message,
+            devStack: e.stack?.split('\n').slice(0, 5).join('\n')
+          } : {})
         },
         { status: 500 },
       );

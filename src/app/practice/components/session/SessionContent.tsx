@@ -74,9 +74,12 @@ const SessionContent = memo(function SessionContent({
         {limitStatus && <SubscriptionLimitDisplay refreshKey={limitsRefreshKey} />}
       </SessionHeader>
 
-      {!isPremium && limitParam === 'free' && (
-        <FreeAccessBanner />
-      )}
+      {/* Free access banner region with reserved space to reduce layout shift */}
+      <div className="mb-4 min-h-16" aria-live="polite">
+        {!isPremium && limitParam === 'free' && (
+          <FreeAccessBanner />
+        )}
+      </div>
 
       {/* Question display */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
@@ -101,14 +104,16 @@ const SessionContent = memo(function SessionContent({
         onQuestionSelect={setCurrentQuestionIndex}
       />
 
-      {/* Limit notification */}
-      {showLimitNotification && 
-        <SubscriptionLimitNotification 
-          message={limitMessage}
-        />
-      }
+      {/* Limit notification region with reserved space to reduce layout shift */}
+      <div className="mt-4 min-h-16" aria-live="polite">
+        {showLimitNotification && (
+          <SubscriptionLimitNotification 
+            message={limitMessage}
+          />
+        )}
+      </div>
     </div>
   );
 });
 
-export { SessionContent };
+export default SessionContent;

@@ -2,11 +2,17 @@
 // src/components/layout/Header.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import { UserButton, SignedIn, SignedOut } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import GoogleTagManager from './GoogleTagManager';
-import SignOutButton from '@/components/auth/SignOutButton';
+import { useState, useEffect, startTransition } from 'react';
+import dynamic from 'next/dynamic';
+
+// Clerk is heavy; lazy-load client widgets to reduce TBT
+const DynamicUserButton = dynamic(() => import('@clerk/nextjs').then(m => m.UserButton), {
+  ssr: false,
+  loading: () => <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+});
+const SignedIn = dynamic(() => import('@clerk/nextjs').then(m => m.SignedIn), { ssr: false });
+const SignedOut = dynamic(() => import('@clerk/nextjs').then(m => m.SignedOut), { ssr: false });
 
 /**
  * Custom NavLink component with loading state
@@ -18,14 +24,17 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // If already on the same page, don't show loading
     if (pathname === href) {
       return;
     }
-    
-    setIsLoading(true);
-    router.push(href);
+
+    // Use startTransition to prevent blocking the main thread
+    startTransition(() => {
+      setIsLoading(true);
+      router.push(href);
+    });
   };
 
   useEffect(() => {
@@ -56,29 +65,25 @@ const NavLink = ({ href, children, className = "" }: { href: string; children: R
 /**
  * Header component for the application.
  * Contains navigation links and authentication controls.
- * Now includes the GoogleTagManager component for analytics.
  */
 const Header = () => {
   const pathname = usePathname();
-  const isPracticePage = pathname?.startsWith('/practice');
+  const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
-      {/* Include Google Tag Manager */}
-      <GoogleTagManager />
-      
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         {/* Logo and brand name */}
         <Link href="/" className="flex items-center space-x-3">
           <Image
             src="/smarterneet-logo.jpeg"
             alt="SmarterNEET Logo"
-            width={64}
-            height={64}
+            width={48}
+            height={48}
             className="rounded-full object-contain"
             priority
-            unoptimized
-            loading="eager"
+quality={60}
+            sizes="48px"
           />
           <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             SmarterNEET
@@ -98,8 +103,10 @@ const Header = () => {
           </NavLink>
           <NavLink href="/chemistry" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Chemistry
-          </NavLink>         
-          
+          </NavLink>
+          <NavLink href="/physics" className="text-gray-700 hover:text-indigo-600 transition-colors">
+            Physics
+          </NavLink>
           <NavLink href="/smarter-guides" className="text-gray-700 hover:text-indigo-600 transition-colors">
             Smarter Guides (Bodhi AI)
           </NavLink>
@@ -111,15 +118,15 @@ const Header = () => {
               Practice
             </NavLink>
           </SignedIn>
-          <span className="text-gray-400">Physics (Coming soon)</span>
           
         </nav>
 
         {/* Authentication */}
+        {needsAuthUI ? (
         <div className="flex items-center space-x-4">
           <SignedIn>
             <div className="flex items-center space-x-2">
-              <UserButton 
+              <DynamicUserButton 
                 afterSignOutUrl={process.env.NEXT_PUBLIC_APP_URL || "https://smarterneet.com"} 
                 appearance={{
                   elements: {
@@ -130,12 +137,6 @@ const Header = () => {
                 showName={false}
                 signInUrl="/sign-in"
               />
-              {/* Backup sign out button - only show on practice pages where sign out might have issues */}
-              {isPracticePage && (
-                <SignOutButton className="text-sm text-gray-600 hover:text-red-600 transition-colors px-2 py-1 rounded hover:bg-gray-100">
-                  Sign out
-                </SignOutButton>
-              )}
             </div>
           </SignedIn>
           <SignedOut>
@@ -153,6 +154,12 @@ const Header = () => {
             </Link>
           </SignedOut>
         </div>
+        ) : (
+          <div className="flex items-center space-x-4">
+            <Link href="/sign-in" className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>
+            <Link href="/sign-up" className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors">Sign Up</Link>
+          </div>
+        )}
       </div>
     </header>
   );

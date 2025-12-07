@@ -1,6 +1,9 @@
 // File: src/app/practice/components/questions/QuestionDisplay.tsx
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react';
-import { LaTeXRenderer } from '@/components/ui/LaTeXRenderer';
+import dynamic from 'next/dynamic';
+const LaTeXRenderer = dynamic(
+  () => import('@/components/ui/LaTeXRenderer').then(m => m.LaTeXRenderer)
+);
 import { 
   Question, 
   QuestionDetails,
@@ -11,18 +14,32 @@ import {
   SequenceOrderingDetails,
   DiagramBasedDetails
 } from '@/app/practice/types';
-import { 
-  MultipleChoiceQuestion, 
-  MatchingQuestion, 
-  AssertionReasonQuestion,
-  MultipleCorrectStatementsQuestion,
-  SequenceOrderingQuestion,
-  DiagramBasedQuestion
-} from '@/app/practice/components/questions';
 import { DebugQuestionInfo } from '../debug/DebugQuestionInfo';
 import { logger } from '@/lib/logger'; // Import the logger service
 import QuestionErrorBoundary from './QuestionErrorBoundary';
-import { NetworkStatusIndicator } from '../ui/NetworkStatusIndicator';
+const NetworkStatusIndicator = dynamic(
+  () => import('../ui/NetworkStatusIndicator').then(m => m.NetworkStatusIndicator)
+);
+
+// Dynamically import heavy question-type components to reduce initial bundle size
+const MultipleChoiceQuestion = dynamic(() =>
+  import('./MultipleChoiceQuestion').then(m => m.MultipleChoiceQuestion)
+);
+const MatchingQuestion = dynamic(() =>
+  import('./MatchingQuestion').then(m => m.MatchingQuestion)
+);
+const AssertionReasonQuestion = dynamic(() =>
+  import('./AssertionReasonQuestion').then(m => m.AssertionReasonQuestion)
+);
+const MultipleCorrectStatementsQuestion = dynamic(() =>
+  import('./MultipleCorrectStatementsQuestion').then(m => m.MultipleCorrectStatementsQuestion)
+);
+const SequenceOrderingQuestion = dynamic(() =>
+  import('./SequenceOrderingQuestion').then(m => m.SequenceOrderingQuestion)
+);
+const DiagramBasedQuestion = dynamic(() =>
+  import('./DiagramBasedQuestion').then(m => m.DiagramBasedQuestion)
+);
 
 interface QuestionDisplayProps {
   question: Question;
@@ -368,11 +385,11 @@ const QuestionDisplay = memo(function QuestionDisplay({
         }`}>
           <div className="flex items-start space-x-2">
             {isNetworkError ? (
-              <svg className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             ) : (
-              <svg className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="h-5 w-5 text-red-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             )}
