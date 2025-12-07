@@ -89,7 +89,6 @@ UserSection.displayName = 'UserSection';
  */
 const Header = () => {
   const pathname = usePathname();
-  const needsAuthUI = pathname?.startsWith('/dashboard') || pathname?.startsWith('/practice') || pathname?.startsWith('/admin');
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-sm border-b border-gray-200">
@@ -106,7 +105,7 @@ const Header = () => {
             quality={60}
             sizes="48px"
           />
-          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <span className="text-xl font-bold bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
             SmarterNEET
           </span>
         </Link>
@@ -145,15 +144,8 @@ const Header = () => {
           )}
         </nav>
 
-        {/* Authentication */}
-        {needsAuthUI ? (
-          <UserSection />
-        ) : (
-          <div className="flex items-center space-x-4">
-            <Link href="/sign-in" className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors">Sign In</Link>
-            <Link href="/sign-up" className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors">Sign Up</Link>
-          </div>
-        )}
+        {/* Authentication - Always show UserSection which handles signed in/out state */}
+        <UserSection />
       </div>
     </header>
   );
