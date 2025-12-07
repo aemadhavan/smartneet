@@ -223,6 +223,9 @@ export class SubscriptionService {
    * Check if user can take a test
    */
   async canUserTakeTest(userId: string): Promise<{ canTake: boolean; reason?: string }> {
+    // TEMP: Bypass subscription limit check
+    return { canTake: true };
+
     try {
       const subscription = await this.getUserSubscription(userId);
       
