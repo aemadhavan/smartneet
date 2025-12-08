@@ -54,15 +54,14 @@ const ALLOWED_MOBILE_APIS = new Set([
   '/api/session-questions'
 ]);
 
-// Apply middleware
-const middleware = async (auth: () => Promise<{ userId: string | null }>, req: NextRequest) => {
-  const pathname = req.nextUrl.pathname;
-
-  // Fast path: Skip static files and images using optimized checks
+/**
+ * Check if the request is for a static file or image
+ */
+function isStaticFile(pathname: string): boolean {
   // Check static paths first (most common)
   for (const path of STATIC_PATHS) {
     if (pathname.startsWith(path)) {
-      return;
+      return true;
     }
   }
 
@@ -71,39 +70,45 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   if (lastDot !== -1) {
     const ext = pathname.slice(lastDot);
     if (IMAGE_EXTENSIONS.has(ext)) {
-      return;
+      return true;
     }
   }
 
-  // Check if request is from mobile app (only get headers once)
+  return false;
+}
+
+/**
+ * Check if the request is from mobile app and accessing allowed APIs
+ */
+function isMobileApiRequest(req: NextRequest, pathname: string): boolean {
   const userAgent = req.headers.get('user-agent');
   const clientId = req.headers.get('x-client-id');
 
   const isMobileApp = (userAgent && (userAgent.includes('SmarterNEET-Mobile') || userAgent.includes('Mobile'))) ||
                       (clientId && clientId.startsWith('flutter-'));
 
-  // If API request from mobile app, allow certain endpoints
-  if (isMobileApp && pathname.startsWith('/api/')) {
-    for (const api of ALLOWED_MOBILE_APIS) {
-      if (pathname.startsWith(api)) {
-        return; // Allow without auth
-      }
+  if (!isMobileApp || !pathname.startsWith('/api/')) {
+    return false;
+  }
+
+  for (const api of ALLOWED_MOBILE_APIS) {
+    if (pathname.startsWith(api)) {
+      return true;
     }
   }
 
-  // Create response to add headers
-  const response = NextResponse.next();
+  return false;
+}
 
-  // Add performance and security headers
-  const headers = response.headers;
-
-  // Security Headers
+/**
+ * Set security headers on the response
+ */
+function setSecurityHeaders(headers: Headers): void {
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('X-Frame-Options', 'DENY');
   headers.set('X-XSS-Protection', '1; mode=block');
   headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // Content Security Policy
   const csp = [
     "default-src 'self'",
     // Allow analytics, monitoring, Clerk, and Stripe scripts
@@ -126,34 +131,34 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
   ].join('; ');
 
   headers.set('Content-Security-Policy', csp);
+}
 
-  // Cache-Control headers for different content types
-  // Note: pathname already declared at line 59
-
-  // Static assets - long cache with immutable
+/**
+ * Set cache control headers based on pathname
+ */
+function setCacheHeaders(headers: Headers, pathname: string): void {
   if (pathname.startsWith('/_next/static/')) {
     headers.set('Cache-Control', 'public, max-age=31536000, immutable');
-  }
-  // API routes - no cache with proper directives
-  else if (pathname.startsWith('/api/')) {
+  } else if (pathname.startsWith('/api/')) {
     headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     headers.set('Pragma', 'no-cache');
     headers.set('Expires', '0');
-  }
-  // Homepage - optimized for bfcache with short cache
-  else if (pathname === '/') {
+  } else if (pathname === '/') {
     headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=86400');
-  }
-  // Chemistry/Biology pages - with stale-while-revalidate
-  else if (pathname.startsWith('/chemistry') || pathname.startsWith('/biology')) {
+  } else if (pathname.startsWith('/chemistry') || pathname.startsWith('/biology')) {
     headers.set('Cache-Control', 'public, max-age=0, must-revalidate, stale-while-revalidate=3600');
-  }
-  // Other pages - with revalidation
-  else {
+  } else {
     headers.set('Cache-Control', 'public, max-age=0, must-revalidate');
   }
+}
 
-  // If not a public route, require authentication
+/**
+ * Handle authentication for protected routes
+ */
+async function handleAuth(
+  auth: () => Promise<{ userId: string | null }>,
+  req: NextRequest
+): Promise<NextResponse | undefined> {
   if (!publicRoutes(req)) {
     const { userId } = await auth();
     if (!userId) {
@@ -161,6 +166,33 @@ const middleware = async (auth: () => Promise<{ userId: string | null }>, req: N
       signInUrl.searchParams.set('redirect_url', req.url);
       return NextResponse.redirect(signInUrl);
     }
+  }
+  return undefined;
+}
+
+// Apply middleware
+const middleware = async (auth: () => Promise<{ userId: string | null }>, req: NextRequest) => {
+  const pathname = req.nextUrl.pathname;
+
+  // Fast path: Skip static files and images
+  if (isStaticFile(pathname)) {
+    return;
+  }
+
+  // If API request from mobile app, allow certain endpoints
+  if (isMobileApiRequest(req, pathname)) {
+    return;
+  }
+
+  // Create response and add headers
+  const response = NextResponse.next();
+  setSecurityHeaders(response.headers);
+  setCacheHeaders(response.headers, pathname);
+
+  // Handle authentication
+  const authRedirect = await handleAuth(auth, req);
+  if (authRedirect) {
+    return authRedirect;
   }
 
   return response;

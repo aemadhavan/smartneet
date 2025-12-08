@@ -25,9 +25,10 @@ import { ClerkProvider } from '@clerk/nextjs';
 
 interface ClientProvidersProps {
   children: ReactNode;
+  serverAuthState?: boolean;
 }
 
-export default function ClientProviders({ children }: ClientProvidersProps) {
+export default function ClientProviders({ children, serverAuthState }: ClientProvidersProps) {
   const pathname = usePathname();
 
   // Define routes that should NOT load Clerk for performance
@@ -39,9 +40,10 @@ export default function ClientProviders({ children }: ClientProvidersProps) {
     pathname?.startsWith('/chemistry') ||
     pathname?.startsWith('/physics');
 
-  // If we are on a performance-critical public route, skip ClerkProvider
-  // This significantly reduces TBT by avoiding the heavy Clerk JS bundle
-  if (isPerformanceRoute) {
+  // If we are on a performance-critical public route and user is NOT signed in, skip ClerkProvider
+  // This significantly reduces TBT by avoiding the heavy Clerk JS bundle for anonymous users
+  // However, if user IS signed in, we need to load Clerk so they can access UserButton/sign out
+  if (isPerformanceRoute && !serverAuthState) {
     return (
       <>
         <BfcacheHandler />
