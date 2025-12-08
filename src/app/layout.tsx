@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import Header from '@/components/layout/HeaderOptimized';
 import dynamic from 'next/dynamic';
 import ClientProviders from '@/components/ClientProviders';
+import { auth } from '@clerk/nextjs/server';
 
 const Footer = dynamic(() => import('@/components/layout/Footer'));
 import GoogleTagManager from '@/components/layout/GoogleTagManager';
@@ -85,12 +86,26 @@ export const metadata: Metadata = {
 /**
  * This is the main function that renders the root layout.
  * It takes the children as a prop and renders them within the layout.
+ * Uses server-side auth check to pass authentication state to Header component.
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: ReactNode;
 }) {
+  // Perform server-side auth check
+  // This is safe even on performance routes as it runs on the server (no client bundle impact)
+  // During build time (static generation), auth() may not be available, so we default to false
+  let isSignedIn = false;
+  try {
+    const { userId } = await auth();
+    isSignedIn = !!userId;
+  } catch {
+    // During static generation/build time, auth() is not available
+    // Default to not signed in - the actual auth state will be determined at runtime
+    isSignedIn = false;
+  }
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -101,8 +116,8 @@ export default function RootLayout({
         {process.env.NEXT_PUBLIC_DISABLE_ANALYTICS !== '1' && <GoogleTagManager />}
         <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WVBD7SRF" height="0" width="0" style={{ display: 'none', visibility: 'hidden' }}></iframe></noscript>
         {process.env.NODE_ENV === 'production' && <Analytics />}
-        <ClientProviders>
-          <Header />
+        <ClientProviders serverAuthState={isSignedIn}>
+          <Header serverAuthState={isSignedIn} />
           <main className="flex-1">{children}</main>
           <Footer />
           {process.env.NODE_ENV === 'production' && <SpeedInsights />}

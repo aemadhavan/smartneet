@@ -5,6 +5,16 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { memo } from 'react';
 import { SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
+import dynamic from 'next/dynamic';
+
+// Dynamically load UserButton for performance routes when user is signed in
+const DynamicUserButton = dynamic(
+  () => import('@clerk/nextjs').then(m => m.UserButton),
+  {
+    ssr: false,
+    loading: () => <div className="w-8 h-8 rounded-full bg-gray-200 animate-pulse" />
+  }
+);
 
 /**
  * Optimized NavLink using Next.js Link instead of custom router logic
@@ -38,9 +48,41 @@ NavLink.displayName = 'NavLink';
 /**
  * Memoized UserSection to prevent re-renders when navigation changes
  */
-const UserSection = memo(({ isPerformanceRoute }: { isPerformanceRoute: boolean }) => {
-  // On performance routes, Clerk is not loaded, so show simple sign-in links
+const UserSection = memo(({ isPerformanceRoute, serverAuthState }: { isPerformanceRoute: boolean; serverAuthState?: boolean }) => {
+  // On performance routes, Clerk is not loaded, so use server auth state
   if (isPerformanceRoute) {
+    // If user is signed in (from server check), show Dashboard, Practice links and UserButton
+    if (serverAuthState) {
+      return (
+        <div className="flex items-center space-x-4">
+          <Link
+            href="/dashboard"
+            className="px-4 py-2 text-sm text-indigo-600 hover:text-indigo-800 transition-colors font-medium"
+          >
+            Dashboard
+          </Link>
+          <Link
+            href="/practice"
+            className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Practice
+          </Link>
+          <DynamicUserButton
+            afterSignOutUrl={process.env.NEXT_PUBLIC_APP_URL || "https://smarterneet.com"}
+            appearance={{
+              elements: {
+                userButtonAvatarBox: "w-8 h-8",
+                userButtonTrigger: "focus:shadow-none"
+              }
+            }}
+            showName={false}
+            signInUrl="/sign-in"
+          />
+        </div>
+      );
+    }
+
+    // User is not signed in, show sign-in/sign-up links
     return (
       <div className="flex items-center space-x-4">
         <Link
@@ -102,8 +144,9 @@ UserSection.displayName = 'UserSection';
  * - Removed custom NavLink with useState (reduces re-renders)
  * - Memoized UserSection to prevent unnecessary re-renders
  * - Uses native Next.js Link with prefetch for better navigation
+ * - Accepts serverAuthState prop for performance routes (server-side auth check)
  */
-const Header = () => {
+const Header = ({ serverAuthState }: { serverAuthState?: boolean }) => {
   const pathname = usePathname();
 
   // Define performance routes (must match ClientProviders.tsx logic)
@@ -170,8 +213,8 @@ const Header = () => {
           </nav>
         )}
 
-        {/* Authentication - Pass isPerformanceRoute to UserSection */}
-        <UserSection isPerformanceRoute={isPerformanceRoute} />
+        {/* Authentication - Pass isPerformanceRoute and serverAuthState to UserSection */}
+        <UserSection isPerformanceRoute={isPerformanceRoute} serverAuthState={serverAuthState} />
       </div>
     </header>
   );
