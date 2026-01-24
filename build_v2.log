@@ -1,0 +1,33 @@
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+
+> smarterneet@0.1.0 build
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Γû▓ Next.js 16.1.4 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ clientTraceMetadata
+  ┬╖ optimizePackageImports
+
+ΓÜá The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Γ£ô Compiled successfully in 11.7s
+  Running next.config.js provided runAfterProductionCompile ...
+Γ£ô Completed runAfterProductionCompile in 456ms
+  Running TypeScript ...
+Failed to compile.
+
+./src/lib/cacheInvalidation.ts:22:5
+Type error: Expected 2 arguments, but got 1.
+
+  20 |     revalidatePath(`/subjects/${subjectId}`)
+  21 |     revalidatePath(`/api/subjects/${subjectId}`)
+> 22 |     revalidateTag(`subject-${subjectId}`)
+     |     ^
+  23 |   }
+  24 |   
+  25 |   /**
+Next.js build worker exited with code: 1 and signal: null

@@ -14,9 +14,10 @@ const stats = [
 export async function HeroServerContent() {
   return (
     <div className="lg:w-1/2 z-10">
-      <div className="inline-block mb-4 px-3 py-1 bg-white/10 rounded-full border border-white/20 text-sm">
-        <span className="mr-2 text-emerald-400">🧬</span>
-        <span className="font-medium">Biology & Chemistry Modules are now live!</span>
+      <div className="inline-block mb-4 px-4 py-2 bg-gradient-to-r from-emerald-500 to-yellow-500 rounded-full border-2 border-yellow-300 text-base md:text-lg shadow-lg shadow-emerald-500/50 animate-pulse">
+        <span className="mr-2 text-white">🎉</span>
+        <span className="font-bold" style={{ color: '#3A006F' }}>Free for First 999 Users Only!!!</span>
+        {/* <span className="font-medium">Biology & Chemistry Modules are now live!</span> */}
       </div>
 
       {/* Critical LCP Element - Rendered immediately on server */}

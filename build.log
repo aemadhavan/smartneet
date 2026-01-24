@@ -1,0 +1,170 @@
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+
+> smarterneet@0.1.0 build
+> next build
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+Γû▓ Next.js 16.1.4 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ clientTraceMetadata
+  ┬╖ optimizePackageImports
+
+ΓÜá The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+> Build error occurred
+Error: Turbopack build failed with 6 errors:
+./src/app/favicon.ico
+Processing image failed
+unable to decode image data
+
+Caused by:
+- Format error decoding Ico: The PNG is not in RGBA format!
+- The PNG is not in RGBA format!
+
+
+./node_modules/.pnpm/@clerk+nextjs@6.35.1_next@16.1.4_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_d5r5nytugiscrwq6pras2ci5ba/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.35.1_next@16.1.4_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_d5r5nytugiscrwq6pras2ci5ba/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.35.1_next@16.1.4_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_d5r5nytugiscrwq6pras2ci5ba/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.35.1_next@16.1.4_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_d5r5nytugiscrwq6pras2ci5ba/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+
+
+./src/components/ui/select.tsx:5:1
+Module not found: Can't resolve 'lucide-react/dist/esm/icons/check-icon'
+  3 | import * as React from "react"
+  4 | import * as SelectPrimitive from "@radix-ui/react-select"
+> 5 | import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | import { cn } from "@/lib/utils"
+  8 |
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/ui/select.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/ui/select.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/ui/select.tsx:5:1
+Module not found: Can't resolve 'lucide-react/dist/esm/icons/chevron-down-icon'
+  3 | import * as React from "react"
+  4 | import * as SelectPrimitive from "@radix-ui/react-select"
+> 5 | import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | import { cn } from "@/lib/utils"
+  8 |
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/ui/select.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/ui/select.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/ui/select.tsx:5:1
+Module not found: Can't resolve 'lucide-react/dist/esm/icons/chevron-up-icon'
+  3 | import * as React from "react"
+  4 | import * as SelectPrimitive from "@radix-ui/react-select"
+> 5 | import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | import { cn } from "@/lib/utils"
+  8 |
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/ui/select.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/ui/select.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+./src/components/ui/dialog.tsx:5:1
+Module not found: Can't resolve 'lucide-react/dist/esm/icons/x-icon'
+  3 | import * as React from "react"
+  4 | import * as DialogPrimitive from "@radix-ui/react-dialog"
+> 5 | import { XIcon } from "lucide-react"
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  6 |
+  7 | import { cn } from "@/lib/utils"
+  8 |
+
+
+
+Import traces:
+  Client Component Browser:
+    ./src/components/ui/dialog.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/EditQuestionModal.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component Browser]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/components/ui/dialog.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/EditQuestionModal.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Client Component SSR]
+    ./src/app/admin/biology/components/BiologyQuestionReview.tsx [Server Component]
+    ./src/app/admin/biology/questions/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found
+
+
+    at <unknown> (./src/components/ui/select.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/ui/select.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/ui/select.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)
+    at <unknown> (./src/components/ui/dialog.tsx:5:1)
+    at <unknown> (https://nextjs.org/docs/messages/module-not-found)

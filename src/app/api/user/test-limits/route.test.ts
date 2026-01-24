@@ -20,6 +20,7 @@ vi.mock('@/db', () => ({
     where: vi.fn(),
     limit: vi.fn(),
   },
+  withRetry: vi.fn((fn) => fn()),
 }));
 
 vi.mock('@/db/schema', () => ({
@@ -42,8 +43,8 @@ vi.mock('@/lib/cache', () => ({
 }));
 
 // Mock console.error and console.log to prevent noise during tests
-const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
+const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
 
 describe('GET /api/user/test-limits', () => {
   const userId = 'user_test_123';
@@ -382,7 +383,7 @@ describe('GET /api/user/test-limits', () => {
       where: vi.fn().mockReturnThis(),
       limit: vi.fn().mockResolvedValue([mockFreePlan]),
     }));
-    
+
     // Make cache.set throw an error, which causes the entire operation to go to the main catch block
     (cache.set as vi.Mock).mockRejectedValue(new Error('Cache write error'));
 
