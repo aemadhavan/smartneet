@@ -54,14 +54,14 @@ const nextConfig: NextConfig = {
   },
 
   // Modularize imports for better tree-shaking
-  modularizeImports: {
-    'lucide-react': {
-      transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
-    },
-    '@radix-ui/react-icons': {
-      transform: '@radix-ui/react-icons/dist/{{member}}',
-    },
-  },
+  // modularizeImports: {
+  //   'lucide-react': {
+  //     transform: 'lucide-react/dist/esm/icons/{{kebabCase member}}',
+  //   },
+  //   '@radix-ui/react-icons': {
+  //     transform: '@radix-ui/react-icons/dist/{{member}}',
+  //   },
+  // },
 
   webpack: (config, { dev, isServer }) => {
     // Mark require-in-the-middle as external on server to prevent Webpack bundling it

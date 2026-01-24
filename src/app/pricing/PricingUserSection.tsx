@@ -223,7 +223,7 @@ export default function PricingUserSection({ plans }: PricingUserSectionProps) {
                     ) : isFreePlan ? (
                       'Start Free'
                     ) : (
-                      'Select Plan'
+                      'Free access for the first 999 users'
                     )}
                   </button>
                 </div>

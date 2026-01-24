@@ -63,6 +63,7 @@ export const RedesignedHeroSection = () => {
             <div className="inline-block mb-4 px-3 py-1 bg-white/10 rounded-full border border-white/20 text-sm">
               <span className="mr-2 text-emerald-400">🧬</span>
               <span className="font-medium">Biology & Chemistry Modules are now live!</span>
+              <span className="font-medium">Biology & Chemistry Modules are now live!</span>
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-6 text-white">

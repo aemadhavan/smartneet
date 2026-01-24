@@ -1,0 +1,934 @@
+npm warn Unknown project config "public-hoist-pattern". This will stop working in the next major version of npm.
+
+> smarterneet@0.1.0 test
+> vitest src/app/api/user/test-limits/route.test.ts
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+
+[1m[44m DEV [49m[22m [34mv3.2.4 [39m[90mC:/Projects/smartneet[39m
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should force refresh and fetch from database if skipCache is true
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:20)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:145:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return default free plan data if no subscription found in DB
+[22m[39mNo subscription found for user user_test_123, using free plan
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return default free plan data if subscription found but plan not found
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:20)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:189:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a free plan user within limits
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:20)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:228:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a free plan user exceeding limits
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:20)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:271:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a premium plan user (unlimited)
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:20)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:311:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20 {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle database query timeout and return default free plan
+Database or timeout error: Error: Database operation timeout
+    at Function.<anonymous> (C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:327:29)
+    at Function.mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at Function.race (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:34)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:331:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle database query timeout and return default free plan
+[22m[39mNo subscription found for user user_test_123, using free plan
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle generic database errors and return default free plan
+Database or timeout error: Error: DB connection failed
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:345:76
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31) {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Unhandled error in test limits API: Error: Cache write error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:387:46
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle subscription with Date object for last_test_date
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31) {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache returning non-object response
+Invalid response format invalid-string-response
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle actual timeout scenario with setTimeout execution
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31) {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle canTake false with undefined reason (covering line 149 branch)
+Database or timeout error: Error: [vitest] No "withRetry" export is defined on the "@/db" mock. Did you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:284:17)
+    at Object.get (file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/chunks/execute.B7h3T_Hc.js:330:16)
+    at dbQueryPromise (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:102:31) {
+  codeFrame: 'vi\x1B[33m.\x1B[39m\x1B[34mmock\x1B[39m(\x1B[35mimport\x1B[39m(\x1B[32m"@/db"\x1B[39m)\x1B[33m,\x1B[39m \x1B[35masync\x1B[39m (importOriginal) \x1B[33m=>\x1B[39m {\n' +
+    '  \x1B[35mconst\x1B[39m actual \x1B[33m=\x1B[39m \x1B[35mawait\x1B[39m \x1B[34mimportOriginal\x1B[39m()\n' +
+    '  \x1B[35mreturn\x1B[39m {\n' +
+    '    \x1B[33m...\x1B[39mactual\x1B[33m,\x1B[39m\n' +
+    '    \x1B[90m// your mocked methods\x1B[39m\n' +
+    '  }\n' +
+    '})'
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle unhandled errors in the main try-catch block
+Unhandled error in test limits API: Error: Auth error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:510:13
+    at mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at spy (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:55:30)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:514:28
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+
+ [31mΓ¥»[39m src/app/api/user/test-limits/route.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m8 failed[39m[2m)[22m[33m 15797[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free access for unauthenticated users[32m 7[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return cached data if available[32m 3[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould force refresh and fetch from database if skipCache is true[39m[33m 325[2mms[22m[39m
+[31m     ΓåÆ expected 'error-default' to be 'database' // Object.is equality[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free plan data if no subscription found in DB[32m 2[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould return default free plan data if subscription found but plan not found[39m[33m 308[2mms[22m[39m
+[31m     ΓåÆ expected 'error-default' to be 'database' // Object.is equality[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user within limits[39m[33m 309[2mms[22m[39m
+[31m     ΓåÆ expected +0 to be 1 // Object.is equality[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user exceeding limits[39m[33m 310[2mms[22m[39m
+[31m     ΓåÆ expected true to be false // Object.is equality[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould return correct data for a premium plan user (unlimited)[39m[33m 311[2mms[22m[39m
+[31m     ΓåÆ expected false to be true // Object.is equality[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle database query timeout and return default free plan [33m 311[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle generic database errors and return default free plan [33m 311[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle cache set errors gracefully after fetching from DB [33m 310[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould handle subscription with Date object for last_test_date[39m[33m 314[2mms[22m[39m
+[31m     ΓåÆ expected null to be '2025-06-27T10:00:00.000Z' // Object.is equality[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle cache returning non-object response[32m 6[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould handle actual timeout scenario with setTimeout execution[39m[33m 12337[2mms[22m[39m
+[31m     ΓåÆ expected "error" to be called with arguments: [ 'Database or timeout error:', ΓÇª(1) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[2m    "Database or timeout error:",[22m
+[32m-   ObjectContaining {[90m
+[32m-     "message": "Database operation timeout",[90m
+[31m+   Error {[90m
+[31m+     "message": "[vitest] No \"withRetry\" export is defined on the \"@/db\" mock. Did you forget to return it from \"vi.mock\"?[90m
+[31m+ If you need to partially mock a module, you can use \"importOriginal\" helper inside:[90m
+[31m+ ",[90m
+[31m+     "codeFrame": "vi[33m.[31m[34mmock[31m([35mimport[31m([32m\"@/db\"[31m)[33m,[31m [35masync[31m (importOriginal) [33m=>[31m {[90m
+[31m+   [35mconst[31m actual [33m=[31m [35mawait[31m [34mimportOriginal[31m()[90m
+[31m+   [35mreturn[31m {[90m
+[31m+     [33m...[31mactual[33m,[31m[90m
+[31m+     [90m// your mocked methods[31m[90m
+[31m+   }[90m
+[31m+ })",[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould handle canTake false with undefined reason (covering line 149 branch)[39m[33m 317[2mms[22m[39m
+[31m     ΓåÆ expected true to be false // Object.is equality[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle unhandled errors in the main try-catch block [33m 311[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 8 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should force refresh and fetch from database if skipCache is true
+AssertionError: expected 'error-default' to be 'database' // Object.is equality
+
+Expected: "database"
+Received: "error-default"
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:148:25
+    146|     expect(response.status).toBe(200);
+    147|     const body = await response.json();
+    148|     expect(body.source).toBe('database'); // Source is actually 'databΓÇª
+       |                         ^
+    149|     expect(cache.get).not.toHaveBeenCalled(); // Cache.get should NOT ΓÇª
+    150|     expect(subscriptionService.getUserSubscription).toHaveBeenCalledTiΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return default free plan data if subscription found but plan not found
+AssertionError: expected 'error-default' to be 'database' // Object.is equality
+
+Expected: "database"
+Received: "error-default"
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:194:25
+    192|     expect(body.limitStatus.canTake).toBe(true);
+    193|     expect(body.subscription.planCode).toBe('free');
+    194|     expect(body.source).toBe('database');
+       |                         ^
+    195|     expect(consoleLogSpy).toHaveBeenCalledWith(
+    196|       `No plan found for subscription ${mockDbSubscription.subscriptioΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a free plan user within limits
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:232:40
+    230|     const body = await response.json();
+    231|     expect(body.limitStatus.canTake).toBe(true);
+    232|     expect(body.limitStatus.usedToday).toBe(1);
+       |                                        ^
+    233|     expect(body.limitStatus.limitPerDay).toBe(3);
+    234|     expect(body.limitStatus.remainingToday).toBe(2);
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a free plan user exceeding limits
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:274:38
+    272|     expect(response.status).toBe(200);
+    273|     const body = await response.json();
+    274|     expect(body.limitStatus.canTake).toBe(false);
+       |                                      ^
+    275|     expect(body.limitStatus.usedToday).toBe(3);
+    276|     expect(body.limitStatus.limitPerDay).toBe(3);
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should return correct data for a premium plan user (unlimited)
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:315:42
+    313|     const body = await response.json();
+    314|     expect(body.limitStatus.canTake).toBe(true);
+    315|     expect(body.limitStatus.isUnlimited).toBe(true);
+       |                                          ^
+    316|     expect(body.limitStatus.usedToday).toBe(10);
+    317|     expect(body.limitStatus.limitPerDay).toBe(null);
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[5/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle subscription with Date object for last_test_date
+AssertionError: expected null to be '2025-06-27T10:00:00.000Z' // Object.is equality
+
+- Expected: 
+"2025-06-27T10:00:00.000Z"
+
++ Received: 
+null
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:431:44
+    429|     const body = await response.json();
+    430|     expect(body.limitStatus.canTake).toBe(true);
+    431|     expect(body.subscription.lastTestDate).toBe(testDate.toISOString()ΓÇª
+       |                                            ^
+    432|     expect(body.source).toBe('database');
+    433|     // Should have covered the Date instanceof Date branch on line 134
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[6/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle actual timeout scenario with setTimeout execution
+AssertionError: expected "error" to be called with arguments: [ 'Database or timeout error:', ΓÇª(1) ]
+
+Received: 
+
+  1st error call:
+
+  [
+    "Database or timeout error:",
+-   ObjectContaining {
+-     "message": "Database operation timeout",
++   Error {
++     "message": "[vitest] No \"withRetry\" export is defined on the \"@/db\" mock. Did you forget to return it from \"vi.mock\"?
++ If you need to partially mock a module, you can use \"importOriginal\" helper inside:
++ ",
++     "codeFrame": "vi.mock(import(\"@/db\"), async (importOriginal) => {
++   const actual = await importOriginal()
++   return {
++     ...actual,
++     // your mocked methods
++   }
++ })",
+    },
+  ]
+
+
+Number of calls: 1
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:465:29
+    463|     expect(body.limitStatus.canTake).toBe(true);
+    464|     expect(body.subscription.planCode).toBe('free');
+    465|     expect(consoleErrorSpy).toHaveBeenCalledWith(
+       |                             ^
+    466|       'Database or timeout error:',
+    467|       expect.objectContaining({ message: 'Database operation timeout' ΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[7/8]ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle canTake false with undefined reason (covering line 149 branch)
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:502:38
+    500|     expect(response.status).toBe(200);
+    501|     const body = await response.json();
+    502|     expect(body.limitStatus.canTake).toBe(false);
+       |                                      ^
+    503|     expect(body.limitStatus.reason).toBe(null); // Should be null due ΓÇª
+    504|     expect(body.source).toBe('database');
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[8/8]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m8 failed[39m[22m[2m | [22m[1m[32m8 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 08:49:20
+[2m   Duration [22m 17.41s[2m (transform 307ms, setup 46ms, collect 168ms, tests 15.80s, environment 524ms, prepare 554ms)[22m
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/app/api/user/test-limits/route.test.ts [22m[34mx1 [34m[39m
+       [2m Filename pattern: [22m[34msrc/app/api/user/test-limits/route.test.ts[39m
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould force refresh and fetch from database if skipCache is true
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m0[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m3[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [1mnull[22m,
+  lastTestDateType: [32m'object'[39m,
+  planName: [32m'Free Plan'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return default free plan data if no subscription found in DB
+[22m[39mNo subscription found for user user_test_123, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return default free plan data if subscription found but plan not found
+[22m[39mNo plan found for subscription 1, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a free plan user within limits
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T21:50:55.187Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a free plan user exceeding limits
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m3[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m0[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mfalse[39m,
+  lastTestDate: [32m'2026-01-24T21:50:55.192Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a premium plan user (unlimited)
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m10[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m9007199254740991[39m,
+  isUnlimited: [33mtrue[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T21:50:55.196Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Premium'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle database query timeout and return default free plan
+Database or timeout error: Error: Database operation timeout
+    at Function.<anonymous> (C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:328:29)
+    at Function.mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at Function.race (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:34)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:332:22
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle database query timeout and return default free plan
+[22m[39mNo subscription found for user user_test_123, using free plan
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle generic database errors and return default free plan
+Database or timeout error: Error: DB connection failed
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:346:76
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle cache set errors gracefully after fetching from DB
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T21:50:55.823Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Database or timeout error: Error: Cache write error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:388:46
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Unhandled error in test limits API: Error: Cache write error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:388:46
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle subscription with Date object for last_test_date
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2025-06-27T10:00:00.000Z'[39m,
+  lastTestDateType: [32m'object'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache returning non-object response
+Invalid response format invalid-string-response
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle actual timeout scenario with setTimeout execution
+[22m[39mNo plan found for subscription 1, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle canTake false with undefined reason (covering line 149 branch)
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m3[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m0[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mfalse[39m,
+  lastTestDate: [32m'2026-01-24T21:51:08.163Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle unhandled errors in the main try-catch block
+Unhandled error in test limits API: Error: Auth error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:511:13
+    at mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at spy (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:55:30)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:515:28
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+
+ [31mΓ¥»[39m src/app/api/user/test-limits/route.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 13316[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free access for unauthenticated users[32m 15[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return cached data if available[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould force refresh and fetch from database if skipCache is true[32m 7[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free plan data if no subscription found in DB[32m 3[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free plan data if subscription found but plan not found[32m 3[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user within limits[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user exceeding limits[32m 5[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a premium plan user (unlimited)[32m 4[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle database query timeout and return default free plan [33m 313[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle generic database errors and return default free plan [33m 309[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle cache set errors gracefully after fetching from DB [33m 312[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle subscription with Date object for last_test_date[32m 2[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle cache returning non-object response[32m 1[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould handle actual timeout scenario with setTimeout execution[39m[33m 12025[2mms[22m[39m
+[31m     ΓåÆ expected 'database' to be 'error-default' // Object.is equality[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle canTake false with undefined reason (covering line 149 branch)[32m 2[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle unhandled errors in the main try-catch block [33m 304[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle actual timeout scenario with setTimeout execution
+AssertionError: expected 'database' to be 'error-default' // Object.is equality
+
+Expected: "error-default"
+Received: "database"
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:463:25
+    461|     expect(response.status).toBe(200);
+    462|     const body = await response.json();
+    463|     expect(body.source).toBe('error-default');
+       |                         ^
+    464|     expect(body.limitStatus.canTake).toBe(true);
+    465|     expect(body.subscription.planCode).toBe('free');
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m15 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 08:50:54
+[2m   Duration [22m 13.58s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2mpackage.json [22m[34mx2 [34m[39m
+       [2m Filename pattern: [22m[34msrc/app/api/user/test-limits/route.test.ts[39m
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould force refresh and fetch from database if skipCache is true
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m0[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m3[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [1mnull[22m,
+  lastTestDateType: [32m'object'[39m,
+  planName: [32m'Free Plan'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return default free plan data if no subscription found in DB
+[22m[39mNo subscription found for user user_test_123, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return default free plan data if subscription found but plan not found
+[22m[39mNo plan found for subscription 1, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a free plan user within limits
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T22:00:49.314Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a free plan user exceeding limits
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m3[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m0[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mfalse[39m,
+  lastTestDate: [32m'2026-01-24T22:00:49.320Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould return correct data for a premium plan user (unlimited)
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m10[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m9007199254740991[39m,
+  isUnlimited: [33mtrue[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T22:00:49.324Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Premium'[39m,
+  source: [32m'database'[39m
+}
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle database query timeout and return default free plan
+[22m[39mNo subscription found for user user_test_123, using free plan
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle database query timeout and return default free plan
+Database or timeout error: Error: Database operation timeout
+    at Function.<anonymous> (C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:328:29)
+    at Function.mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at Function.race (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:164:34)
+    at processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:332:22
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:20
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle generic database errors and return default free plan
+Database or timeout error: Error: DB connection failed
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:346:76
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle cache set errors gracefully after fetching from DB
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2026-01-24T22:00:49.959Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Database or timeout error: Error: Cache write error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:388:46
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache set errors gracefully after fetching from DB
+Unhandled error in test limits API: Error: Cache write error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:388:46
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runFiles (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1787:3)
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle subscription with Date object for last_test_date
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m1[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m2[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mtrue[39m,
+  lastTestDate: [32m'2025-06-27T10:00:00.000Z'[39m,
+  lastTestDateType: [32m'object'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle cache returning non-object response
+Invalid response format invalid-string-response
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle actual timeout scenario with setTimeout execution
+[22m[39mNo plan found for subscription 1, using free plan
+
+[90mstdout[2m | src/app/api/user/test-limits/route.test.ts[2m > [22m[2mGET /api/user/test-limits[2m > [22m[2mshould handle canTake false with undefined reason (covering line 149 branch)
+[22m[39m[DEBUG] Test limits calculation for user user_test_123: {
+  testsUsedToday: [33m3[39m,
+  limitPerDay: [33m3[39m,
+  remainingToday: [33m0[39m,
+  isUnlimited: [33mfalse[39m,
+  canTake: [33mfalse[39m,
+  lastTestDate: [32m'2026-01-24T22:01:02.316Z'[39m,
+  lastTestDateType: [32m'string'[39m,
+  planName: [32m'Basic'[39m,
+  source: [32m'database'[39m
+}
+
+stderr | src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle unhandled errors in the main try-catch block
+Unhandled error in test limits API: Error: Auth error
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:511:13
+    at mockCall (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+spy@3.2.4/node_modules/@vitest/spy/dist/index.js:96:15)
+    at spy (file:///C:/Projects/smartneet/node_modules/.pnpm/tinyspy@4.0.4/node_modules/tinyspy/dist/index.js:47:80)
+    at Module.GET (C:\Projects\smartneet\src\app\api\user\test-limits\route.ts:55:30)
+    at C:\Projects\smartneet\src\app\api\user\test-limits\route.test.ts:515:28
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///C:/Projects/smartneet/node_modules/.pnpm/@vitest+runner@3.2.4/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+
+ [31mΓ¥»[39m src/app/api/user/test-limits/route.test.ts [2m([22m[2m16 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 13349[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free access for unauthenticated users[32m 8[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return cached data if available[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould force refresh and fetch from database if skipCache is true[32m 6[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free plan data if no subscription found in DB[32m 3[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return default free plan data if subscription found but plan not found[32m 3[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user within limits[32m 6[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a free plan user exceeding limits[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould return correct data for a premium plan user (unlimited)[32m 4[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle database query timeout and return default free plan [33m 324[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle generic database errors and return default free plan [33m 306[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle cache set errors gracefully after fetching from DB [33m 312[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle subscription with Date object for last_test_date[32m 4[2mms[22m[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle cache returning non-object response[32m 3[2mms[22m[39m
+[31m   [31m├ù[31m GET /api/user/test-limits[2m > [22mshould handle actual timeout scenario with setTimeout execution[39m[33m 12037[2mms[22m[39m
+[31m     ΓåÆ expected 'database' to be 'error-default' // Object.is equality[39m
+   [32mΓ£ô[39m GET /api/user/test-limits[2m > [22mshould handle canTake false with undefined reason (covering line 149 branch)[32m 7[2mms[22m[39m
+   [33m[2mΓ£ô[22m[39m GET /api/user/test-limits[2m > [22mshould handle unhandled errors in the main try-catch block [33m 314[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  src/app/api/user/test-limits/route.test.ts > GET /api/user/test-limits > should handle actual timeout scenario with setTimeout execution
+AssertionError: expected 'database' to be 'error-default' // Object.is equality
+
+Expected: "error-default"
+Received: "database"
+
+ Γ¥» src/app/api/user/test-limits/route.test.ts:463:25
+    461|     expect(response.status).toBe(200);
+    462|     const body = await response.json();
+    463|     expect(body.source).toBe('error-default');
+       |                         ^
+    464|     expect(body.limitStatus.canTake).toBe(true);
+    465|     expect(body.subscription.planCode).toBe('free');
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m15 passed[39m[22m[90m (16)[39m
+[2m   Start at [22m 09:00:46
+[2m   Duration [22m 13.63s
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2mpackage.json [22m[34mx3 [34m[39m
+       [2m Filename pattern: [22m[34msrc/app/api/user/test-limits/route.test.ts[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Unhandled Errors ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Unhandled Error ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+Error: Cannot find module 'C:\Projects\smartneet\node_modules\.pnpm\vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori\node_modules\vitest\dist\workers\forks.js' imported from C:\Projects\smartneet\node_modules\.pnpm\vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori\node_modules\vitest\dist\worker.js
+ Γ¥» finalizeResolution node:internal/modules/esm/resolve:283:11
+ Γ¥» moduleResolve node:internal/modules/esm/resolve:952:10
+ Γ¥» defaultResolve node:internal/modules/esm/resolve:1188:11
+ Γ¥» ModuleLoader.defaultResolve node:internal/modules/esm/loader:642:12
+ Γ¥» #cachedDefaultResolve node:internal/modules/esm/loader:591:25
+ Γ¥» ModuleLoader.resolve node:internal/modules/esm/loader:574:38
+ Γ¥» ModuleLoader.getModuleJobForImport node:internal/modules/esm/loader:236:38
+ Γ¥» ModuleLoader.import node:internal/modules/esm/loader:539:34
+ Γ¥» defaultImportModuleDynamicallyForModule node:internal/modules/esm/utils:215:31
+ Γ¥» importModuleDynamicallyCallback node:internal/modules/esm/utils:254:12
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+Serialized Error: { code: 'ERR_MODULE_NOT_FOUND', url: 'file:///C:/Projects/smartneet/node_modules/.pnpm/vitest@3.2.4_@types+debug@4.1.12_@types+node@20.19.25_@vitest+ui@3.2.4_jiti@2.6.1_jsdom@26.1._s74wlqy3chp4n3ckjikeg4aori/node_modules/vitest/dist/workers/forks.js' }
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+[2m Test Files [22m [90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 09:05:10
+[2m   Duration [22m 0ms
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+
+node:internal/modules/cjs/loader:1215
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\Projects\smartneet\node_modules\.pnpm\tinypool@1.1.1\node_modules\tinypool\dist\entry\process.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1212:15)
+    at Module._load (node:internal/modules/cjs/loader:1043:27)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+    at node:internal/main/run_main_module:28:49 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v20.19.2
+The system cannot find the path specified.
