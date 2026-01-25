@@ -6,34 +6,16 @@ $ next build
   ┬╖ optimizePackageImports
 
   Creating an optimized production build ...
-Γ£ô Compiled successfully in 11.4s
+Γ£ô Compiled successfully in 11.6s
   Running next.config.js provided runAfterProductionCompile ...
-Γ£ô Completed runAfterProductionCompile in 559ms
+Γ£ô Completed runAfterProductionCompile in 557ms
   Running TypeScript ...
   Collecting page data using 11 workers ...
   Generating static pages using 11 workers (0/86) ...
-(node:10328) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
-In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
-
-To prepare for this change:
-- If you want the current behavior, explicitly use 'sslmode=verify-full'
-- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
-
-See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
-(Use `node --trace-warnings ...` to show where the warning was created)
   Generating static pages using 11 workers (21/86) 
-(node:25268) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
-In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
-
-To prepare for this change:
-- If you want the current behavior, explicitly use 'sslmode=verify-full'
-- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
-
-See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
-(Use `node --trace-warnings ...` to show where the warning was created)
   Generating static pages using 11 workers (42/86) 
   Generating static pages using 11 workers (64/86) 
-Γ£ô Generating static pages using 11 workers (86/86) in 3.5s
+Γ£ô Generating static pages using 11 workers (86/86) in 3.2s
   Finalizing page optimization ...
 
 Route (app)                                      Revalidate  Expire

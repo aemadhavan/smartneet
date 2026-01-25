@@ -22,10 +22,8 @@ function getPool() {
   if (!poolInstance) {
     // Configure the pool with limits appropriate for serverless environment
     poolInstance = new Pool({
-      connectionString: process.env.XATA_DATABASE_URL,
-      ssl: {
-        rejectUnauthorized: false // This might be needed for Xata connections
-      },
+      connectionString: process.env.XATA_DATABASE_URL?.replace('sslmode=require', 'sslmode=verify-full'),
+      ssl: true,
       max: 5, // Reduced for serverless - prevents connection exhaustion
       min: 0, // No persistent connections - better for serverless cold starts
       idleTimeoutMillis: 30000, // Release idle connections sooner to prevent stale connections
@@ -54,14 +52,14 @@ export const db = drizzle(pool, { schema });  // Pass schema here
 // Add a helper function for retrying operations with backoff
 export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
   let lastError: DatabaseError | null = null;
-  
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error: unknown) {
       // Cast error to DatabaseError type to check for code property
       const dbError = error as DatabaseError;
-      
+
       // Retry for database connection errors
       const errorMessage = dbError.message || String(error);
       const isRetryableError =
@@ -79,7 +77,7 @@ export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3):
         errorMessage.includes('too many connections') ||
         errorMessage.includes('connection failed') ||
         errorMessage.includes('ECONNRESET');
-        
+
       if (isRetryableError) {
         lastError = dbError;
         // Exponential backoff: 1s, 2s, 4s, ...
@@ -92,7 +90,7 @@ export async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3):
       }
     }
   }
-  
+
   // If we get here, all retries failed
   throw lastError || new Error('Operation failed after maximum retries');
 }
