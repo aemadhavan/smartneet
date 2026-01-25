@@ -172,6 +172,7 @@ const nextConfig: NextConfig = {
               minChunks: 2,
               priority: -20,
               reuseExistingChunk: true,
+
             },
             common: {
               name: 'common',
@@ -279,12 +280,16 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-  disableLogger: true,
-  automaticVercelMonitors: true,
   sourcemaps: {
     disable: false,
     deleteSourcemapsAfterUpload: true,
   },
-  autoInstrumentServerFunctions: false,
-  autoInstrumentMiddleware: false,
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    automaticVercelMonitors: true,
+    autoInstrumentServerFunctions: false,
+    autoInstrumentMiddleware: false,
+  },
 });

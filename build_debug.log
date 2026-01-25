@@ -1,0 +1,26 @@
+$ next build
+Γû▓ Next.js 16.1.4 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  ┬╖ clientTraceMetadata
+  ┬╖ optimizePackageImports
+
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 12.1s
+  Running next.config.js provided runAfterProductionCompile ...
+Γ£ô Completed runAfterProductionCompile in 579ms
+  Running TypeScript ...
+Failed to compile.
+
+./next.config.ts:175:15
+Type error: An object literal cannot have multiple properties with the same name.
+
+  173 |               priority: -20,
+  174 |               reuseExistingChunk: true,
+> 175 |               reuseExistingChunk: true,
+      |               ^
+  176 |             },
+  177 |             common: {
+  178 |               name: 'common',
+Next.js build worker exited with code: 1 and signal: null
+error: script "build" exited with code 1
